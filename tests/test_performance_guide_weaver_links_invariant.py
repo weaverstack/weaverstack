@@ -50,9 +50,10 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
     ) in page
     assert "/features/#data-engineering" in parser.links
     assert "/features/#scale" in parser.links
+    assert "/features/#visibility" in parser.links
     assert "4. Implementing these techniques in your own environment" in page
     assert BOOKMARKS in parser.links
-    assert LIVE_DASHBOARD in parser.links
+    assert LIVE_DASHBOARD not in parser.links
     assert any(
         iframe.get("src") == DASHBOARD_DEMO
         and iframe.get("loading") == "lazy"
@@ -66,6 +67,13 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
     assert '<script type="text/plain" id="wd-data">' in snapshot
     for name in ("StressCatalogue", "StressLake", "StressCore", "StressMart"):
         assert name in snapshot
+
+    bookmark_section = page.split('<h3 id="bookmark-design">', 1)[1].split(
+        '<h2 id="performance-measurements">', 1
+    )[0]
+    assert bookmark_section.index(
+        "Late or backdated source records"
+    ) < bookmark_section.index(BOOKMARKS)
 
 
 @weaver_test()

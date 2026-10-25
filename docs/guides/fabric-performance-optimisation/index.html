@@ -102,7 +102,7 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 .process-steps small { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 450; line-height: 1.35; }
 .process-figure figcaption { margin-top: 13px; color: var(--muted); font-size: 13px; }
 .dashboard-guide-demo { margin: 30px 0 42px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow); }
-.dashboard-guide-demo iframe { display: block; width: 100%; height: clamp(440px, 64vw, 620px); border: 0; background: var(--white); }
+.dashboard-guide-demo iframe { display: block; width: 100%; height: clamp(700px, 72vw, 820px); border: 0; background: var(--white); }
 .dashboard-guide-demo figcaption { padding: 14px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .strategy-figure { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 26px 0 42px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
 .strategy-figure div { padding: 18px; background: var(--paper); }
@@ -119,7 +119,7 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 .evidence-layers span { color: var(--ink-soft); font-size: 13px; }
 .evidence-layers small { color: var(--muted); font-size: 12px; }
 @media (max-width: 900px) { .article-layout { grid-template-columns: 1fr; } .article-nav { position: static; order: -1; } }
-@media (max-width: 640px) { .facts-figure { grid-template-columns: repeat(2, 1fr); } .facts-figure div { padding: 12px; border-left: 0; border-top: 1px solid var(--line); } .facts-figure div:nth-child(-n+2) { border-top: 0; } .process-steps { grid-template-columns: repeat(2, 1fr); } .strategy-figure { grid-template-columns: 1fr; } .implementation-steps li { grid-template-columns: 1fr; gap: 7px; } .evidence-layers > div { grid-template-columns: 1fr; gap: 4px; } }
+@media (max-width: 640px) { .facts-figure { grid-template-columns: repeat(2, 1fr); } .facts-figure div { padding: 12px; border-left: 0; border-top: 1px solid var(--line); } .facts-figure div:nth-child(-n+2) { border-top: 0; } .process-steps { grid-template-columns: repeat(2, 1fr); } .strategy-figure { grid-template-columns: 1fr; } .implementation-steps li { grid-template-columns: 1fr; gap: 7px; } .evidence-layers > div { grid-template-columns: 1fr; gap: 4px; } .dashboard-guide-demo iframe { height: 980px; } }
 @media (max-width: 560px) { .result-chart-row { grid-template-columns: 78px minmax(110px, 1fr) 70px; gap: 9px; } .telemetry-row { grid-template-columns: 108px minmax(90px, 1fr) 76px; gap: 8px; } }
 </style>
 </head>
@@ -165,10 +165,10 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <figcaption>Additional dependencies create fan-in across one DAG. Some transformations declare up to ten extra prerequisites.</figcaption>
 </figure>
 <p>The extra dependencies model scheduling pressure rather than expensive analytical joins. Source generation and daily source changes were kept outside the measured estate-load interval.</p>
-<p>The estate can be visualised with the dependency graph in Weaver’s <a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/">Catalogue Dashboard</a>. This DAG view is included in the standard dashboard; the interactive example below uses a smaller generated estate.</p>
+<p>The measured estate is visualised below in the real Stress Dashboard: the Orchestration DAG built from StressCatalogue.</p>
 <figure class="dashboard-guide-demo">
-<iframe src="https://docs.weaverstack.dev/assets/catalogue-dashboard/orchestration.html" title="Interactive Weaver Catalogue Dashboard dependency graph" loading="lazy"></iframe>
-<figcaption>This is the Catalogue Dashboard’s own interactive DAG view. <a href="https://docs.weaverstack.dev/assets/catalogue-dashboard/orchestration.html" target="_blank" rel="noopener">Open it full size</a> or <a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#orchestration">learn how to explore the graph</a>.</figcaption>
+<iframe src="/assets/stress-dashboard/orchestration.html" title="The real Stress Dashboard Orchestration DAG" loading="lazy"></iframe>
+<figcaption>The real Stress Dashboard, populated from StressCatalogue and captured on 25 October 2026. <a href="/assets/stress-dashboard/orchestration.html" target="_blank" rel="noopener">Open this snapshot full size</a> or <a href="https://app.fabric.microsoft.com/groups/bc690e88-80e3-4e97-8184-f919b46b91cf/reports/6562a0f5-774c-4b1a-9713-579cb84e52fb/orchestration?experience=fabric-developer" target="_blank" rel="noopener">open the live report in Fabric</a>.</figcaption>
 </figure>
 <h3 id="scope-and-exclusions">1.3 Scope and exclusions</h3>
 <p>The experiment isolates data movement, incremental reconciliation, validation, operational state and orchestration. It does not cover complex analytical joins, interactive query performance, Power BI rendering, theoretical maximum throughput or comparisons between Fabric SKUs.</p>

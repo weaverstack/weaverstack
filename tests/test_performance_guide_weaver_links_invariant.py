@@ -10,8 +10,13 @@ from support.weaver_test import weaver_test
 ROOT = Path(__file__).resolve().parents[1]
 GUIDE = ROOT / "docs/guides/fabric-performance-optimisation/index.html"
 FEATURES = ROOT / "docs/features/index.html"
-DASHBOARD_DEMO = (
-    "https://docs.weaverstack.dev/assets/catalogue-dashboard/orchestration.html"
+DASHBOARD_DEMO = "/assets/stress-dashboard/orchestration.html"
+SNAPSHOT = ROOT / "docs" / DASHBOARD_DEMO.removeprefix("/")
+LIVE_DASHBOARD = (
+    "https://app.fabric.microsoft.com/groups/"
+    "bc690e88-80e3-4e97-8184-f919b46b91cf/reports/"
+    "6562a0f5-774c-4b1a-9713-579cb84e52fb/orchestration"
+    "?experience=fabric-developer"
 )
 BOOKMARKS = (
     "https://docs.weaverstack.dev/advanced/incremental-data-processing/"
@@ -47,13 +52,20 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
     assert "/features/#scale" in parser.links
     assert "4. Implementing these techniques in your own environment" in page
     assert BOOKMARKS in parser.links
-    assert "https://docs.weaverstack.dev/estate/catalogue-dashboard/" in parser.links
+    assert LIVE_DASHBOARD in parser.links
     assert any(
         iframe.get("src") == DASHBOARD_DEMO
         and iframe.get("loading") == "lazy"
         and iframe.get("title")
         for iframe in parser.iframes
     )
+
+    snapshot = SNAPSHOT.read_text(encoding="utf-8")
+    assert len(snapshot) > 1_000_000
+    assert f'content="{LIVE_DASHBOARD}"' in snapshot
+    assert '<script type="text/plain" id="wd-data">' in snapshot
+    for name in ("StressCatalogue", "StressLake", "StressCore", "StressMart"):
+        assert name in snapshot
 
 
 @weaver_test()

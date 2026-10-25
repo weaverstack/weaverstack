@@ -208,6 +208,15 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <p>Using the maximum timestamp in a target table as that cursor is fragile. It cannot describe several upstream sources, filtered changes may never reach the target, and calculating the maximum can scan a large table.</p>
 <p>The benchmark stores one bookmark per loadable object. It records the instant immediately before the last clean load began and advances only after success. Changes that arrive during a load remain eligible next time.</p>
 <p>Late or backdated source records still need source-specific handling, such as an overlap window or change-data-capture sequence. Some generated transformations use a target Epoch maximum, so the benchmark contains both patterns.</p>
+<h2 id="implementing-these-techniques-in-your-own-environment">These capabilities are part of Weaver</h2>
+<p><a href="/features/#scale">Weaver includes these techniques</a>. You choose the concurrency limits for your site; Weaver handles dependency scheduling, asynchronous execution, endpoint barriers, incremental bookmarks, reconciliation and operational recording.</p>
+<p>The practical choices are:</p>
+<ol class="implementation-steps">
+<li><strong>Schedule from dependencies.</strong><span>Keep the graph as queryable metadata. Release work when prerequisites clear, with separate resource limits for Spark and each Warehouse.</span></li>
+<li><strong>Treat incremental state as infrastructure.</strong><span>Give every loadable object reliable change detection, an explicit bookmark, validation, reconciliation and an operational record.</span></li>
+<li><strong>Implement the contract for each engine.</strong><span>Keep one load contract, but use the physical strategy that suits Python, Spark SQL or Warehouse T-SQL.</span></li>
+</ol>
+<p>See <a href="/how-it-works/">how Weaver works</a>, then use the documentation for <a href="https://docs.weaverstack.dev/estate/concurrency/">concurrency</a> and <a href="https://docs.weaverstack.dev/advanced/incremental-data-processing/">incremental processing and bookmarks</a>.</p>
 <h2 id="performance-measurements">3. Performance measurements</h2>
 <p>End-to-end wall time is the headline metric. Row counts, execution outcomes and node-duration distributions provide the correctness and tail checks.</p>
 <div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Scenario</th><th scope="col">Duration</th><th scope="col">Rows changed</th></tr></thead><tbody><tr><td>Initial load from empty</td><td>54 minutes 44 seconds</td><td>4,045,265,040</td></tr><tr><td>Unchanged load</td><td>8 minutes 19 seconds</td><td>0</td></tr><tr><td>Day 1 incremental</td><td>17 minutes 29 seconds</td><td>7,821,922</td></tr><tr><td>Day 2 incremental</td><td>17 minutes 35 seconds</td><td>7,719,640</td></tr><tr><td>Day 3 incremental</td><td>17 minutes 14 seconds</td><td>7,552,602</td></tr><tr><td>Untuned implementation</td><td>More than 20 hours</td><td>Retrospective estimate, not directly measured</td></tr></tbody></table></div>
@@ -251,26 +260,17 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <h3 id="interpretation">3.3 Interpretation</h3>
 <p>The tested workload completed its initial load in under 55 minutes and incremental loads in under 18 minutes on F64.</p>
 <p>This is evidence for this class of engineering workload, not a general Fabric benchmark. The transformations were deliberately simple, the estate was synthetic and the untuned estimate was not a controlled before-and-after measurement.</p>
-<h2 id="implementing-these-techniques-in-your-own-environment">4. These capabilities are part of Weaver</h2>
-<p><a href="/features/#scale">Weaver includes these techniques</a>. You choose the concurrency limits for your site; Weaver handles dependency scheduling, asynchronous execution, endpoint barriers, incremental bookmarks, reconciliation and operational recording.</p>
-<p>The practical choices are:</p>
-<ol class="implementation-steps">
-<li><strong>Schedule from dependencies.</strong><span>Keep the graph as queryable metadata. Release work when prerequisites clear, with separate resource limits for Spark and each Warehouse.</span></li>
-<li><strong>Treat incremental state as infrastructure.</strong><span>Give every loadable object reliable change detection, an explicit bookmark, validation, reconciliation and an operational record.</span></li>
-<li><strong>Implement the contract for each engine.</strong><span>Keep one load contract, but use the physical strategy that suits Python, Spark SQL or Warehouse T-SQL.</span></li>
-</ol>
-<p>See <a href="/how-it-works/">how Weaver works</a>, then use the documentation for <a href="https://docs.weaverstack.dev/estate/concurrency/">concurrency</a> and <a href="https://docs.weaverstack.dev/advanced/incremental-data-processing/">incremental processing and bookmarks</a>.</p>
 <h2 id="reproducing-the-experiment">Reproducing the experiment</h2>
 <p>The public stress-test generator creates the source estate, measured estate and deterministic daily changes. The runner records each build, load and test in machine-readable form.</p>
 <p>The same workflow can run at a smaller scale, such as 300 objects and 1% of the data volume.</p>
-<h2 id="conclusion">5. Conclusion</h2>
+<h2 id="conclusion">4. Conclusion</h2>
 <p>Microsoft Fabric completed the 3,000-object initial load in 54 minutes 44 seconds and the three measured incremental loads in 17 minutes 14 seconds to 17 minutes 35 seconds.</p>
 <p>The result came from the loading architecture: separate execution lanes, explicit endpoint barriers, engine-specific reconciliation and a cheap no-change path. At this scale, orchestration and operational overhead matter as much as row volume.</p>
 <h2 id="the-implementation-weaver">Explore Weaver</h2>
 <p>Weaver is the open-source framework used to run this experiment. Metadata declarations sit alongside ordinary Python and SQL transformations while Weaver manages dependencies, incremental loading, auditing, rejection policy, bookmarks and concurrent execution.</p>
 <p><a href="/features/">Explore Weaver’s features</a>, <a href="/get-started/">build a small project</a> or inspect the benchmark generator, methodology and runner in the <a href="https://github.com/weaverstack/weaverstack/tree/main/examples/stress">public source code</a>.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Introduction</a></li><li><a href="#experimental-design">Experimental design</a></li><li><a href="#performance-engineering-strategy">Performance engineering in Weaver</a></li><li><a href="#performance-measurements">Performance measurements</a></li><li><a href="#implementing-these-techniques-in-your-own-environment">These capabilities are part of Weaver</a></li><li><a href="#reproducing-the-experiment">Reproducing the experiment</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#the-implementation-weaver">Explore Weaver</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Introduction</a></li><li><a href="#experimental-design">Experimental design</a></li><li><a href="#performance-engineering-strategy">Performance engineering in Weaver</a></li><li><a href="#implementing-these-techniques-in-your-own-environment">These capabilities are part of Weaver</a></li><li><a href="#performance-measurements">Performance measurements</a></li><li><a href="#reproducing-the-experiment">Reproducing the experiment</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#the-implementation-weaver">Explore Weaver</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

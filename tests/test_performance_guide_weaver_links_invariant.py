@@ -40,6 +40,9 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
     assert "These data engineering capabilities are included in" in page
     assert "/features/#data-engineering" in parser.links
     assert "/features/#scale" in parser.links
+    assert page.index(
+        'id="implementing-these-techniques-in-your-own-environment"'
+    ) < page.index('id="performance-measurements"')
     assert BOOKMARKS in parser.links
     assert "https://docs.weaverstack.dev/estate/catalogue-dashboard/" in parser.links
     assert any(

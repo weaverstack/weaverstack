@@ -10,7 +10,9 @@ from support.weaver_test import weaver_test
 ROOT = Path(__file__).resolve().parents[1]
 GUIDE = ROOT / "docs/guides/fabric-performance-optimisation/index.html"
 FEATURES = ROOT / "docs/features/index.html"
-DASHBOARD_DEMO = "https://docs.weaverstack.dev/assets/catalogue-dashboard/overview.html"
+DASHBOARD_DEMO = (
+    "https://docs.weaverstack.dev/assets/catalogue-dashboard/orchestration.html"
+)
 BOOKMARKS = (
     "https://docs.weaverstack.dev/advanced/incremental-data-processing/"
     "#bookmarks-separate-processing-state-from-source-data"
@@ -37,12 +39,13 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
     parser = GuideLinks()
     parser.feed(page)
 
-    assert "These data engineering capabilities are included in" in page
+    assert (
+        "CRUD statistics, bookmarks and execution logging. These capabilities are "
+        'part of <a href="/features/#data-engineering">Weaver</a>'
+    ) in page
     assert "/features/#data-engineering" in parser.links
     assert "/features/#scale" in parser.links
-    assert page.index(
-        'id="implementing-these-techniques-in-your-own-environment"'
-    ) < page.index('id="performance-measurements"')
+    assert "4. Implementing these techniques in your own environment" in page
     assert BOOKMARKS in parser.links
     assert "https://docs.weaverstack.dev/estate/catalogue-dashboard/" in parser.links
     assert any(

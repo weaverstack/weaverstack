@@ -154,7 +154,7 @@
 <section class="section" id="project-at-a-glance">
 <div class="wrap">
 <h2>What a Weaver project looks like</h2>
-<p>Use the Python, SQL and Power BI files you already know. The Parcel delivery example below combines a Lakehouse, Warehouse, semantic model and Report.</p>
+<p>Use the Python, SQL and Power BI files you already know. The Parcel delivery example connects a Lakehouse, Warehouse, semantic model and Report in one DAG.</p>
 <div class="project-glance">
 <div class="code plain">
 <div class="code-bar"><span>Parcel example project</span></div>
@@ -176,7 +176,7 @@
     └── <span class="c-key">Parcel.Report/</span></pre>
 </div>
 <figure aria-labelledby="product-project-flow">
-<h3 id="product-project-flow">How the parts of your Fabric project connect</h3>
+<h3 id="product-project-flow">Different Fabric objects, one DAG.</h3>
 <div class="project-diagram-scroll" tabindex="0" role="region" aria-label="Illustrative Fabric project; scroll horizontally on narrow screens">
 <svg class="parcel-diagram" viewBox="0 0 960 340" role="img" aria-labelledby="product-project-flow parcel-product-desc">
 <desc id="parcel-product-desc">An illustrative project: Python files and Tables in a Lakehouse feed Warehouse SQL through a Shortcut, then a native semantic model and Report. A Spark SQL transformation branches from the Lakehouse Table.</desc>
@@ -203,10 +203,10 @@
 </g>
 <path class="parcel-edge" data-project-edge="folder|event" d="M116 164 H132" marker-end="url(#parcel-product-arrow)"/>
 <path class="parcel-edge" data-project-edge="event|current" d="M232 164 H240 V108 H248" marker-end="url(#parcel-product-arrow)"/>
-<path class="parcel-edge" data-project-edge="event|shortcut" d="M232 164 H386" marker-end="url(#parcel-product-arrow)"/>
+<path class="parcel-edge" data-project-edge="event|shortcut" data-boundary="Lakehouse:Warehouse" d="M232 164 H386" marker-end="url(#parcel-product-arrow)"/>
 <path class="parcel-edge" data-project-edge="shortcut|consumer" d="M498 164 H514" marker-end="url(#parcel-product-arrow)"/>
 <path class="parcel-edge" data-project-edge="consumer|model" d="M626 164 H666" marker-end="url(#parcel-product-arrow)"/>
-<path class="parcel-edge parcel-binding" data-project-binding="model|report" d="M778 164 H821" marker-end="url(#parcel-product-arrow)"/>
+<path class="parcel-edge parcel-binding" data-project-edge="model|report" data-project-binding="model|report" d="M778 164 H821" marker-end="url(#parcel-product-arrow)"/>
 <g class="parcel-node parcel-file" data-project-node="folder" data-logical-id="Lakehouse/Landing/Files/Parcel.Events">
 <rect x="16" y="132" width="100" height="76" rx="8"/>
 <text class="parcel-node-title" style="font-size:18px" x="66.0" y="156">Events</text>
@@ -250,6 +250,7 @@
 </g>
 </svg>
 </div>
+<figcaption>Python, Spark SQL, T-SQL, a semantic model and a Report are different Fabric objects in one dependency graph.</figcaption>
 </figure>
 </div>
 </div>

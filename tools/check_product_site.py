@@ -383,26 +383,38 @@ def run(root: Path, developer_site: Path | None):
         assert list(node.descendants("figcaption")), (
             "Spotlight lacks an accessible explanation"
         )
-    diagram = one(with_class(spotlights[0], "fabric-dag"), "single Fabric graph")
+    diagram = one(
+        with_class(spotlights[0], "project-diagram-scroll"), "single Fabric graph"
+    )
     nodes = [
-        n.attrs["data-dag-node"]
+        n.attrs["data-project-node"]
         for n in diagram.descendants()
-        if "data-dag-node" in n.attrs
+        if "data-project-node" in n.attrs
     ]
     assert nodes == [
         "folder",
-        "python-table",
-        "spark-table",
-        "warehouse-table",
-        "model-refresh",
+        "event",
+        "current",
+        "shortcut",
+        "consumer",
+        "model",
+        "report",
     ], "Graph topology missing or reordered"
     edges = {
-        n.attrs["data-dag-edge"]
+        n.attrs["data-project-edge"]
         for n in diagram.descendants()
-        if "data-dag-edge" in n.attrs
+        if "data-project-edge" in n.attrs
     }
-    assert edges == {f"{a}:{b}" for a, b in zip(nodes, nodes[1:])}, (
-        "Disconnected managed graph"
+    assert edges == {
+        "folder|event",
+        "event|current",
+        "event|shortcut",
+        "shortcut|consumer",
+        "consumer|model",
+        "model|report",
+    }, "Managed graph is missing an object dependency"
+    assert len([edge for edge in edges if edge.startswith("event|")]) == 2, (
+        "Managed graph does not show a branch"
     )
     boundaries = [n for n in diagram.descendants() if "data-boundary" in n.attrs]
     assert (
@@ -415,7 +427,7 @@ def run(root: Path, developer_site: Path | None):
             "Python",
             "Spark SQL",
             "T-SQL",
-            "Refresh",
+            "Report",
         )
     )
     assert not with_class(diagram, "pipeline"), "Invented pipeline glue in graph"

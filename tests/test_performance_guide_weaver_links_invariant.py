@@ -77,12 +77,14 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
 
 
 @weaver_test()
-def test_feature_scale_story_links_to_the_performance_guide():
+def test_feature_scale_story_links_to_the_guide_after_advanced_features():
     page = FEATURES.read_text(encoding="utf-8")
-    scale = page.split('id="scale"', 1)[1].split('id="visibility"', 1)[0]
+    guide = 'href="/guides/fabric-performance-optimisation/"'
 
-    assert (
-        '<h3 id="scale-title"><a href="/guides/fabric-performance-optimisation/">'
-        "From 3 objects to 3,000.</a></h3>"
-    ) in scale
-    assert "github.com/weaverstack/weaverstack/tree/main/examples/stress" not in scale
+    assert '<h3 id="scale-title">From 3 objects to 3,000.</h3>' in page
+    assert "When your estate gets complicated" in page
+    assert page.count(guide) == 1
+    assert page.index('id="advanced"') < page.index('id="scale"')
+    assert page.index('id="scale"') < page.index(guide)
+    assert page.index(guide) < page.index('class="section feature-cta"')
+    assert "github.com/weaverstack/weaverstack/tree/main/examples/stress" not in page

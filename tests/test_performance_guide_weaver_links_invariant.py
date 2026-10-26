@@ -84,6 +84,7 @@ def test_feature_scale_story_links_to_the_guide_after_advanced_features():
     assert '<h3 id="scale-title">From 3 objects to 3,000.</h3>' in page
     assert "When your estate gets complicated" in page
     assert page.count(guide) == 1
-    assert page.index('id="advanced"') < page.index(guide)
+    assert page.index('id="advanced"') < page.index('id="scale"')
+    assert page.index('id="scale"') < page.index(guide)
     assert page.index(guide) < page.index('class="section feature-cta"')
     assert "github.com/weaverstack/weaverstack/tree/main/examples/stress" not in page

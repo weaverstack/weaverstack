@@ -3,7 +3,7 @@
     "start-simple": "Start with what you know",
     "data-engineering": "Serious data engineering, already included",
     "power-bi": "Power BI, engineered for organisations",
-    "visibility": "The entire estate is exposed through Warehouse tables",
+    "visibility": "Visibility, included",
     "scale": "Built for scale",
     "advanced": "When your estate gets complicated"
   },
@@ -323,7 +323,7 @@
     "generated-warehouse",
     "power-bi",
     "catalogue-dashboard",
-    "scale",
-    "mirror"
+    "mirror",
+    "scale"
   ]
 }

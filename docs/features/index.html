@@ -43,7 +43,6 @@
 .features-showcase .dag-spotlight .parcel-node-sub { fill: var(--pv-muted); text-anchor: middle; font-size: 17px; }
 .features-showcase .dag-spotlight .parcel-edge { fill: none; stroke: var(--pv-blue); stroke-width: 1.5; }
 .features-showcase .dag-spotlight .parcel-binding { stroke-dasharray: 4 3; }
-.features-showcase .feature-subheading { margin: 30px 0 0; font-size: clamp(25px, 3vw, 34px); line-height: 1.2; }
 </style>
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -78,7 +77,7 @@
 <section class="page-head"><div class="wrap">
 <h1>Write your code. Weaver handles the work around it.</h1>
 <p class="lead">Keep using Python, SQL and Power BI in Fabric. Weaver gives your team a consistent way to load data, test results, deploy changes and connect the work.</p>
-<nav class="feature-jumps" aria-label="Feature sections"><a href="#start-simple">Start simple</a><a href="#data-engineering">Data engineering</a><a href="#power-bi">Power BI</a><a href="#visibility">Visibility</a><a href="#scale">Scale</a><a href="#advanced">Advanced</a></nav>
+<nav class="feature-jumps" aria-label="Feature sections"><a href="#start-simple">Start simple</a><a href="#data-engineering">Data engineering</a><a href="#power-bi">Power BI</a><a href="#visibility">Visibility</a><a href="#advanced">Advanced</a><a href="#scale">Scale</a></nav>
 </div></section>
 <section class="section feature-group" id="start-simple" data-feature-group="1"><div class="wrap"><h2>Start with what you know</h2>
 <div class="feature-list">
@@ -212,9 +211,8 @@
 <p class="group-docs"><a href="https://docs.weaverstack.dev/semantic-models/native-tmdl/">Deploy a native model</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/power-bi/">Power BI reference</a></p></div></section>
 <section class="section feature-group" id="visibility" data-feature-group="4"><div class="wrap">
 <span id="operations" aria-hidden="true"></span>
-<h2>The entire estate — every object and its health state — is exposed through Warehouse tables.</h2>
-<p class="group-lead">So you know exactly what exists, what ran and what needs attention.</p>
-<h3 class="feature-subheading">Visibility, included</h3>
+<h2>Visibility, included</h2>
+<p class="group-lead">The entire estate — every object and its health state — is exposed through Warehouse tables. So you know exactly what exists, what ran and what needs attention.</p>
 <p class="group-lead">Weaver includes a companion Power BI dashboard. One command adds it to your Fabric workspace.</p>
 <figure class="feature-spotlight dashboard-spotlight" data-spotlight="catalogue-dashboard" aria-labelledby="dashboard-title">
 <h3 id="dashboard-title">All your Fabric work, at a glance.</h3>
@@ -234,21 +232,6 @@
 <div class="feature-row" data-feature="concurrency"><h3><a href="https://docs.weaverstack.dev/estate/concurrency/">Control how much runs at once</a></h3><p>Set limits on how much runs together while Weaver keeps dependent work in the right order.</p></div>
 </div>
 <p class="group-docs"><a href="https://docs.weaverstack.dev/estate/operate/">Run and inspect your project</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/">Operation boundaries</a></p></div></section>
-<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Built for scale</h2>
-<figure class="feature-spotlight scale-spotlight" data-spotlight="scale" aria-labelledby="scale-title">
-<h3 id="scale-title">From 3 objects to 3,000.</h3>
-<ol class="scale-flow"><li><b>3</b><strong>Easy to keep in your head.</strong></li><li><b>30</b><strong>It’s hard to keep track.</strong></li><li><b>300</b><strong>It’s no longer whether you use a framework, but which one.</strong></li><li><b>3,000</b><strong>Scheduling and recovery decide everything.</strong></li></ol>
-<figcaption>Weaver has been tested and tuned for thousands of connected objects. It runs independent work together, tracks what data has changed and refreshes SQL access only when needed.</figcaption>
-</figure>
-<div class="feature-list">
-<div class="feature-row"><h3>Tuned for each engine</h3><p>From Delta reads and writes to transactions, T-SQL and Shortcut creation, each operation is tuned for its engine to eliminate waste.</p></div>
-<div class="feature-row"><h3>Run independent steps together</h3><p>Weaver can run separate Spark and Warehouse steps at the same time, within limits you choose.</p></div>
-<div class="feature-row"><h3>Process only the changes</h3><p>Each object tracks its own progress, so it can process inserts, updates and deletes rather than starting over every time.</p></div>
-<div class="feature-row"><h3>SQL endpoints refreshed as needed</h3><p>A refresh runs in the background, and only the consumers that need the new state wait for it.</p></div>
-</div>
-<p class="group-docs"><a href="/get-started/">Get started</a></p>
-</div></section>
-
 <section class="section feature-group" id="advanced" data-feature-group="6"><div class="wrap"><h2>When your estate gets complicated</h2>
 <figure class="feature-spotlight command-spotlight workspace-spotlight" aria-labelledby="workspace-example-title">
 <h3 id="workspace-example-title">Same code. Different workspaces. No rewrites.</h3>
@@ -285,7 +268,20 @@
 <figcaption>With Mirror, you can change the parts you're working on and use existing data for the rest, without reloading everything.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/estate/mirror/">Develop using Mirror</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/mirror/">Scope and reset boundaries</a></p>
 </figure>
-<p class="group-docs"><a href="/guides/fabric-performance-optimisation/">Read the 3,000-object performance guide</a></p>
+</div></section>
+<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Built for scale</h2>
+<figure class="feature-spotlight scale-spotlight" data-spotlight="scale" aria-labelledby="scale-title">
+<h3 id="scale-title">From 3 objects to 3,000.</h3>
+<ol class="scale-flow"><li><b>3</b><strong>Easy to keep in your head.</strong></li><li><b>30</b><strong>It’s hard to keep track.</strong></li><li><b>300</b><strong>It’s no longer whether you use a framework, but which one.</strong></li><li><b>3,000</b><strong>Scheduling and recovery decide everything.</strong></li></ol>
+<figcaption>Weaver has been tested and tuned for thousands of connected objects. It runs independent work together, tracks what data has changed and refreshes SQL access only when needed.</figcaption>
+</figure>
+<div class="feature-list">
+<div class="feature-row"><h3>Tuned for each engine</h3><p>From Delta reads and writes to transactions, T-SQL and Shortcut creation, each operation is tuned for its engine to eliminate waste.</p></div>
+<div class="feature-row"><h3>Run independent steps together</h3><p>Weaver can run separate Spark and Warehouse steps at the same time, within limits you choose.</p></div>
+<div class="feature-row"><h3>Process only the changes</h3><p>Each object tracks its own progress, so it can process inserts, updates and deletes rather than starting over every time.</p></div>
+<div class="feature-row"><h3>SQL endpoints refreshed as needed</h3><p>A refresh runs in the background, and only the consumers that need the new state wait for it.</p></div>
+</div>
+<p class="group-docs"><a href="/guides/fabric-performance-optimisation/">Read the 3,000-object performance guide</a><span aria-hidden="true"> · </span><a href="/get-started/">Get started</a></p>
 </div></section>
 <section class="section feature-cta"><div class="wrap"><h2>Start with one item.</h2>
 <p>Begin with a Lakehouse, a Warehouse or a Power BI model, and connect more as you need them.</p>

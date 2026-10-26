@@ -62,16 +62,14 @@ def test_warehouse_visibility_is_one_feature_story():
     assert "#operations" not in jumps
     assert jumps.count("#visibility") == 1
     assert '<section class="section feature-group" id="operations"' not in features
-    assert (
+    assert "<h2>Visibility, included</h2>" in visibility
+    estate_line = (
         "The entire estate — every object and its health state — is exposed through "
         "Warehouse tables."
-    ) in visibility
-    assert (
-        "So you know exactly what exists, what ran and what needs attention."
-        in visibility
     )
-    assert "Visibility, included" in visibility
-    assert visibility.index("Visibility, included") < visibility.index(
+    assert estate_line in visibility
+    assert visibility.index("<h2>") < visibility.index(estate_line)
+    assert visibility.index(estate_line) < visibility.index(
         'data-spotlight="catalogue-dashboard"'
     )
     assert 'data-feature="catalogue"' in visibility

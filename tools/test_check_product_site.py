@@ -77,15 +77,17 @@ class ProductMigration(unittest.TestCase):
     def test_rejects_disconnected_cross_engine_graph(self):
         self.mutate(
             "features",
-            'data-dag-edge="spark-table:warehouse-table"',
-            'data-former-edge="spark-table:warehouse-table"',
+            'data-project-edge="event|shortcut"',
+            'data-former-edge="event|shortcut"',
         )
-        with self.assertRaisesRegex(AssertionError, "Disconnected managed graph"):
+        with self.assertRaisesRegex(AssertionError, "missing an object dependency"):
             self.check()
 
     def test_rejects_a_stale_product_link(self):
         self.mutate(
-            "", 'href="https://docs.weaverstack.dev/lakehouse/"', 'href="/lakehouse/"'
+            "features",
+            'href="https://docs.weaverstack.dev/lakehouse/python/"',
+            'href="/lakehouse/"',
         )
         with self.assertRaisesRegex(AssertionError, "stale retired product link"):
             self.check()
@@ -98,7 +100,7 @@ class ProductMigration(unittest.TestCase):
     def test_accepts_editorial_changes_without_exact_sentence_lock(self):
         self.mutate(
             "features",
-            "Develop and operate Weaver projects on Windows, macOS or Linux, or work entirely inside Fabric Notebooks.",
+            "Write code in VS Code or another editor on Windows, macOS or Linux, or work entirely in Fabric Notebooks.",
             "Work on Windows, macOS or Linux, or entirely inside Fabric Notebooks.",
         )
         self.check()

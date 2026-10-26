@@ -3,9 +3,8 @@
     "start-simple": "Start with what you know",
     "data-engineering": "Serious data engineering, already included",
     "power-bi": "Power BI, engineered for organisations",
-    "operations": "An estate that knows what\u2019s happening",
+    "visibility": "The entire estate is exposed through Warehouse tables",
     "scale": "Built for scale",
-    "visibility": "Visibility, included",
     "advanced": "When your estate gets complicated"
   },
   "features": [
@@ -239,7 +238,7 @@
     },
     {
       "id": "dashboard-deploy",
-      "group": 5,
+      "group": 4,
       "title": "One command",
       "description": "weaver catalogue-dashboard deploys the semantic model and Report beside the catalogue, and brings them up to date on the next run.",
       "urls": [
@@ -248,7 +247,7 @@
     },
     {
       "id": "dashboard-live",
-      "group": 5,
+      "group": 4,
       "title": "Live over Direct Lake",
       "description": "The model reads the catalogue\u2019s tables over Direct Lake, so each page shows your Weaver-managed estate as work settles.",
       "urls": [
@@ -257,7 +256,7 @@
     },
     {
       "id": "dashboard-yours",
-      "group": 5,
+      "group": 4,
       "title": "Free to tweak",
       "description": "It is an ordinary Power BI Report. Tweak it to fit your needs, or throw it away and build your own over the catalogue.",
       "urls": [
@@ -323,8 +322,8 @@
     "cross-engine-dag",
     "generated-warehouse",
     "power-bi",
-    "scale",
     "catalogue-dashboard",
+    "scale",
     "mirror"
   ]
 }

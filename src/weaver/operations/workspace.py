@@ -17,12 +17,14 @@ def _operation_workspace(
 
         an explicit workspace name
           → a workspace configuration file
-            → the Session's own workspace
+            → the active workflow's configuration, or the Session's own
               → workspace-config.yml in the working directory
                 → the workspace the notebook runs in
                   → a configuration error naming what is missing
 
-    A discovered project configuration ranks below the Session's workspace.
+    A discovered project configuration ranks below the Session's workspace. An
+    operation inherits the active workflow's configuration when it runs on the
+    workflow's Session, whether given it or not.
     """
 
     if isinstance(workspace, Workspace):
@@ -32,8 +34,10 @@ def _operation_workspace(
             "    with weaver.session(workspace=workspace) as session:\n"
             "        weaver.build('.', session=session)"
         )
+    from ..workflow import _inherited
+
     # Repeating the Session's name must not discard its catalogue and bindings.
-    inherited = getattr(session, "workspace", None)
+    inherited = _inherited(session)
     if (
         workspace_config is None
         and inherited is not None

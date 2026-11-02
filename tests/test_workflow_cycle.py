@@ -429,6 +429,33 @@ def test_one_workflow_id_correlates_the_whole_workflow(tmp_path, recorded, confi
 
 
 @weaver_test()
+def test_the_commands_run_in_the_python_workflow_of_the_cli_session(
+    tmp_path, recorded, confirmed
+):
+    """The CLI enters `weaver.workflow` on its Session: no second Session or ID."""
+
+    from weaver.workflow import active_workflow
+
+    calls, parser_factory, record = recorded
+    seen = []
+
+    def observing(parsed):
+        seen.append(active_workflow())
+        return record(parsed)
+
+    parser = parser_factory()
+    for action in parser._subparsers._group_actions[0].choices.values():
+        action.set_defaults(handler=observing)
+    path = _write(tmp_path, RUNS)
+
+    run_workflow(_Args("verify", file=str(path)), parser_factory=lambda: parser)
+
+    assert {id(each.session) for each in seen} == {id(calls[0].session)}
+    assert {each.workflow_id for each in seen} == {calls[0].workflow_id}
+    assert active_workflow() is None
+
+
+@weaver_test()
 def test_commands_can_supply_the_workflow_workspace(
     tmp_path, recorded, confirmed, monkeypatch
 ):

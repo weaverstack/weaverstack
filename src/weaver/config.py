@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .declaration.model import WeaverItemId
 from .errors import ConfigError, IdentityError
@@ -136,6 +136,68 @@ def resolve_workspace(
         else None,
     }
     return Workspace(**common)
+
+
+#: Fields a caller may replace on a resolved Workspace. ``workspace`` is not one:
+#: naming another workspace resolves its configuration instead.
+OVERRIDABLE = (
+    "environment",
+    "catalogue",
+    "mirror",
+    "execution",
+    "targets",
+    "data_sources",
+    "catalogue_dashboard",
+)
+
+
+def with_overrides(workspace: Workspace, overrides: Mapping[str, Any]) -> Workspace:
+    """``workspace`` with each given field replaced whole.
+
+    Values take the workspace configuration's shapes, or the typed values a
+    Workspace holds, and are validated as configuration is. An empty mapping
+    replaces too. ``None`` is not an override.
+    """
+
+    from dataclasses import replace
+
+    unknown = set(overrides) - set(OVERRIDABLE)
+    if unknown:
+        raise ConfigError(
+            "Workspace configuration has unknown keys: " + ", ".join(sorted(unknown))
+        )
+    changes = {name: value for name, value in overrides.items() if value is not None}
+    if "execution" in changes and not isinstance(
+        changes["execution"], ExecutionSettings
+    ):
+        changes["execution"] = _execution(changes["execution"], where="execution")
+    if "targets" in changes:
+        changes["targets"] = _targets(_target_payload(changes["targets"]))
+    if "catalogue_dashboard" in changes:
+        changes["catalogue_dashboard"] = _text(
+            changes["catalogue_dashboard"], where="catalogue_dashboard"
+        )
+    if not changes:
+        return workspace
+    try:
+        return replace(workspace, **changes)
+    except IdentityError as exc:
+        raise ConfigError(f"Workspace configuration is invalid: {exc}") from exc
+
+
+def _target_payload(raw: Any) -> Any:
+    """Accept typed target keys and declarations beside the YAML spelling."""
+
+    if not isinstance(raw, Mapping):
+        return raw
+    return {
+        str(item): (
+            declaration.physical
+            if isinstance(declaration, TargetDeclaration)
+            else declaration
+        )
+        for item, declaration in raw.items()
+    }
 
 
 def _text(value: Any, *, where: str) -> str:

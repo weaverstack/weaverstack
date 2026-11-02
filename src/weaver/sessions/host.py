@@ -96,8 +96,11 @@ def session_for(workspace: Workspace | None, **kwargs) -> Session:
 def use_or_create_session(
     session: Session | None, *, workspace: Workspace | None = None
 ) -> Iterator[Session]:
-    """The caller's Session, or one owned by this operation and closed with it."""
+    """The caller's Session, the active workflow's, or one owned by this operation."""
 
+    from ..workflow import workflow_session
+
+    session = workflow_session(session)
     if session is not None:
         if session.closed:
             raise CommandError("The Session is closed.")

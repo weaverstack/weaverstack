@@ -62,6 +62,7 @@ from .operations.workspace import current_workspace
 from .sessions.public import session
 from .shortcuts import Shortcut
 from .test_report import ValidationNodeReport, ValidationRunReport
+from .workflow import Workflow, workflow
 
 
 def _resolve_version() -> str:
@@ -115,6 +116,8 @@ __all__ = [
     "LoadActivity",
     # the reusable context every operation accepts
     "session",
+    "workflow",
+    "Workflow",
     "ValidationNodeReport",
     # authored objects
     "WeaverObject",

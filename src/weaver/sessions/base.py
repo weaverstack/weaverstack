@@ -143,6 +143,7 @@ class Session(ABC):
         #: a worker or TDS connection.
         self._flushers: dict = {}
         self._workflow_id: str | None = None
+        self._workflow_thread: int | None = None
         #: Machine-readable CLI commands suppress human progress and styling.
         self.machine_output = False
         self._closed = False
@@ -205,12 +206,26 @@ class Session(ABC):
 
     @contextmanager
     def workflow(self, workflow_id: str) -> Iterator[str]:
-        previous = self._workflow_id
-        self._workflow_id = workflow_id
+        """Record runs under ``workflow_id`` until exit, restoring the outer one.
+
+        The ID belongs to the whole Session, so workflows nest on one thread and
+        never run concurrently on two.
+        """
+
+        current = threading.get_ident()
+        with self._scope_lock:
+            if self._workflow_id is not None and self._workflow_thread != current:
+                raise CommandError(
+                    "This Session is already running a workflow on another thread. "
+                    "Open a Session for each concurrent workflow."
+                )
+            previous = (self._workflow_id, self._workflow_thread)
+            self._workflow_id, self._workflow_thread = workflow_id, current
         try:
             yield workflow_id
         finally:
-            self._workflow_id = previous
+            with self._scope_lock:
+                self._workflow_id, self._workflow_thread = previous
 
     def position(self, workspace: Workspace | None = None) -> str:
         """Return whether execution is in Fabric, from a client, or unplaced.

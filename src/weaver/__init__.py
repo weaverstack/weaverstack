@@ -39,6 +39,7 @@ from .operations.catalogue_dashboard import (
     CatalogueDashboardResult,
     deploy_catalogue_dashboard,
 )
+from .operations.execute import ExecuteResult, execute
 from .operations.health import health
 from .operations.load import load
 from .operations.mirror import (
@@ -111,6 +112,8 @@ __all__ = [
     "ValidationRunReport",
     "health",
     "HealthReport",
+    "execute",
+    "ExecuteResult",
     "HealthSection",
     "HealthFinding",
     "LoadActivity",

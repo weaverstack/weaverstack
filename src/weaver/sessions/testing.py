@@ -317,6 +317,48 @@ class TestSession(Session):
         )
         return self._answer(self._tsql_answers, [statement])
 
+    def query_tsql_limited(
+        self,
+        statement: str,
+        *,
+        target: Any,
+        limit: int,
+        workspace: Workspace | None = None,
+    ):
+        """Record the batch, and answer it as one result set."""
+
+        from ..sql.execution import LimitedRows
+
+        self._record("tsql", [statement], workspace, target=target, limit=limit)
+        rows = list(self._answer(self._tsql_answers, [statement]))
+        if not rows:
+            return ()
+        columns = tuple(rows[0])
+        return (
+            LimitedRows(
+                columns=columns,
+                rows=tuple(tuple(row[c] for c in columns) for row in rows[:limit]),
+                truncated=len(rows) > limit,
+            ),
+        )
+
+    def execute_source(
+        self,
+        source: str,
+        *,
+        lakehouse: str,
+        name: str,
+        workspace: Workspace | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        self._record("python", source, workspace, lakehouse=lakehouse, name=name)
+        if not self._python_answers:
+            raise CommandError(
+                "No Python result is configured for this TestSession. Call "
+                "answer_python() first."
+            )
+        return self._python_answers.pop(0)
+
     def query_tsql_sets(
         self,
         statements,

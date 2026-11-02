@@ -101,6 +101,9 @@ def test_the_top_level_is_the_ordinary_notebook_surface_only():
         "LoadResult",
         "test",
         "ValidationRunReport",
+        # Ad hoc T-SQL, Spark SQL, Python or DAX against one item, recording nothing.
+        "execute",
+        "ExecuteResult",
         # Health: the operation, and the structured report it returns.
         "health",
         "HealthReport",

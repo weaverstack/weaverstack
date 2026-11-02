@@ -179,6 +179,41 @@ class NotebookSession(Session):
         with self.telemetry.timing(f"python.{program.name}"):
             return program.call()
 
+    def execute_source(
+        self,
+        source: str,
+        *,
+        lakehouse: str,
+        name: str,
+        workspace: Workspace | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        import json
+
+        from ..lakehouse import _attached_from_runtime_context
+
+        attached = _attached_from_runtime_context()[2]
+        if attached != lakehouse:
+            raise CommandError(
+                f"This notebook's Spark session is attached to "
+                f"{'Lakehouse ' + repr(attached) if attached else 'no Lakehouse'}; "
+                f"this work needs {lakehouse!r}. Attach {lakehouse!r} to the "
+                "notebook, or run it from a desktop."
+            )
+        emitted = []
+        namespace = {
+            "spark": self.scope(workspace).spark(),
+            # The same JSON round trip a result makes from Livy.
+            "emit": lambda value: emitted.append(
+                json.loads(json.dumps(value, default=str))
+            ),
+        }
+        with self.telemetry.timing(f"python.{name}"):
+            exec(compile(source, f"<{name}>", "exec"), namespace)
+        if not emitted:
+            raise CommandError(f"{name} returned no result.")
+        return emitted[-1]
+
     def execute_spark_sql_batch(
         self,
         statements: Sequence[str],

@@ -555,6 +555,22 @@ class ConsoleSession(Session):
             retry_submission=program.resubmit,
         )
 
+    def execute_source(
+        self,
+        source: str,
+        *,
+        lakehouse: str,
+        name: str,
+        workspace: Workspace | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        scope = self.scope(workspace)
+        scope.require_spark_home(lakehouse)
+        livy = self.foreground_livy(scope)
+        return scope.livy_run(
+            source, name=name, timeout=timeout, livy=livy, retry_submission=False
+        )
+
     def execute_run_in_fabric(self, run, *, workspace: Workspace | None = None):
         from .run_in_fabric import send
 

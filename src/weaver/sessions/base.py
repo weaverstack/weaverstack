@@ -645,6 +645,38 @@ class Session(ABC):
         with ThreadPoolExecutor(max_workers=workers) as pool:
             return tuple(pool.map(query, statements))
 
+    def query_tsql_limited(
+        self,
+        statement: str,
+        *,
+        target: Any,
+        limit: int,
+        workspace: Workspace | None = None,
+    ):
+        """Run a T-SQL batch once and return each result set read to ``limit`` rows."""
+
+        return self.sql_executor(target, workspace=workspace).query_limited(
+            statement, limit=limit
+        )
+
+    def execute_source(
+        self,
+        source: str,
+        *,
+        lakehouse: str,
+        name: str,
+        workspace: Workspace | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        """Run self-contained Python in Fabric and return what it passed to ``emit``.
+
+        ``spark`` is attached to ``lakehouse``, so unqualified names resolve
+        there. The program needs no Weaver runtime. A submission that may have
+        reached Fabric is never sent again.
+        """
+
+        raise CommandError("This Session cannot run Python in Fabric.")
+
     # --- asynchronous appends -------------------------------------------------
 
     def flusher(self, table, *, warehouse, workspace: Workspace | None = None):

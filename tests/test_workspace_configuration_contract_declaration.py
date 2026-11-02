@@ -121,9 +121,7 @@ def no_notebook(monkeypatch):
 def notebook(monkeypatch, tmp_path):
     """A Fabric notebook running in Sales Analytics, outside any project."""
 
-    runtime = types.SimpleNamespace(
-        context={"currentWorkspaceName": "Sales Analytics"}
-    )
+    runtime = types.SimpleNamespace(context={"currentWorkspaceName": "Sales Analytics"})
     module = types.ModuleType("notebookutils")
     module.runtime = runtime
     monkeypatch.setitem(sys.modules, "notebookutils", module)

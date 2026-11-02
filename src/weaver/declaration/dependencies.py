@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from ..sql_statements import parse_sql
 from .metadata import ObjectId
+from .model import split_qualified_name
 
 _TOKENS = None
 
@@ -77,12 +78,12 @@ def extract_python_references(
     for name in imported_modules:
         if name.startswith("_"):
             continue
-        parts = name.split("__")
-        if len(parts) != 2:
+        parts = split_qualified_name(name)
+        if parts is None:
             continue
-        if not all(part and not part.startswith("_") for part in parts):
+        if any(part.startswith("_") for part in parts):
             continue
-        key = tuple(parts)
+        key = parts
         if key not in seen:
             seen.add(key)
             references.append(RelationReference(parts=key))

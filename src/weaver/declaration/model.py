@@ -421,6 +421,36 @@ TARGET_TYPES = (LOGICAL_TARGET, PHYSICAL_TARGET)
 NAME_SEPARATOR = "__"
 
 
+def split_qualified_name(name: str) -> tuple[str, str] | None:
+    """``Schema__Object`` as its two parts, or None when it does not name both.
+
+    A schema cannot contain ``__``, so the first one separates the parts and any
+    later one belongs to the object. ``_`` is a real schema: in a run of leading
+    underscores the last two are the separator, so ``___Load`` is ``_.Load``.
+    """
+
+    leading = len(name) - len(name.lstrip("_"))
+    if leading > len(NAME_SEPARATOR):
+        schema = name[: leading - len(NAME_SEPARATOR)]
+        object_name = name[leading:]
+    else:
+        schema, separator, object_name = name.partition(NAME_SEPARATOR)
+        if not separator:
+            return None
+    return (schema, object_name) if schema and object_name else None
+
+
+def unseparated_schema(schema: str) -> str:
+    """Refuse a schema name that would read back as a different identity."""
+
+    if NAME_SEPARATOR in schema:
+        raise IdentityError(
+            f"schema name {schema!r} cannot contain {NAME_SEPARATOR!r}, which "
+            "separates schema from object"
+        )
+    return schema
+
+
 def _one_of(value: object, allowed: tuple[str, ...], *, what: str) -> str:
     if not isinstance(value, str) or value not in allowed:
         expected = ", ".join(allowed)
@@ -528,9 +558,9 @@ class ShortcutDeclaration:
                 )
             return self.destination_identity
         if self.is_schema:
-            return WeaverSchemaId(self.owner, self.name)
-        parts = self.name.split(NAME_SEPARATOR)
-        if len(parts) != 2 or not all(parts):
+            return WeaverSchemaId(self.owner, unseparated_schema(self.name))
+        parts = split_qualified_name(self.name)
+        if parts is None:
             raise IdentityError(
                 f"shortcut {self.name!r} names a {self.shortcut_type}, so its "
                 f"name must be Schema{NAME_SEPARATOR}Object"

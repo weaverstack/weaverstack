@@ -1281,7 +1281,12 @@ def _is_python_module_reference(reference: str) -> bool:
         return True
     if reference.startswith(f"{SHORTCUTS_MODULE}."):
         return True
-    return _PYTHON_ID_SEPARATOR in reference.rsplit(".", 1)[-1]
+    # An object name may contain ``__``, so a dotted reference is Python only
+    # when an area qualifies it; a relation reference is ``Schema.Object``.
+    area, dot, module = reference.partition(".")
+    if not dot:
+        return _PYTHON_ID_SEPARATOR in reference
+    return area in (*AREAS, LIB) and _PYTHON_ID_SEPARATOR in module
 
 
 def _shortcut_symbol(reference: str) -> str | None:

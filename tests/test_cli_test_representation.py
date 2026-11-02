@@ -105,6 +105,20 @@ def test_both_item_spellings_are_one_selection(captured, capsys):
 
 
 @weaver_test()
+def test_stale_reaches_the_api(captured, capsys):
+    _run("--stale")
+
+    assert captured["stale"] is True
+
+
+@weaver_test()
+def test_an_ordinary_test_is_not_stale(captured, capsys):
+    _run()
+
+    assert captured["stale"] is False
+
+
+@weaver_test()
 def test_naming_no_item_reaches_the_api_as_no_selection(captured, capsys):
     """Every installed item, which the Weaver catalogue answers."""
 

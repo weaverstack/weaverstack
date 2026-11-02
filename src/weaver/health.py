@@ -582,7 +582,8 @@ class _LoadHealth:
 
     ``as_of`` against its completion instant says whether the object is overdue,
     and the same instant against its ancestors' says whether it is behind its
-    sources. A Static object is asked neither.
+    sources. A Static object is asked neither. Validation freshness asks only
+    :meth:`established_at`, so it passes no ``as_of``.
     """
 
     def __init__(
@@ -590,7 +591,7 @@ class _LoadHealth:
         dag: InstalledDag,
         *,
         statuses: Mapping[WeaverDocumentId, RuntimeStatus],
-        as_of: datetime,
+        as_of: datetime | None,
     ) -> None:
         self.dag = dag
         self.statuses = statuses
@@ -837,6 +838,185 @@ def resolve_as_of(value, *, started: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+# --- validations ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ValidationSubjectHealth:
+    """One Test or Assumption, its ``_.TestStatus`` row and its findings.
+
+    No findings means Green.
+    """
+
+    node: InstalledNode
+    runtime_status: RuntimeStatus | None = None
+    findings: tuple[HealthFinding, ...] = ()
+
+    @property
+    def identity(self) -> WeaverDocumentId:
+        return self.node.identity
+
+    @property
+    def severity(self) -> str:
+        return worst(finding.severity for finding in self.findings)
+
+
+@dataclass(frozen=True)
+class ValidationAssessment:
+    """Every validation in scope, assessed once.
+
+    :func:`assess` renders it as the report's Tests section, and
+    ``weaver test --stale`` runs the subjects it does not call Green.
+    """
+
+    subjects: tuple[ValidationSubjectHealth, ...] = ()
+
+    def unsettled(self) -> tuple[ValidationSubjectHealth, ...]:
+        return tuple(subject for subject in self.subjects if subject.severity != GREEN)
+
+    def unsettled_identities(self) -> tuple[WeaverDocumentId, ...]:
+        return tuple(subject.identity for subject in self.unsettled())
+
+    def to_health_section(self) -> HealthSection:
+        findings: list[HealthFinding] = []
+        counts: dict[str, int] = {}
+        for subject in self.subjects:
+            word = _word(subject.runtime_status)
+            counts[word] = counts.get(word, 0) + 1
+            findings.extend(subject.findings)
+        return HealthSection(
+            area=TESTS,
+            findings=_ordered(findings),
+            counts=MappingProxyType(counts),
+            subjects=len(self.subjects),
+        )
+
+
+def assess_validations(
+    catalogue: Catalogue,
+    *,
+    items: Sequence[WeaverItemId] | None = None,
+    source: Catalogue | None = None,
+) -> ValidationAssessment:
+    """Every validation of ``items`` assessed against its recorded result.
+
+    Not Green: never run, Pending, failed, errored or blocked, or passed before
+    an ancestor was loaded or built. Time alone does not make a result stale.
+    ``source`` is the catalogue a mirrored ancestor's load is recorded in.
+    """
+
+    dag = catalogue.dag()
+    effective = effective_load_state(catalogue, source=source)
+    chosen = None if items is None else frozenset(items)
+    subjects = tuple(
+        node for node in dag.validations() if chosen is None or node.item in chosen
+    )
+    return _ValidationHealth(
+        dag,
+        catalogue=catalogue,
+        statuses=test_statuses(catalogue),
+        load_health=_LoadHealth(dag, statuses=effective.statuses, as_of=None),
+    ).assess(subjects)
+
+
+class _ValidationHealth:
+    """Assess each validation's last result and whether its inputs moved since.
+
+    Freshness asks the Load assessment when an ancestor was established, so a
+    mirrored ancestor answers with its source's instant.
+    """
+
+    def __init__(self, dag, *, catalogue, statuses, load_health) -> None:
+        self.dag = dag
+        self.catalogue = catalogue
+        self.statuses = statuses
+        self.load_health = load_health
+
+    def assess(self, nodes) -> ValidationAssessment:
+        return ValidationAssessment(
+            subjects=tuple(
+                ValidationSubjectHealth(
+                    node=node,
+                    runtime_status=self.statuses.get(node.identity),
+                    findings=tuple(self._state(node, self.statuses.get(node.identity))),
+                )
+                for node in nodes
+            )
+        )
+
+    def _state(self, node: InstalledNode, status):
+        if status is None:
+            yield _finding(
+                TESTS,
+                TEST_PENDING,
+                AMBER,
+                node,
+                PENDING,
+                "this validation has not run since it was built",
+            )
+            return
+        if status.result in _TEST_RED:
+            yield _finding(
+                TESTS,
+                TEST_FAILED,
+                RED,
+                node,
+                status.result,
+                f"the last run {status.result}",
+                status,
+            )
+            return
+        if status.result != SUCCEEDED:
+            yield _finding(
+                TESTS,
+                TEST_PENDING,
+                AMBER,
+                node,
+                status.result,
+                f"the last run {status.result}",
+                status,
+            )
+            return
+        moved = self._changed_since(node, status.completed_at)
+        if moved is not None:
+            ancestor, how = moved
+            yield _finding(
+                TESTS,
+                TEST_STALE_DEPENDENCY,
+                AMBER,
+                node,
+                status.result,
+                f"{ancestor} has been {how} since this validation passed",
+                status,
+            )
+
+    def _changed_since(
+        self, node: InstalledNode, at: datetime | None
+    ) -> tuple[str, str] | None:
+        """The managed ancestor loaded or built after this validation passed.
+
+        A rebuild resets an object's load state, so its Registry build instant
+        is what records the change until it loads again. A new View definition
+        puts the validations over it behind, as it does a materialised consumer.
+        """
+
+        if at is None:
+            return None
+        moved = []
+        for ancestor in self.dag.ancestors(node.identity):
+            if not participates_in_load_state(ancestor):
+                continue
+            if (self.load_health.established_at(ancestor.identity) or at) > at:
+                moved.append((ancestor.node_id, "loaded"))
+            elif (self._built_at(ancestor.identity) or at) > at:
+                moved.append((ancestor.node_id, "built"))
+        return min(moved) if moved else None
+
+    def _built_at(self, identity) -> datetime | None:
+        registered = self.catalogue.registered.get(identity)
+        return None if registered is None else _instant(registered.build_datetime)
+
+
 # --- the evaluation -----------------------------------------------------------
 
 
@@ -951,91 +1131,16 @@ class _Assessment:
     # --- tests ----------------------------------------------------------------
 
     def tests(self) -> HealthSection:
-        findings: list[HealthFinding] = []
-        counts: dict[str, int] = {}
-        subjects = self._subjects(self.dag.validations())
-        for node in subjects:
-            status = self.test_status.get(node.identity)
-            counts[_word(status)] = counts.get(_word(status), 0) + 1
-            findings.extend(self._test_state(node, status))
-        return HealthSection(
-            area=TESTS,
-            findings=_ordered(findings),
-            counts=MappingProxyType(counts),
-            subjects=len(subjects),
+        return (
+            _ValidationHealth(
+                self.dag,
+                catalogue=self.catalogue,
+                statuses=self.test_status,
+                load_health=self.load_health,
+            )
+            .assess(self._subjects(self.dag.validations()))
+            .to_health_section()
         )
-
-    def _test_state(self, node: InstalledNode, status):
-        if status is None:
-            yield _finding(
-                TESTS,
-                TEST_PENDING,
-                AMBER,
-                node,
-                PENDING,
-                "this validation has not run since it was built",
-            )
-            return
-        if status.result in _TEST_RED:
-            yield _finding(
-                TESTS,
-                TEST_FAILED,
-                RED,
-                node,
-                status.result,
-                f"the last run {status.result}",
-                status,
-            )
-            return
-        if status.result != SUCCEEDED:
-            yield _finding(
-                TESTS,
-                TEST_PENDING,
-                AMBER,
-                node,
-                status.result,
-                f"the last run {status.result}",
-                status,
-            )
-            return
-        moved = self._changed_since(node, status.completed_at)
-        if moved is not None:
-            ancestor, how = moved
-            yield _finding(
-                TESTS,
-                TEST_STALE_DEPENDENCY,
-                AMBER,
-                node,
-                status.result,
-                f"{ancestor} has been {how} since this validation passed",
-                status,
-            )
-
-    def _changed_since(
-        self, node: InstalledNode, at: datetime | None
-    ) -> tuple[str, str] | None:
-        """The managed ancestor loaded or built after this validation passed.
-
-        A rebuild resets an object's load state, so its Registry build instant
-        is what records the change until it loads again. A new View definition
-        puts the validations over it behind, as it does a materialised consumer.
-        """
-
-        if at is None:
-            return None
-        moved = []
-        for ancestor in self.dag.ancestors(node.identity):
-            if not participates_in_load_state(ancestor):
-                continue
-            if (self.load_health.established_at(ancestor.identity) or at) > at:
-                moved.append((ancestor.node_id, "loaded"))
-            elif (self._built_at(ancestor.identity) or at) > at:
-                moved.append((ancestor.node_id, "built"))
-        return min(moved) if moved else None
-
-    def _built_at(self, identity) -> datetime | None:
-        registered = self.catalogue.registered.get(identity)
-        return None if registered is None else _instant(registered.build_datetime)
 
     # --- build ----------------------------------------------------------------
 

@@ -679,6 +679,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_source_arg(validate)
     _add_concurrency_arg(validate)
     validate.add_argument(
+        "--stale",
+        action="store_true",
+        help=(
+            "Run only the validations whose test health is not green: never run, "
+            "failed, or passed before an object they read was loaded or built."
+        ),
+    )
+    validate.add_argument(
         "--dry-run",
         action="store_true",
         help="Show the test plan without running it.",
@@ -1715,6 +1723,7 @@ def _test_once(args: argparse.Namespace) -> int:
             source=args.source,
             concurrency=args.concurrency,
             dry_run=args.dry_run,
+            stale=args.stale,
             session=opened,
         )
 
@@ -1737,6 +1746,7 @@ def _run_test(
     files,
     source=None,
     dry_run: bool,
+    stale: bool = False,
     concurrency=None,
     session=None,
 ):
@@ -1752,6 +1762,7 @@ def _run_test(
             source=source,
             concurrency=concurrency,
             dry_run=dry_run,
+            stale=stale,
             session=opened,
             **_command_context(workspace),
         )

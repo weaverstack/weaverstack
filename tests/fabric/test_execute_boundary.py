@@ -14,8 +14,21 @@ from weaver.sessions.run_in_fabric import _workspace_literal
 SPARK_SQL = "SET spark.sql.ansi.enabled=true; SELECT id FROM range(5)"
 
 
-@weaver_test(remote=True, resources={"rest", "tds"})
-def test_tsql_returns_each_result_set_to_the_limit(weaver_session, fabric_catalogue):
+@pytest.fixture
+def catalogue_session(weaver_session, fabric_workspace, fabric_catalogue):
+    """The shared Session with the catalogue Warehouse's connection acquired."""
+
+    from weaver.targets import ItemRef, WarehouseTarget
+
+    weaver_session.sql_executor(
+        WarehouseTarget(ItemRef(fabric_catalogue.name)), workspace=fabric_workspace
+    )
+    return register_session(weaver_session)
+
+
+@weaver_test(remote=True, resources={"tds"})
+def test_tsql_returns_each_result_set_to_the_limit(catalogue_session, fabric_catalogue):
+    weaver_session = catalogue_session
     catalogue = f"Warehouse/{fabric_catalogue.name}"
 
     result = weaver.execute(

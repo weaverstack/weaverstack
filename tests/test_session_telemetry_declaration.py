@@ -76,6 +76,7 @@ def test_a_session_sql_executor_records_every_tds_operation():
     executor.query_result_sets("select 1; select 2")
     executor.call_procedure("p", outputs=(("n", "int"),))
     executor.call_procedure_with_results("p", outputs=(("n", "int"),))
+    executor.query_limited("select * from T", limit=10)
 
     assert [event.operation for event in telemetry.events()] == [
         "execute",
@@ -84,5 +85,22 @@ def test_a_session_sql_executor_records_every_tds_operation():
         "query_result_sets",
         "call_procedure",
         "call_procedure_with_results",
+        "query_limited",
     ]
     assert telemetry.resources_used() == {"tds"}
+
+
+@weaver_test()
+def test_no_sql_operation_reaches_tds_unrecorded():
+    """``__getattr__`` forwards anything else, without telemetry."""
+
+    from weaver.sql.execution import SqlExecutor
+
+    operations = {
+        name
+        for name, value in vars(SqlExecutor).items()
+        if callable(value) and not name.startswith("_")
+    }
+
+    assert operations
+    assert operations <= set(vars(SessionSqlExecutor))

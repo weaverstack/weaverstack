@@ -50,8 +50,8 @@ def test_a_nested_workflow_restores_the_outer_one_even_after_an_error():
 
 @weaver_test()
 def test_a_run_sent_to_fabric_carries_the_workflow_it_was_sent_from():
-    from weaver.sessions.run_in_fabric import _program
     from weaver.sessions.program import FabricRun
+    from weaver.sessions.run_in_fabric import _program
 
     def entry(**_):  # pragma: no cover - only its name is used
         return {}

@@ -5,23 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f7f7f6">
 <title>The limitations and missed opportunities of dbt on Microsoft Fabric</title>
-<meta name="description" content="Fabric is a multi-engine platform. Five seams appear when a SQL transformation framework sits at the centre of it, and what changes when data engineering starts with Fabric instead.">
+<meta name="description" content="Where dbt fits on Microsoft Fabric and where it stops: Python and Spark beside the Fabric Warehouse, Lakehouse orchestration, incremental loads and OneLake.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://weaverstack.dev/guides/dbt-on-fabric/">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://weaverstack.dev/guides/dbt-on-fabric/">
 <meta property="og:site_name" content="Weaver">
 <meta property="og:title" content="The limitations and missed opportunities of dbt on Microsoft Fabric">
-<meta property="og:description" content="Is a SQL transformation framework holding us back from what Fabric makes possible?">
+<meta property="og:description" content="Where dbt fits on Microsoft Fabric and where it stops, across Python, Spark, Lakehouse, Warehouse and OneLake.">
 <meta property="og:image" content="https://weaverstack.dev/og-dbt.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Weaver compared with dbt on Microsoft Fabric.">
 <meta property="og:locale" content="en_AU">
+<meta property="article:published_time" content="2026-11-03">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="The limitations and missed opportunities of dbt on Microsoft Fabric">
-<meta name="twitter:description" content="Is a SQL transformation framework holding us back from what Fabric makes possible?">
+<meta name="twitter:description" content="Where dbt fits on Microsoft Fabric and where it stops, across Python, Spark, Lakehouse, Warehouse and OneLake.">
 <meta name="twitter:image" content="https://weaverstack.dev/og-dbt.png">
 <meta name="twitter:image:alt" content="Weaver compared with dbt on Microsoft Fabric.">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -36,14 +37,15 @@
     {
       "@type": "Article",
       "headline": "The limitations and missed opportunities of dbt on Microsoft Fabric",
-      "description": "Fabric is a multi-engine platform. Five seams appear when a SQL transformation framework sits at the centre of it, and what changes when data engineering starts with Fabric instead.",
+      "description": "Where dbt fits on Microsoft Fabric and where it stops: Python and Spark beside the Fabric Warehouse, Lakehouse orchestration, incremental loads and OneLake.",
       "url": "https://weaverstack.dev/guides/dbt-on-fabric/",
       "datePublished": "2026-11-03",
+      "dateModified": "2026-11-04",
       "inLanguage": "en-AU",
       "author": {"@type": "Person", "name": "Matthias Wong"},
       "publisher": {"@type": "Organization", "name": "Weaver", "url": "https://weaverstack.dev/"},
       "isPartOf": {"@type": "CollectionPage", "name": "Fabric Engineering Guides", "url": "https://weaverstack.dev/guides/"},
-      "about": ["dbt on Microsoft Fabric", "Microsoft Fabric data engineering", "Lakehouse and Warehouse orchestration"]
+      "about": ["dbt on Microsoft Fabric", "dbt job in Fabric", "Fabric Warehouse", "Fabric Lakehouse", "OneLake shortcuts", "Microsoft Fabric data engineering"]
     },
     {
       "@type": "BreadcrumbList",
@@ -88,16 +90,16 @@
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
-<p>Microsoft Fabric is a multi-engine platform. Python, Spark, Lakehouse, Warehouse, OneLake and Power BI, all in one place.</p>
+<p><a href="https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview">Microsoft Fabric</a> is a multi-engine platform. Python, Spark, Lakehouse, Warehouse, OneLake and Power BI, all in one place.</p>
 <p>So why are so many of us building on it around a framework designed for SQL transformations?</p>
 <p>And what if that framework is the very thing holding us back?</p>
 <p>To be clear, dbt is excellent at what it does. It brought real engineering discipline to SQL development: dependency management, testing, documentation and repeatable deployments. If your Fabric project is mostly SQL transformations, dbt may be all you need.</p>
 <p>But Fabric offers much more than SQL transformations. And as you start using it, the seams appear.</p>
-<p>A Python notebook for ingestion. A Spark job for Lakehouse processing. A dbt project for the Warehouse. Fabric pipelines to stitch them together. Separate arrangements for deployment, testing and monitoring.</p>
+<p>A Python notebook for ingestion. A Spark job for Lakehouse processing. A dbt project for the Fabric Warehouse. Fabric pipelines to stitch them together. Separate arrangements for deployment, testing and monitoring.</p>
 <p>Each addition seems reasonable. Each inconvenience seems minor. But they add up, and at some point you start to wonder:</p>
 <p class="pull">Are we designing our data engineering around what Fabric makes possible, or around what our framework was designed to support?</p>
 
-<h2 id="a-table-is-a-table">The first seam: a table is a table</h2>
+<h2 id="a-table-is-a-table">The first seam: a table is a table, in Python, Spark SQL or T-SQL</h2>
 <p>A production table needs the same things whether Python, Spark SQL or T-SQL populates it: staging, primary keys, change detection, merging, auditing, and the ability to resume safely after a failure.</p>
 <p>These aren't SQL features. They're data engineering requirements.</p>
 <p>Fabric lets you pick the right engine for each job. Python for acquisition and awkward file formats. T-SQL for relational modelling. Spark SQL for scale.</p>
@@ -105,32 +107,32 @@
 <p>A primary key doesn't stop being a primary key because you wrote it in Python. So why should choosing Python mean stepping outside your engineering framework? And why should you have to invent another one to fill the gap?</p>
 <p class="pull">The language should be an implementation choice, not a change in engineering standards.</p>
 
-<h2 id="orchestrating-jobs-not-data">The second seam: orchestrating jobs, not data</h2>
-<p>A typical Fabric architecture: a notebook populates Delta tables, a dbt job transforms them, another job builds the final models, and a pipeline connects the stages. Microsoft documents patterns like this, and they work.</p>
+<h2 id="orchestrating-jobs-not-data">The second seam: orchestrating jobs, not data, across Lakehouse and Warehouse</h2>
+<p>A typical Fabric architecture: a notebook populates Delta tables, a <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-overview">dbt job</a> transforms them, another job builds the final models, and a pipeline connects the stages. Microsoft documents patterns like this, from <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-medallion-lakehouse-architecture">medallion Lakehouse layers</a> to <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-activity">running a dbt job inside a pipeline</a>, and they work.</p>
 <p>Now suppose one source changes, affecting two Delta tables and three Warehouse tables.</p>
 <p>The real dependencies are between those five objects. So why are we scheduling, rerunning and monitoring notebooks and jobs?</p>
 <p>dbt understands dependencies between its own models. It doesn't see the Python that feeds them or the Lakehouse processing beside them. So another orchestration layer goes on top, with its own boundaries to maintain. As the estate grows, those boundaries start deciding how you handle failures, concurrency and reruns.</p>
 <p class="pull">Why should the boundary between Lakehouse and Warehouse set the boundary of your engineering framework? Fabric brings them together. Your dependency graph should too.</p>
 
-<h2 id="keeping-track">The third seam: keeping track of what's happening</h2>
+<h2 id="keeping-track">The third seam: keeping track of incremental loads</h2>
 <p>Running a warehouse in production is more than executing transformations.</p>
 <p>Suppose a source delivers 100,000 records and only five have changed. The warehouse should know that. It should update those five, leave the rest untouched, and record exactly what happened.</p>
 <p>Now suppose 40,000 records vanish overnight. Were they deleted, or did the extract break?</p>
 <p>Or the load fails halfway. Where should the next run start?</p>
 <p>These are basic warehouse disciplines: detecting genuine change, handling deletes deliberately, keeping change timestamps that mean something, and advancing bookmarks only when a load succeeds.</p>
-<p>dbt executes transformations, and does it well. But it doesn't keep track of what changed row by row, or where each table is up to. Incremental models approximate parts of this, one model at a time.</p>
+<p>dbt executes transformations, and does it well. But it doesn't keep track of what changed row by row, or where each table is up to. <a href="https://docs.getdbt.com/docs/build/incremental-models">Incremental models</a> approximate parts of this, one model at a time.</p>
 <p>So teams build their own bookkeeping around dbt. Then again for Python. And again for Lakehouse.</p>
 <p>Why should keeping track of your own warehouse be a do-it-yourself project?</p>
 <p class="pull">Reliable loading should be an ordinary expectation, not a special achievement.</p>
 
 <h2 id="onelake">The fourth seam: OneLake changes how you can develop</h2>
 <p>OneLake is one of my favourite things about Fabric.</p>
-<p>Some of my government sources take hours to acquire. With OneLake shortcuts, development can reuse that source data without copying or downloading it again. Change a transformation, rebuild the affected objects, inspect, repeat. Dozens of iterations in the time one acquisition would take.</p>
+<p>Some of my government sources take hours to acquire. With <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">OneLake shortcuts</a>, development can reuse that source data without copying or downloading it again. Change a transformation, rebuild the affected objects, inspect, repeat. Dozens of iterations in the time one acquisition would take.</p>
 <p>But shortcuts alone don't give you that workflow. The framework has to know which data is borrowed, which objects it manages locally, and how to deploy changes safely.</p>
 <p>So why shouldn't this be central to how we develop on Fabric, rather than something we engineer separately?</p>
 <p class="pull">That's the difference between adapting an existing framework to a new platform and designing one around what the platform can do.</p>
 
-<h2 id="the-whole-estate">The fifth seam: who understands the whole estate?</h2>
+<h2 id="the-whole-estate">The fifth seam: who understands the whole Fabric estate?</h2>
 <p>By now there are many moving parts: notebooks, Lakehouse tables, Warehouse models, pipelines, separate execution histories, tests and deployment configurations.</p>
 <p>When something breaks, where do you look? Which object failed? What sits downstream of it? What actually changed? Which tests are now stale? Can you rerun just the affected work?</p>
 <p>dbt has lineage and test results. Fabric has monitoring. A shared Git repository and a master pipeline help. None of them add up to one operational picture.</p>
@@ -155,7 +157,7 @@
 <p>Weaver also has a first-class command-line interface for build, load and test across the whole estate. AI agents already use it to develop and maintain I ❤️ Gov, running the full loop of change, run, check and fix without leaving the terminal.</p>
 <p>The benefit isn't just fewer pipelines. It's using Fabric's full capability without solving the same engineering problems again and again.</p>
 
-<h2 id="is-dbt-still-a-good-choice">Is dbt still a good choice?</h2>
+<h2 id="is-dbt-still-a-good-choice">Is dbt still a good choice on Fabric?</h2>
 <p>Absolutely. If your main need is managing SQL transformations, dbt is mature and highly capable, and there's no reason to abandon a working architecture.</p>
 <p>But if your work is spreading across engines, it's worth asking some harder questions.</p>
 <p>How much effort goes into coordinating separate systems?</p>
@@ -166,7 +168,7 @@
 <p class="pull">The question isn't whether dbt works on Fabric. It's whether we're letting Fabric become everything it could be.</p>
 <p>See how Weaver compares in practice: <a href="/vs-dbt/">Weaver for dbt developers</a>.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#a-table-is-a-table">A table is a table</a></li><li><a href="#orchestrating-jobs-not-data">Orchestrating jobs, not data</a></li><li><a href="#keeping-track">Keeping track</a></li><li><a href="#onelake">OneLake development</a></li><li><a href="#the-whole-estate">The whole estate</a></li><li><a href="#start-with-fabric">Start with Fabric instead</a></li><li><a href="#why-we-built-weaver">Why we built Weaver</a></li><li><a href="#is-dbt-still-a-good-choice">Is dbt still a good choice?</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#a-table-is-a-table">A table is a table</a></li><li><a href="#orchestrating-jobs-not-data">Orchestrating jobs, not data</a></li><li><a href="#keeping-track">Keeping track</a></li><li><a href="#onelake">OneLake development</a></li><li><a href="#the-whole-estate">The whole estate</a></li><li><a href="#start-with-fabric">Start with Fabric instead</a></li><li><a href="#why-we-built-weaver">Why we built Weaver</a></li><li><a href="#is-dbt-still-a-good-choice">Is dbt still a good choice on Fabric?</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

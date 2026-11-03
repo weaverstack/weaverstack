@@ -152,8 +152,9 @@ or owned Session and one workflow ID. Only `_operation_workspace` and
 `use_or_create_session` read the active workflow, so an operation given no
 Session runs as if given the workflow's. `Session.workflow` carries the ID that
 Load and Test record and send to Fabric; a Session runs one workflow at a time
-and nests on one thread. The CLI workflow runner enters `weaver.workflow` on its
-own Session and keeps sequencing, confirmation and findings policy.
+and nests within one thread or asyncio task. The CLI workflow runner enters
+`weaver.workflow` on its own Session and keeps sequencing, confirmation and
+findings policy.
 
 The fast suite runs against a `TestSession`: a real implementation of the Session
 contract that records what a host was asked to do and does not interpret it. It

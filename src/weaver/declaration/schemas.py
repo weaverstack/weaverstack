@@ -14,8 +14,9 @@ from typing import Any
 
 import yaml
 
-from ..errors import DiscoveryError, MetadataError
+from ..errors import DiscoveryError, IdentityError, MetadataError
 from .metadata import _UniqueKeyLoader
+from .model import unseparated_schema
 
 SCHEMA_SUFFIX = ".yml"
 
@@ -80,6 +81,10 @@ def read_schema_document(relative_path: str, data: bytes) -> SchemaSes:
     from .source import content_hash
 
     filename_id = schema_id_for_filename(relative_path)
+    try:
+        unseparated_schema(filename_id)
+    except IdentityError as exc:
+        raise DiscoveryError(f"{relative_path}: {exc}") from exc
     schema = parse_schema_document(text, relative_path)
     schema = replace(schema, source_hash=content_hash(data))
     if schema.schema_id != filename_id:

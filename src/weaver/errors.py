@@ -139,3 +139,7 @@ class InstallationIdentityError(BuildError):
 
 class InstallError(WeaverError):
     """Raised when a build bundle cannot be installed."""
+
+
+class ExecuteError(WeaverError):
+    """Raised when ad hoc T-SQL, Spark SQL, Python or DAX fails where it ran."""

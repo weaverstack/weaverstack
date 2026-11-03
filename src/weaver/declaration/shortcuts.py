@@ -206,6 +206,11 @@ def read_warehouse_shortcuts(
                     "shortcuts file or change the destination."
                 )
             identity = destination.object_id
+            if NAME_SEPARATOR in identity.schema:
+                raise DiscoveryError(
+                    f"{relative}: destination {raw_destination}: schema name "
+                    f"{identity.schema!r} cannot contain {NAME_SEPARATOR!r}"
+                )
             name = f"{identity.schema}{NAME_SEPARATOR}{identity.object}"
             _reject_repeat(seen, name, relative=relative)
             try:

@@ -7,7 +7,7 @@ Three artefacts, from three kinds of source:
 
 .. code-block:: text
 
-    Warehouse/Reporting/Sales__Customer.sql    -> _.[Load Sales.Customer]
+    Warehouse/Reporting/Sales.Customer.sql     -> _.[Load Sales.Customer]
     Lakehouse/Sales/lib/dates.py               -> Files/_/Load/lib/dates.py
     Lakehouse/Sales/Tables/Sales.Customer.sql  -> Files/_/Load/Tables/Sales__Customer.py
 

@@ -37,6 +37,13 @@ def test_one_double_underscore_is_an_object_reference():
 
 
 @weaver_test()
+def test_the_first_double_underscore_separates_schema_from_object():
+    assert [str(r) for r in extract_python_references(("Sales__Order__Extra",))] == [
+        "Sales.Order__Extra"
+    ]
+
+
+@weaver_test()
 def test_the_weaver_import_is_not_a_reference():
     assert extract_python_references(("weaver",)) == ()
 
@@ -51,7 +58,7 @@ def test_an_underscore_prefixed_module_is_not_a_reference():
     assert extract_python_references(("_Sales__Order",)) == ()
 
 
-@pytest.mark.parametrize("name", ["Sales", "Sales__Order__Extra", "Sales__", "__Order"])
+@pytest.mark.parametrize("name", ["Sales", "Sales__", "__Order"])
 @weaver_test()
 def test_names_that_are_not_two_parts_are_ignored(name):
     assert extract_python_references((name,)) == ()

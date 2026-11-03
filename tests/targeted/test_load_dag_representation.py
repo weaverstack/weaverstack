@@ -41,6 +41,7 @@ from weaver.installed import (
     PYTHON_FOLDER,
     PYTHON_TABLE,
     WAREHOUSE_PROCEDURE,
+    _is_python_module_reference,
 )
 from weaver.load_plan import ENDPOINT_REFRESH, LoadDag, load_dag
 from weaver.locations import Location
@@ -635,22 +636,30 @@ def _registry(item: str, schema: str, name: str, *, object_type="table", role="d
 
 
 def _dependency(item: str, schema: str, name: str, reference: str, within=True):
-    """One Dependency row, keyed as the declaring object is keyed."""
+    """One Dependency row, keyed as the declaring object is keyed.
+
+    As Build does, a two-part relation records the object it names in the same
+    item; an import or a physical read leaves the referenced columns null.
+    """
 
     identity = WeaverItemId.parse(item)
-    referenced = identity if within else WeaverItemId.parse("Lakehouse/Elsewhere")
     if identity.item_type == "Lakehouse" and "/" not in schema:
         schema = f"Tables/{schema}"
+    referenced_schema, dot, referenced_name = reference.partition(".")
+    relation = within and dot and "." not in referenced_name
+    relation = relation and not _is_python_module_reference(reference)
+    if relation and identity.item_type == "Lakehouse":
+        referenced_schema = f"Tables/{referenced_schema}"
     return {
         "item_type": identity.item_type,
         "item_name": identity.item_name,
         "referencing_schema_name": schema,
         "referencing_object_name": name,
         "dependency_reference": reference,
-        "referenced_item_type": referenced.item_type,
-        "referenced_item_name": referenced.item_name,
-        "referenced_schema_name": schema,
-        "referenced_object_name": reference.rpartition(".")[2],
+        "referenced_item_type": identity.item_type if relation else None,
+        "referenced_item_name": identity.item_name if relation else None,
+        "referenced_schema_name": referenced_schema if relation else None,
+        "referenced_object_name": referenced_name if relation else None,
         "signature": "dependency",
     }
 

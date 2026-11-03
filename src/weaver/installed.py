@@ -977,6 +977,21 @@ class _DependencyRow:
     referenced: tuple[str, ...] = ()
     source_mode: str | None = None
     source_access: str | None = None
+    #: The producer Build resolved, when the row records one.
+    recorded: WeaverDocumentId | None = None
+
+
+def _recorded_producer(row) -> WeaverDocumentId | None:
+    item_type = str(row.get("referenced_item_type") or "")
+    item_name = str(row.get("referenced_item_name") or "")
+    name = str(row.get("referenced_object_name") or "")
+    if not (item_type and item_name and name):
+        return None
+    return stored_identity(
+        WeaverItemId(item_type, item_name),
+        str(row.get("referenced_schema_name") or ""),
+        name,
+    )
 
 
 def _dependency_rows(catalogue: Catalogue, nodes) -> tuple[_DependencyRow, ...]:
@@ -1045,6 +1060,7 @@ def _dependency_rows(catalogue: Catalogue, nodes) -> tuple[_DependencyRow, ...]:
                 _DependencyRow(
                     consumer=consumer,
                     reference=str(row.get("dependency_reference") or ""),
+                    recorded=_recorded_producer(row),
                 )
             )
     # A semantic validation reads its model, so a refresh makes it stale.
@@ -1100,7 +1116,9 @@ class _References:
                 if row.semantic_table is not None:
                     found, source = self._semantic(row)
                 else:
-                    found = self._one(row.consumer, row.reference)
+                    found = self._one(
+                        row.consumer, row.reference, recorded=row.recorded
+                    )
             except CatalogueStateError as exc:
                 # Defer failure until an operation reaches this consumer so an
                 # unrelated target remains usable.
@@ -1171,7 +1189,13 @@ class _References:
             "access": row.source_access,
         }
 
-    def _one(self, consumer: WeaverDocumentId, reference: str):
+    def _one(
+        self,
+        consumer: WeaverDocumentId,
+        reference: str,
+        *,
+        recorded: WeaverDocumentId | None = None,
+    ):
         """Resolve shortcuts before native objects to preserve the crossing."""
 
         if consumer.item.item_type == "Report":
@@ -1188,9 +1212,38 @@ class _References:
             return producer, None
         if "/" in reference:
             return self._identity(consumer, reference)
+        readings = (self._relation, self._python)
         if _is_python_module_reference(reference):
-            return self._python(consumer, reference)
-        return self._relation(consumer, reference)
+            readings = readings[::-1]
+        if recorded is None:
+            # An older catalogue, or a reference that did not resolve.
+            return readings[0](consumer, reference)
+        return self._recorded(consumer, reference, recorded, readings)
+
+    def _recorded(self, consumer, reference: str, recorded, readings):
+        """The reading of ``reference`` that reaches the producer Build recorded.
+
+        An object name may contain ``__``, so ``Tables.Customer__History`` is a
+        relation in schema ``Tables`` or an import of a ``Tables`` module. A
+        shortcut's row may record its destination or its source.
+        """
+
+        for read in readings:
+            external = {key: list(value) for key, value in self.external.items()}
+            try:
+                found = read(consumer, reference)
+            except CatalogueStateError:
+                found = None
+            if found is not None:
+                producer, through = found
+                if recorded in (producer, getattr(through, "destination", None)):
+                    return found
+            self.external = external
+        raise CatalogueStateError(
+            f"{consumer} depends on {reference!r}, recorded as {recorded}, but no "
+            f"installed object or shortcut matches. Install {recorded.item} or "
+            f"build {consumer.item} again."
+        )
 
     def _identity(self, consumer: WeaverDocumentId, reference: str):
         """A semantic validation's read, named by full logical identity."""
@@ -1281,7 +1334,12 @@ def _is_python_module_reference(reference: str) -> bool:
         return True
     if reference.startswith(f"{SHORTCUTS_MODULE}."):
         return True
-    return _PYTHON_ID_SEPARATOR in reference.rsplit(".", 1)[-1]
+    # An object name may contain ``__``, so a dotted reference is Python only
+    # when an area qualifies it; a relation reference is ``Schema.Object``.
+    area, dot, module = reference.partition(".")
+    if not dot:
+        return _PYTHON_ID_SEPARATOR in reference
+    return area in (*AREAS, LIB) and _PYTHON_ID_SEPARATOR in module
 
 
 def _shortcut_symbol(reference: str) -> str | None:

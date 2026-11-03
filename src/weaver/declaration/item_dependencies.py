@@ -16,6 +16,7 @@ from .model import (
     WeaverDocumentId,
     WeaverItemId,
     WeaverRepository,
+    split_qualified_name,
 )
 from .shortcuts import LAKEHOUSE_FILE
 from .source import SourceDocument
@@ -394,8 +395,8 @@ def _python_references(
             if components and components[0] == "lib":
                 continue
             object_module = components[-1] if components else ""
-            parts = object_module.split("__")
-            if len(parts) != 2 or not all(parts):
+            parts = split_qualified_name(object_module)
+            if parts is None:
                 continue
             if len(components) == 1:
                 raise DiscoveryError(

@@ -1073,8 +1073,10 @@ class SparkSqlAssumption(_SparkSqlValidation, Assumption):
 def _identity(class_name: str) -> tuple[str, str]:
     """``Sales__Order`` → ``("Sales", "Order")``; ``___Load`` → ``("_", "Load")``.
 
-    Leading underscores include the schema and separator, so ``_.Load`` uses
-    three underscores. This repeats the parser's rule without importing it.
+    The first ``__`` separates the parts, so ``Sales__Order__History`` is
+    ``("Sales", "Order__History")``. Leading underscores include the schema and
+    separator, so ``_.Load`` uses three underscores. This repeats the parser's
+    rule without importing it.
     """
 
     leading = len(class_name) - len(class_name.lstrip("_"))
@@ -1084,7 +1086,8 @@ def _identity(class_name: str) -> tuple[str, str]:
             class_name[leading:],
         ]
     else:
-        split = class_name.split(CLASS_ID_SEPARATOR)
+        schema, separator, object_name = class_name.partition(CLASS_ID_SEPARATOR)
+        split = [schema, object_name] if separator else [class_name]
     parts = [part.strip() for part in split]
     if len(parts) != 2 or not all(parts):
         raise LoadError(

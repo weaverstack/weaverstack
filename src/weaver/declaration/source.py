@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from ..errors import DiscoveryError, MetadataError
+from ..errors import DiscoveryError, IdentityError, MetadataError
 from ..objects import BASE_CLASS_NAMES, BASE_CLASSES
 from ..signatures import implementation_signature
 from ..sql_statements import parse_sql
@@ -35,7 +35,13 @@ from .metadata import (
     extract_sql_metadata_and_body,
     parse_document,
 )
-from .model import LAKEHOUSE, SEMANTIC_MODEL, WeaverDocumentId
+from .model import (
+    LAKEHOUSE,
+    SEMANTIC_MODEL,
+    WeaverDocumentId,
+    split_qualified_name,
+    unseparated_schema,
+)
 
 if TYPE_CHECKING:  # names used only in annotations
     from .ddl import GeneratedDdl
@@ -94,20 +100,13 @@ def _stem(filename: str) -> str:
 
 
 def python_id_parts(stem: str) -> list[str]:
-    """Split ``Schema__Object`` where the schema may itself be underscores.
+    """``Schema__Object`` as two parts, or ``[stem]`` when it does not name both.
 
-    ``Sales__Order`` is unambiguous, but ``_`` is a real schema, and ``_`` +
-    ``__`` + ``Load`` spells ``___Load``, which an ordinary split reads as an
-    empty schema. So in a run of leading underscores the last two are the
-    separator and the rest the schema: ``___Load`` is ``_.Load``.
-
-    Only a schema made entirely of underscores reaches that branch.
+    See :func:`~weaver.declaration.model.split_qualified_name`.
     """
 
-    leading = len(stem) - len(stem.lstrip("_"))
-    if leading >= len(PYTHON_ID_SEPARATOR) + 1:
-        return [stem[: leading - len(PYTHON_ID_SEPARATOR)], stem[leading:]]
-    return stem.split(PYTHON_ID_SEPARATOR)
+    parts = split_qualified_name(stem)
+    return [stem] if parts is None else list(parts)
 
 
 _python_id_parts = python_id_parts
@@ -122,7 +121,7 @@ def object_id_for_filename(filename: str, language: str) -> ObjectId:
             )
         parts = _python_id_parts(stem)
     else:
-        if PYTHON_ID_SEPARATOR in stem:
+        if "." not in stem and PYTHON_ID_SEPARATOR in stem:
             raise DiscoveryError(
                 f"{filename}: a SQL object filename must be Schema.Object.sql"
             )
@@ -132,7 +131,11 @@ def object_id_for_filename(filename: str, language: str) -> ObjectId:
         raise DiscoveryError(
             f"{filename}: an object filename must name Schema and Object, got {stem!r}"
         )
-    return ObjectId(schema=parts[0], object=parts[1])
+    try:
+        schema = unseparated_schema(parts[0])
+    except IdentityError as exc:
+        raise DiscoveryError(f"{filename}: {exc}") from exc
+    return ObjectId(schema=schema, object=parts[1])
 
 
 @dataclass(frozen=True)

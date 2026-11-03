@@ -41,7 +41,7 @@ SENTINEL = datetime(1900, 1, 1, tzinfo=timezone.utc)
 #: One anchored life: freestanding first, then anchored, loaded, and read back
 #: through a second construction that reads the catalogue again.
 ANCHORED = r"""
-import sys
+import importlib, sys
 from datetime import datetime, timezone
 
 from weaver import lakehouse_for
@@ -50,6 +50,9 @@ from weaver.errors import LoadError
 destination = lakehouse_for(resolver, target)
 root = destination.files_root() + "/_/Load"
 sys.path.insert(0, root)
+# An earlier load in this interpreter can have cached the root's listing from
+# before this estate was installed, and the mount does not change its mtime.
+importlib.invalidate_caches()
 
 from Files.Raw__CustomerCsv import Raw__CustomerCsv
 
@@ -266,7 +269,7 @@ def test_one_build_installs_the_lakehouse_references_and_the_next_plans_none(
 #: folder through the resolved OneLake path, and runs the generated Spark SQL
 #: program from the file the installer wrote.
 BODY = r"""
-import os, sys
+import importlib, os, sys
 from pathlib import Path
 
 from weaver import lakehouse_for
@@ -281,6 +284,7 @@ results = {}
 # names only whatever a notebook happened to attach.
 root = destination.files_root() + "/_/Load"
 sys.path.insert(0, root)
+importlib.invalidate_caches()  # as above: a stale listing of the root
 results["deployed"] = sorted(os.listdir(root))
 results["tables"] = sorted(os.listdir(os.path.join(root, "Tables")))
 

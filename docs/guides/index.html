@@ -48,6 +48,7 @@
 .resource-copy h2 { max-width: none; margin: 0 0 10px; font-size: clamp(25px, 3vw, 34px); }
 .resource-copy p { max-width: 68ch; margin: 0 0 14px; }
 .resource-meta { color: var(--muted); font: 13px var(--mono); }
+.featured-resource + .featured-resource { border-top: 0; }
 .resource-index > h2 { margin: 52px 0 10px; }
 .coming-soon-intro { color: var(--muted); }
 .resource-upcoming { margin: 26px 0 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }
@@ -87,6 +88,14 @@
 <h2><a href="/guides/fabric-performance-optimisation/">Performance Engineering on Microsoft Fabric</a></h2>
 <p>Lessons from stress-testing a 3,000-object data pipeline processing approximately 4 billion rows on an F64 capacity.</p>
 <span class="resource-meta">Performance · Parallel loading · Incremental processing</span>
+</div>
+</article>
+<article class="featured-resource">
+<p class="resource-label">Published article</p>
+<div class="resource-copy">
+<h2><a href="/guides/dbt-on-fabric/">Choosing dbt for Microsoft Fabric</a></h2>
+<p>A practical look at where dbt fits in the Fabric ecosystem of Python, Spark, Lakehouse, Warehouse and OneLake.</p>
+<span class="resource-meta">dbt · Architecture · Lakehouse and Warehouse</span>
 </div>
 </article>
 <h2>Coming soon</h2>

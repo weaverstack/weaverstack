@@ -97,6 +97,17 @@ def recorded_installation(catalogue, item):
     return row if row and (row.get("workspace_id") or row.get("item_id")) else None
 
 
+def _discover_once(rows, *, resolver):
+    """List the workspace's items once when the rows name more than one item.
+
+    One item costs at most its own typed lookup, and nothing once resolved.
+    """
+
+    targets = {(row["item_type"], row["target_name"]) for row in rows}
+    if len(targets) > 1 and hasattr(resolver, "discover_once"):
+        resolver.discover_once()
+
+
 def check_installations(rows, *, resolver):
     """Verify each installation, returning ``(resolved, faults)`` by item key.
 
@@ -105,8 +116,7 @@ def check_installations(rows, *, resolver):
     """
 
     rows = tuple(rows)
-    if len(rows) > 1 and hasattr(resolver, "discover_once"):
-        resolver.discover_once()
+    _discover_once(rows, resolver=resolver)
     resolved = {}
     faults = {}
     for row in rows:
@@ -153,8 +163,7 @@ def resolve_installations(catalogue, rows, *, resolver, items=()):
         for row in rows
         if upgrade or f"{row['item_type']}/{row['item_name']}" in selected
     ]
-    if len(wanted) > 1 and hasattr(resolver, "discover_once"):
-        resolver.discover_once()
+    _discover_once(wanted, resolver=resolver)
     publication_rows = []
     for row in wanted:
         # Old Warehouse/Lakehouse publication wrote the recorded target name

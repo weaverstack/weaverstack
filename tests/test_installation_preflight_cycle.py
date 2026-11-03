@@ -747,6 +747,22 @@ def test_a_single_installation_keeps_its_typed_listing():
 
 
 @weaver_test()
+def test_installations_of_one_resolved_item_ask_fabric_nothing():
+    resolver = given_resolver(warehouses=["Sales"])
+    resolver.resolve(ItemRef("Sales"), item_type="Warehouse")
+    before = list(resolver.client.requested)
+    resolved, faults = check_installations(
+        [
+            row(resolver, "Warehouse", "Orders", "Sales"),
+            row(resolver, "Warehouse", "Returns", "Sales"),
+        ],
+        resolver=resolver,
+    )
+    assert len(resolved) == 2 and not faults
+    assert resolver.client.requested == before
+
+
+@weaver_test()
 def test_target_inventories_resolve_every_binding_from_one_listing():
     from weaver.build_bundle.targets import ItemBinding, ItemBindings, WarehouseBinding
     from weaver.build_bundle.workflow import read_target_inventories

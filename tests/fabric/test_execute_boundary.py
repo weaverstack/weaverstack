@@ -63,7 +63,11 @@ def test_spark_sql_and_python_run_in_fabric_with_the_lakehouse_attached(
     printed = weaver.execute(
         "python",
         "Lakehouse/Sales",
-        "print(spark.range(3).count())",
+        "def main():\n"
+        "    print(spark.range(3).count())\n"
+        "\n"
+        "if __name__ == '__main__':\n"
+        "    main()\n",
         session=weaver_session,
     )
     with pytest.raises(ExecuteError, match="(?s)before.*ZeroDivisionError"):

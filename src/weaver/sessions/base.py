@@ -7,6 +7,7 @@ and Runner retain planning and orchestration responsibilities.
 
 from __future__ import annotations
 
+import sys
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -108,6 +109,19 @@ class ReportingFrame:
         return mapping
 
 
+def _workflow_owner() -> tuple[int, object]:
+    """The thread and running asyncio task, if any, that holds a workflow."""
+
+    task = None
+    asyncio = sys.modules.get("asyncio")
+    if asyncio is not None:
+        try:
+            task = asyncio.current_task()
+        except RuntimeError:
+            pass
+    return threading.get_ident(), task
+
+
 class Session(ABC):
     """A reusable execution scope for resolution, resources, and execution.
 
@@ -143,6 +157,7 @@ class Session(ABC):
         #: a worker or TDS connection.
         self._flushers: dict = {}
         self._workflow_id: str | None = None
+        self._workflow_owner: tuple[int, object] | None = None
         #: Machine-readable CLI commands suppress human progress and styling.
         self.machine_output = False
         self._closed = False
@@ -205,12 +220,26 @@ class Session(ABC):
 
     @contextmanager
     def workflow(self, workflow_id: str) -> Iterator[str]:
-        previous = self._workflow_id
-        self._workflow_id = workflow_id
+        """Record runs under ``workflow_id`` until exit, restoring the outer one.
+
+        The ID belongs to the whole Session, so workflows nest within one thread
+        or asyncio task and never overlap across two.
+        """
+
+        current = _workflow_owner()
+        with self._scope_lock:
+            if self._workflow_id is not None and self._workflow_owner != current:
+                raise CommandError(
+                    "This Session is already running a workflow on another thread "
+                    "or task. Open a Session for each concurrent workflow."
+                )
+            previous = (self._workflow_id, self._workflow_owner)
+            self._workflow_id, self._workflow_owner = workflow_id, current
         try:
             yield workflow_id
         finally:
-            self._workflow_id = previous
+            with self._scope_lock:
+                self._workflow_id, self._workflow_owner = previous
 
     def position(self, workspace: Workspace | None = None) -> str:
         """Return whether execution is in Fabric, from a client, or unplaced.

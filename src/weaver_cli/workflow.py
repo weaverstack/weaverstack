@@ -107,9 +107,9 @@ def run_workflow(args: argparse.Namespace, *, parser_factory=None, stdin=None) -
     ) as session:
         _warm_for(session, parsed_commands, workspace=workspace)
         try:
-            from weaver.run import new_workflow_id
+            from weaver import workflow
 
-            with session.workflow(new_workflow_id()):
+            with workflow(session=session):
                 return _execute(entries, parsed_commands, session=session)
         finally:
             if getattr(args, "timings", False):

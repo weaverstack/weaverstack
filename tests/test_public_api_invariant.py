@@ -59,6 +59,9 @@ def test_the_top_level_is_the_ordinary_notebook_surface_only():
         # The reusable context every operation accepts. A callable rather than
         # the session package, which is why that package is `weaver.sessions`.
         "session",
+        # Operations sharing one Session, configuration and workflow ID.
+        "workflow",
+        "Workflow",
         # Setting a project up: the operation, and what it reports doing.
         "initialise",
         "InitialiseReport",

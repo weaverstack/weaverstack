@@ -293,6 +293,88 @@ def test_the_python_program_truncates_long_output():
 
 
 @weaver_test()
+def test_the_python_program_runs_its_source_as_main():
+    source = (
+        "def main():\n"
+        "    print('Running', __name__)\n"
+        "\n"
+        "if __name__ == '__main__':\n"
+        "    main()\n"
+    )
+
+    found = _run(_python_program(source, 1000, "investigate.py"), _Spark())
+
+    assert found == {"output": "Running __main__\n", "truncated": False, "error": None}
+
+
+@weaver_test()
+def test_a_python_traceback_names_the_source():
+    found = _run(_python_program("1 / 0", 1000, "investigate.py"), _Spark())
+
+    assert 'File "investigate.py", line 1' in found["error"]
+
+
+@weaver_test()
+def test_a_python_program_that_prints_nothing_succeeds_with_no_output():
+    found = _run(_python_program("x = 1", 1000), _Spark())
+
+    assert found == {"output": "", "truncated": False, "error": None}
+
+
+@pytest.mark.parametrize(
+    "source, failed",
+    [
+        ("import sys\nsys.exit()", False),
+        ("import sys\nsys.exit(0)", False),
+        ("import sys\nsys.exit(2)", True),
+        ("raise SystemExit('stopped')", True),
+    ],
+)
+@weaver_test()
+def test_a_python_exit_status_decides_success(source, failed):
+    found = _run(_python_program(source, 1000), _Spark())
+
+    assert bool(found["error"]) is failed
+    if failed:
+        assert "SystemExit" in found["error"]
+
+
+@weaver_test()
+def test_the_python_program_keeps_no_more_than_its_limit_while_printing():
+    namespace = {"spark": _Spark(), "emit": lambda value: None}
+
+    exec(
+        _python_program("for _ in range(10_000):\n    print('x' * 100)", 50),
+        namespace,
+    )
+
+    assert sum(len(piece) for piece in namespace["_buffer"].kept) == 50
+    assert namespace["_buffer"].truncated
+
+
+@weaver_test()
+def test_a_python_failure_after_long_output_keeps_the_limit_and_the_trace():
+    found = _run(
+        _python_program("print('x' * 100)\nraise ValueError('late')", 10),
+        _Spark(),
+    )
+
+    assert found["output"] == "x" * 10
+    assert found["truncated"]
+    assert "ValueError: late" in found["error"]
+
+
+@weaver_test()
+def test_python_with_no_output_returns_an_empty_success(session):
+    session.answer_python({"output": "", "truncated": False, "error": None})
+
+    result = weaver.execute("python", "Lakehouse/Landing", "x = 1", session=session)
+
+    assert result.output == ""
+    assert not result.output_truncated
+
+
+@weaver_test()
 def test_python_runs_in_fabric_from_a_file(session, tmp_path):
     path = tmp_path / "investigate.py"
     path.write_text("print('rows')\n", encoding="utf-8")
@@ -302,6 +384,8 @@ def test_python_runs_in_fabric_from_a_file(session, tmp_path):
 
     (call,) = _calls(session, "python")
     assert "print('rows')" in call.body
+    assert "_origin = 'investigate.py'" in call.body
+    assert str(tmp_path) not in call.body
     assert call.detail["lakehouse"] == "Landing_Dev"
     assert result.output == "rows\n"
     assert result.result_sets == ()
@@ -474,24 +558,61 @@ def test_a_desktop_sends_the_source_to_livy_once_with_the_lakehouse_attached(
     assert seen["livy"] == "livy"
 
 
-def _notebook(monkeypatch, attached):
+SALES_WORKSPACE_ID = "6f2c0d1e-0000-4000-8000-000000000001"
+LANDING_ID = "a1b2c3d4-0000-4000-8000-000000000002"
+
+
+def _notebook(monkeypatch, *, workspace_id, item_id, name):
     module = types.ModuleType("notebookutils")
     module.runtime = types.SimpleNamespace(
         context={
             "currentWorkspaceName": "Sales Analytics",
-            "defaultLakehouseName": attached,
+            "defaultLakehouseWorkspaceId": workspace_id,
+            "defaultLakehouseId": item_id,
+            "defaultLakehouseName": name,
         }
     )
     monkeypatch.setitem(sys.modules, "notebookutils", module)
 
 
-@weaver_test()
-def test_a_notebook_runs_the_source_in_process(monkeypatch):
+class _Resolver:
+    """Fabric's answer: Landing_Dev in Sales Analytics."""
+
+    def __init__(self):
+        self.resolved = []
+
+    def resolve(self, item, *, item_type):
+        from weaver.fabric.resources import Item
+
+        self.resolved.append((item.name, item_type))
+        return Item(
+            id=LANDING_ID,
+            name=item.name,
+            type=item_type,
+            workspace_id=SALES_WORKSPACE_ID,
+        )
+
+
+def _notebook_session(spark):
     from weaver.sessions.notebook import NotebookSession
 
-    _notebook(monkeypatch, "Landing_Dev")
+    resolver = _Resolver()
+    return NotebookSession(workspace=WORKSPACE, spark=spark, resolver=resolver), (
+        resolver
+    )
+
+
+@weaver_test()
+def test_a_notebook_runs_the_source_in_process(monkeypatch):
+    # Fabric reports IDs in either case.
+    _notebook(
+        monkeypatch,
+        workspace_id=SALES_WORKSPACE_ID.upper(),
+        item_id=LANDING_ID,
+        name="Landing_Dev",
+    )
     spark = _Spark(frames={"select n": _Frame(["n"], [(1,), (2,)])})
-    session = NotebookSession(workspace=WORKSPACE, spark=spark)
+    session, resolver = _notebook_session(spark)
 
     found = session.execute_source(
         _spark_sql_program(["select n"], 1),
@@ -500,17 +621,61 @@ def test_a_notebook_runs_the_source_in_process(monkeypatch):
     )
 
     assert found == {"columns": ["n"], "rows": [[1]], "truncated": True, "error": None}
+    assert resolver.resolved == [("Landing_Dev", "Lakehouse")]
 
 
+@pytest.mark.parametrize(
+    "attached, described",
+    [
+        (
+            {"workspace_id": SALES_WORKSPACE_ID, "item_id": "other", "name": "Raw"},
+            "Lakehouse 'Raw' (other)",
+        ),
+        (
+            {"workspace_id": "elsewhere", "item_id": "copy", "name": "Landing_Dev"},
+            "Lakehouse 'Landing_Dev' (copy)",
+        ),
+        (
+            {
+                "workspace_id": SALES_WORKSPACE_ID,
+                "item_id": "copy",
+                "name": "Landing_Dev",
+            },
+            "Lakehouse 'Landing_Dev' (copy)",
+        ),
+        (
+            {"workspace_id": "elsewhere", "item_id": LANDING_ID, "name": "Landing_Dev"},
+            f"Lakehouse 'Landing_Dev' ({LANDING_ID})",
+        ),
+        ({"workspace_id": "", "item_id": "", "name": "Landing_Dev"}, "no Lakehouse"),
+        (
+            {"workspace_id": "", "item_id": LANDING_ID, "name": "Landing_Dev"},
+            f"Lakehouse 'Landing_Dev' ({LANDING_ID})",
+        ),
+    ],
+    ids=[
+        "another-lakehouse",
+        "same-name-another-workspace",
+        "same-name-another-item",
+        "same-item-id-another-workspace",
+        "no-attachment-metadata",
+        "no-workspace-id",
+    ],
+)
 @weaver_test()
-def test_a_notebook_attached_elsewhere_refuses_the_source(monkeypatch):
-    from weaver.sessions.notebook import NotebookSession
+def test_a_notebook_runs_only_on_the_attached_lakehouse_it_resolves(
+    monkeypatch, attached, described
+):
+    _notebook(monkeypatch, **attached)
+    spark = _Spark()
+    session, _ = _notebook_session(spark)
 
-    _notebook(monkeypatch, "Raw")
-    session = NotebookSession(workspace=WORKSPACE, spark=_Spark())
+    with pytest.raises(CommandError) as refused:
+        session.execute_source("spark.sql('x')", lakehouse="Landing_Dev", name="x")
 
-    with pytest.raises(CommandError, match="attached to Lakehouse 'Raw'"):
-        session.execute_source("emit(1)", lakehouse="Landing_Dev", name="x")
+    assert f"attached to {described}" in str(refused.value)
+    assert f"needs Lakehouse 'Landing_Dev' ({LANDING_ID})" in str(refused.value)
+    assert spark.statements == []
 
 
 # --- the command line ----------------------------------------------------------

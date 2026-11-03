@@ -190,19 +190,29 @@ class NotebookSession(Session):
     ) -> Any:
         import json
 
+        from ..fabric.resources import LAKEHOUSE
         from ..lakehouse import _attached_from_runtime_context
+        from ..targets import ItemRef
 
-        attached = _attached_from_runtime_context()[2]
-        if attached != lakehouse:
+        scope = self.scope(workspace)
+        # A display name is unique only within a workspace and item type.
+        attached = _attached_from_runtime_context()
+        expected = scope.resolver.resolve(ItemRef(lakehouse), item_type=LAKEHOUSE)
+        if _ids(attached[:2]) != _ids((expected.workspace_id, expected.id)):
+            described = (
+                f"Lakehouse {attached[2]!r} ({attached[1]})"
+                if attached[1]
+                else "no Lakehouse"
+            )
             raise CommandError(
-                f"This notebook's Spark session is attached to "
-                f"{'Lakehouse ' + repr(attached) if attached else 'no Lakehouse'}; "
-                f"this work needs {lakehouse!r}. Attach {lakehouse!r} to the "
-                "notebook, or run it from a desktop."
+                f"This notebook's Spark session is attached to {described}; this "
+                f"work needs Lakehouse {lakehouse!r} ({expected.id}) in "
+                f"{scope.workspace.workspace}. Attach it to the notebook, or run "
+                "it from a desktop."
             )
         emitted = []
         namespace = {
-            "spark": self.scope(workspace).spark(),
+            "spark": scope.spark(),
             # The same JSON round trip a result makes from Livy.
             "emit": lambda value: emitted.append(
                 json.loads(json.dumps(value, default=str))
@@ -395,3 +405,7 @@ class NotebookScope(WorkspaceScope):
 
 
 __all__ = ["NotebookScope", "NotebookSession"]
+
+
+def _ids(values) -> tuple[str, ...]:
+    return tuple(str(value or "").strip().casefold() for value in values)

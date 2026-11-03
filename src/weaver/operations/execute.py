@@ -108,8 +108,8 @@ def execute(
 
     T-SQL runs as one batch and returns every result set. Spark SQL runs its
     statements in order, with the Lakehouse attached, and returns the last
-    one's result. Python runs in Fabric with ``spark`` attached to the
-    Lakehouse and returns what it printed. DAX runs one query.
+    one's result. Python runs in Fabric as ``__main__``, with ``spark``
+    attached to the Lakehouse, and returns what it printed. DAX runs one query.
 
     A failure raises :class:`~weaver.errors.ExecuteError` with what the engine
     reported. When a request may have reached Fabric and its response was
@@ -128,6 +128,8 @@ def execute(
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise CommandError("limit must be a positive integer")
     text = _source(command, file)
+    # Tracebacks name the file; a desktop path means nothing in Fabric.
+    origin = {"origin": Path(file).name if file is not None else "<command>"}
 
     resolved = operation_workspace(
         "execute",
@@ -146,7 +148,12 @@ def execute(
             started = time.monotonic()
             try:
                 found = _RUN[engine](
-                    opened, text, workspace=resolved, physical=physical, limit=limit
+                    opened,
+                    text,
+                    workspace=resolved,
+                    physical=physical,
+                    limit=limit,
+                    **(origin if engine == "python" else {}),
                 )
             except OutcomeUnknown as exc:
                 raise OutcomeUnknown(
@@ -271,34 +278,73 @@ def _spark_sql(session, text: str, *, workspace, physical: str, limit: int) -> d
     }
 
 
-#: As the Spark SQL program, after ``_source`` and ``_limit``.
+#: As the Spark SQL program, after ``_source``, ``_origin`` and ``_limit``.
+#: The source runs as ``__main__`` and keeps at most ``_limit`` printed
+#: characters however much it prints.
 _PYTHON_PROGRAM = """\
 import contextlib as _contextlib
 import io as _io
 import traceback as _traceback
-_buffer = _io.StringIO()
+
+
+class _Bounded(_io.TextIOBase):
+    def __init__(self, limit):
+        self.kept = []
+        self.room = limit
+        self.truncated = False
+
+    def writable(self):
+        return True
+
+    def write(self, text):
+        if len(text) > self.room:
+            self.truncated = True
+        if self.room > 0:
+            piece = text[: self.room]
+            self.kept.append(piece)
+            self.room -= len(piece)
+        return len(text)
+
+
+_buffer = _Bounded(_limit)
 _failure = None
 try:
     with _contextlib.redirect_stdout(_buffer):
-        exec(compile(_source, "<execute>", "exec"), {"spark": spark})
+        exec(
+            compile(_source, _origin, "exec"),
+            {"__name__": "__main__", "spark": spark},
+        )
+except SystemExit as _exit:
+    if _exit.code not in (None, 0):
+        _failure = _traceback.format_exc()
 except BaseException:
     _failure = _traceback.format_exc()
-_output = _buffer.getvalue()
 emit({
-    "output": _output[:_limit],
-    "truncated": len(_output) > _limit,
+    "output": "".join(_buffer.kept),
+    "truncated": _buffer.truncated,
     "error": _failure,
 })
 """
 
 
-def _python_program(source: str, limit: int) -> str:
-    return f"_source = {source!r}\n_limit = {limit!r}\n" + _PYTHON_PROGRAM
+def _python_program(source: str, limit: int, origin: str = "<command>") -> str:
+    return (
+        f"_source = {source!r}\n_origin = {origin!r}\n_limit = {limit!r}\n"
+        + _PYTHON_PROGRAM
+    )
 
 
-def _python(session, text: str, *, workspace, physical: str, limit: int) -> dict:
+def _python(
+    session,
+    text: str,
+    *,
+    workspace,
+    physical: str,
+    limit: int,
+    origin: str = "<command>",
+) -> dict:
     found = session.execute_source(
-        _python_program(text, OUTPUT_LIMIT),
+        _python_program(text, OUTPUT_LIMIT, origin),
         lakehouse=physical,
         name="execute.python",
         workspace=workspace,

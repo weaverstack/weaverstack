@@ -72,9 +72,10 @@ def workflow(
     ``workspace_config``, then the Session's or the enclosing workflow's own,
     then ``workspace-config.yml`` in the working directory, then the Fabric
     notebook's workspace. ``catalogue`` and ``environment`` override what
-    resolves. ``mirror``, ``execution``, ``targets``, ``data_sources`` and
-    ``catalogue_dashboard`` each replace the resolved value whole, in the
-    shapes workspace configuration uses.
+    resolves, as do ``mirror`` and ``catalogue_dashboard``. ``execution``
+    changes only the concurrency settings it names, and ``targets`` and
+    ``data_sources`` only the entries they name, in the shapes workspace
+    configuration uses.
 
     Without ``session``, the workflow borrows an enclosing workflow's Session,
     or opens one and closes it on exit. A given Session is borrowed and left

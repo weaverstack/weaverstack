@@ -155,7 +155,11 @@ def _test_graph(request, state) -> RunGraph:
         dag, request.items, operation="Test", error=ValidationError
     )
     estate = ValidationEstate.of(dag)
-    selected = validation_order(estate.matching(request.names, request.items))
+    matched = estate.matching(request.names, request.items)
+    if request.selected is not None:
+        chosen = frozenset(request.selected)
+        matched = tuple(each for each in matched if each.logical in chosen)
+    selected = validation_order(matched)
     return RunGraph(
         nodes=tuple(
             RunNode(

@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
+from ..catalogue.state import READABLE_TABLES
+from ..catalogue.tables import LOAD_STATUS, TEST_STATUS
 from ..declaration.model import WeaverItemId
 from ..errors import CommandError
 from ..selection import matching, name_patterns
@@ -42,6 +44,7 @@ def test(
     environment: str | None = None,
     workspace_config: str | Path | None = None,
     dry_run: bool = False,
+    stale: bool = False,
     concurrency: int | None = None,
     session=None,
 ) -> ValidationRunReport:
@@ -68,6 +71,12 @@ def test(
 
     ``source`` defaults to the current directory or Notebook Resources.
 
+    ``stale`` runs only the validations ``weaver health`` does not call Green:
+    never run, Pending, failed, errored or blocked, or passed before an object
+    they read was loaded or built again. ``names`` still have to match. A
+    current estate selects nothing, which succeeds. Stale selection reads
+    recorded results, so it needs catalogue mode.
+
     A completed run returns its report whatever the validations found. The
     report distinguishes findings from validations that could not be evaluated.
     """
@@ -89,6 +98,15 @@ def test(
     project = Project(source, resolved)
     requested = requested_items(items, what="test", project=project)
     from_files = bool(selected_files) or not resolved.catalogue
+    if stale and selected_files:
+        raise CommandError(
+            "stale selects from recorded results, and validations run from "
+            "files record none. Remove files, or stale."
+        )
+    if stale and not resolved.catalogue:
+        from ..config import CATALOGUE_HINT
+
+        raise CommandError(f"test --stale needs a Weaver catalogue. {CATALOGUE_HINT}.")
 
     from ..sessions.host import use_or_create_session
 
@@ -116,6 +134,7 @@ def test(
                     items=requested,
                     names=selected_names,
                     dry_run=dry_run,
+                    stale=stale,
                     concurrency=concurrency,
                 )
             frame.failed = not report.succeeded
@@ -137,11 +156,13 @@ def run_test(
     names: Sequence[str] = (),
     state=None,
     dry_run: bool = False,
+    stale: bool = False,
     concurrency: int | None = None,
 ) -> ValidationRunReport:
     """Run installed validations through a prepared Session, and record them.
 
     ``state`` lets a caller provide an already-read catalogue snapshot.
+    ``stale`` runs the validations the catalogue read does not call Green.
 
     The catalogue is read before Spark starts because it holds the physical
     target.
@@ -156,18 +177,39 @@ def run_test(
     with session.step("Read catalogue"):
         if state is None:
             state = RunState(
-                catalogue=read_installed_catalogue(session=session, workspace=workspace)
+                catalogue=read_installed_catalogue(
+                    session=session,
+                    workspace=workspace,
+                    # Stale selection compares recorded results with load state.
+                    tables=(*READABLE_TABLES, TEST_STATUS, LOAD_STATUS)
+                    if stale
+                    else None,
+                )
             )
         # Resolve an empty scope against the catalogue just read.
         items, installed = run_scope(
             state.catalogue.dag(), items, what="test", catalogue=workspace.catalogue
         )
     session.report(run_context_lines(workspace, items, installed))
+
+    selected = None
+    if stale:
+        from ..health import assess_validations
+        from .mirror import mirrored_source
+
+        # A mirrored ancestor's load is recorded in the catalogue it mirrors.
+        source = mirrored_source(
+            state.catalogue,
+            workspace=workspace,
+            session=session,
+            operation="test --stale",
+            tables=(LOAD_STATUS,),
+        )
+        selected = assess_validations(
+            state.catalogue, items=items, source=source
+        ).unsettled_identities()
     targets = tuple(installed[item] for item in items)
 
-    _require_lakehouse_environment(
-        session, workspace=workspace, targets=targets, dry_run=dry_run
-    )
     # Fabric requires a Lakehouse attachment before Spark starts.
     session.offer_spark_home(lakehouse_names(targets), workspace=workspace)
     started = datetime.now(timezone.utc)
@@ -175,6 +217,7 @@ def run_test(
     request = RunRequest.test(
         items,
         names=names,
+        selected=selected,
         dry_run=dry_run,
         # Validations are independent; a finding does not block the rest.
         fault_tolerant=True,
@@ -182,6 +225,13 @@ def run_test(
     )
     with session.step("Build run graph"):
         runner = validation_runner(workspace, state, request)
+    # Decided after selection, so a stale run with nothing to do needs no runtime.
+    _require_lakehouse_environment(
+        session,
+        workspace=workspace,
+        targets=targets,
+        dry_run=dry_run or not needs_spark(runner.graph),
+    )
 
     run = FabricRun(
         name="test",

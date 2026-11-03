@@ -99,8 +99,8 @@ class RunRequest:
     items: tuple
     #: Regular expressions selecting original installed loadables or validations.
     names: tuple[str, ...] = ()
-    #: Original Load seeds, by logical identity, before expansion.
-    #: ``None`` selects every loadable the requested items own. ``load`` only.
+    #: Original Load seeds, or the validations to run, by logical identity.
+    #: ``None`` selects everything the requested items own.
     selected: tuple | None = None
     #: Continue through settled dependency failures, and report each outcome.
     fault_tolerant: bool = False
@@ -125,8 +125,6 @@ class RunRequest:
         validate_concurrency(self.concurrency)
         if not self.items:
             raise CommandError(f"{self.kind} needs at least one item")
-        if self.selected is not None and self.kind != LOAD:
-            raise CommandError("selected= applies only to loads")
         if (self.ancestors or self.descendants) and self.kind != LOAD:
             raise CommandError("ancestors and descendants apply only to loads")
         if self.reload and self.kind != LOAD:
@@ -144,6 +142,8 @@ class RunRequest:
     @classmethod
     def test(cls, items: Sequence, **policy) -> "RunRequest":
         policy["names"] = tuple(policy.get("names") or ())
+        selected = policy.get("selected")
+        policy["selected"] = None if selected is None else tuple(selected)
         return cls(kind=TEST, items=tuple(items), **policy)
 
     @property

@@ -40,7 +40,18 @@ def estate(tmp_path):
     load_estate(root)
     (root / "Lakehouse/Raw/tests").mkdir(parents=True)
     (root / "Lakehouse/Raw/tests/Sales__OrderHasRows.py").write_text(
-        lakehouse_test("Sales.OrderHasRows", primary_key="OrderId"), encoding="utf-8"
+        lakehouse_test("Sales.OrderHasRows", primary_key="OrderId").replace(
+            "from weaver import Test",
+            "from weaver import Test\nfrom Tables.Sales__Order import Sales__Order",
+        ),
+        encoding="utf-8",
+    )
+    (root / "Lakehouse/Raw/tests/Sales__ExportHasRows.py").write_text(
+        lakehouse_test("Sales.ExportHasRows", primary_key="OrderId").replace(
+            "from weaver import Test",
+            "from weaver import Test\nfrom Files.Sales__Export import Sales__Export",
+        ),
+        encoding="utf-8",
     )
     from weaver.declaration import parse_item_repository
     from weaver.locations import Location
@@ -133,5 +144,53 @@ def test_a_second_workflow_on_the_same_session_records_its_own_id(estate, succee
     assert first == first_report and second == second_report and first != second
     assert [row["workflow_id"] for row in writer.rows(TEST_STATUS.name)] == [
         first,
+        first,
+        second,
         second,
     ]
+
+
+@weaver_test()
+def test_a_stale_test_after_a_load_runs_what_that_load_moved(estate, succeeding):
+    """Test, then load one object, then a stale test: only its reader runs."""
+
+    from weaver.operations.test import run_test
+
+    catalogue, writer = estate
+    workspace = given_workspace(catalogue="Warehouse/Weaver_LH")
+    session = TestSession(workspace=workspace, executes_here=True)
+
+    def stale_test():
+        return run_test(
+            session,
+            workspace=workspace,
+            items=(RAW,),
+            state=RunState(catalogue=catalogue),
+            stale=True,
+        )
+
+    with weaver.workflow(session=session) as entered:
+        before = stale_test()
+        execute_load(
+            session,
+            workspace=workspace,
+            runner=Runner(
+                RunState(catalogue=catalogue),
+                RunRequest.load((RAW,), names=("Sales.Order",)),
+                workspace=workspace,
+                can_refresh=True,
+            ),
+            started=_now(),
+        )
+        after = stale_test()
+        settled = stale_test()
+
+    assert {node.logical_id for node in before.nodes} == {
+        "Lakehouse/Raw/Sales.OrderHasRows",
+        "Lakehouse/Raw/Sales.ExportHasRows",
+    }
+    assert [node.logical_id for node in after.nodes] == [
+        "Lakehouse/Raw/Sales.OrderHasRows"
+    ]
+    assert settled.nodes == () and settled.succeeded
+    assert {before.workflow_id, after.workflow_id} == {entered.workflow_id}

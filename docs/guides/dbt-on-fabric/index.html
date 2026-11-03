@@ -95,48 +95,64 @@
 <p>dbt brought real engineering discipline to SQL development: dependency management, testing, documentation and repeatable deployments. If your Fabric work is mostly SQL transformations in a Warehouse, dbt may be all you need.</p>
 <p>Fabric is broader than that. Python, Spark, Lakehouse, Warehouse, OneLake and Power BI share one platform, and as a project uses more of it, the places where dbt stops start to matter.</p>
 <p>A typical project grows piece by piece. A Python notebook for ingestion. A Spark job for Lakehouse processing. A dbt project for the Fabric Warehouse. Fabric pipelines to connect them. Separate arrangements for deployment, testing and monitoring. Each addition is reasonable on its own. But they add up, and at some point you start to wonder: are we designing our data engineering around what Fabric makes possible, or around what our framework was designed to support?</p>
-<p>This article walks through five places where those pieces meet, and the questions worth asking about each before you commit.</p>
+<p>This article walks through six places where those pieces meet, and what to check about each before you commit.</p>
 
 <h2 id="a-table-is-a-table">The first seam: a table is a table, in Python, Spark SQL or T-SQL</h2>
 <p>A production table needs the same things whether Python, Spark SQL or T-SQL populates it: staging, primary keys, change detection, merging, auditing, and the ability to resume safely after a failure. These aren't SQL features. They're data engineering requirements.</p>
 <p>Fabric lets you pick the right engine for each job. Python for acquisition and awkward file formats. T-SQL for relational modelling. Spark SQL for scale.</p>
-<p>dbt gives SQL models that discipline. Tables loaded by Python sit outside it, so the engineering standard often changes when the language does: different development patterns, different execution, different conventions, and often a home-grown framework to fill the gap.</p>
+<p>dbt gives SQL models that discipline. It supports <a href="https://docs.getdbt.com/docs/build/python-models">Python models</a> on some platforms, but not on Fabric: Microsoft's <a href="https://github.com/microsoft/dbt-fabricspark">Lakehouse adapter</a> covers SQL models only, with no Python support planned. Tables loaded by Python sit outside dbt, so the engineering standard often changes when the language does: different development patterns, different execution, different conventions.</p>
 <p>A primary key doesn't stop being a primary key because you wrote it in Python. So why should choosing Python mean stepping outside your engineering framework? And why should a data team have to invent another one to fill the gap? The programming language changes how a table is implemented. It doesn't change the standard the table is held to.</p>
 
-<h2 id="orchestrating-jobs-not-data">The second seam: orchestrating jobs, not data, across Lakehouse and Warehouse</h2>
-<p>A typical Fabric architecture: a notebook populates Delta tables, a <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-overview">dbt job</a> transforms them, another job builds the final models, and a pipeline connects the stages. Microsoft <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-activity">documents patterns like this</a>, and they work.</p>
-<p>dbt understands the dependencies between its own models, and handles them well. It doesn't see the Python that feeds them or the Lakehouse processing beside them, so the orchestration that spans them sits in a layer above, scheduling notebooks and jobs.</p>
-<p>Now suppose one source changes, affecting two Delta tables and three Warehouse tables. The real dependencies are between those five objects. So why are we scheduling, rerunning and monitoring the notebooks and jobs that contain them? As the estate grows, those job boundaries start to decide how failures, concurrency and reruns are handled.</p>
-<p>Why should the boundary between Lakehouse and Warehouse set the boundary of the engineering framework? Fabric brings them together. The dependency graph should too.</p>
+<h2 id="files">The second seam: files are important too</h2>
+<p>The advantage of Microsoft Fabric is that it can handle files as well as tables. Published workbooks, PDFs, HTML pages, CSV extracts and API responses land in a Lakehouse's Files area, beside the tables built from them. A lot of the data that matters arrives this way, and acquiring it is often the slowest and most fragile part of the pipeline.</p>
+<p>From an engineering point of view, files raise the same questions as tables:</p>
+<ul>
+<li><strong>Change detection.</strong> Which files are new, which changed and which were withdrawn since the last run. A publisher correcting a file at the same URL is a change; the same file downloaded twice is not, so content matters more than timestamps.</li>
+<li><strong>Dependencies.</strong> Which tables are built from which files, so a changed file reloads only the tables that read it.</li>
+<li><strong>Metadata.</strong> Where each file came from, when it was retrieved and what it contained, carried through to the rows built from it.</li>
+<li><strong>Incremental load.</strong> Acquisition fetches only what is missing or changed, and each table reads only the files that changed since its own last successful load. Files that can't be acquired again are history, and need protecting from a rebuild.</li>
+</ul>
+<p>dbt starts from sources that are already tables. Its source freshness check looks at the latest load timestamp in a table; it has no record of which files arrived, changed or disappeared. Acquisition, and the record of what was acquired, happens before dbt, usually in notebooks and pipelines with a manifest of the team's own design.</p>
+<p>Why should the files a pipeline depends on be tracked less carefully than the tables built from them?</p>
 
-<h2 id="keeping-track">The third seam: keeping track of incremental loads</h2>
-<p>Running a warehouse in production is more than executing transformations.</p>
-<p>Suppose a source delivers 100,000 records and only five have changed. The warehouse should know that. It should update those five, leave the rest untouched, and record exactly what happened.</p>
+<h2 id="orchestrating-jobs-not-data">The third seam: orchestrating jobs, not data, across Lakehouse and Warehouse</h2>
+<p>Take the common pattern: a notebook populates Delta tables, a <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-overview">dbt job</a> transforms them, another job builds the final models, and a pipeline connects the stages. Microsoft <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-activity">documents patterns like this</a>, and they work.</p>
+<p>dbt understands the dependencies between its own models, and handles them well. On Fabric it can build in both places: <code>dbt-fabric</code> for the Warehouse in T-SQL, and <code>dbt-fabricspark</code> for the Lakehouse in Spark SQL. But each dbt run targets one adapter, so Lakehouse and Warehouse models usually sit in separate projects or runs, and references between projects are a <a href="https://docs.getdbt.com/docs/mesh/govern/project-dependencies">dbt platform Enterprise feature</a>. dbt still doesn't see the Python that feeds them, so the orchestration that spans them sits in a layer above, scheduling notebooks and jobs.</p>
+<p>Now suppose one source changes, affecting two Delta tables and three Warehouse tables. The real dependencies are between those five objects. So why are we scheduling, rerunning and monitoring the notebooks and jobs that contain them? As the estate grows, those job boundaries start to decide how failures, concurrency and reruns are handled.</p>
+<p>Fabric brings Lakehouse and Warehouse together on one platform. The dependency graph can span them too, rather than stopping at the boundary between them.</p>
+
+<h2 id="keeping-track">The fourth seam: keeping track of what's changing</h2>
+<p>Running a warehouse in production is more than executing transformations. Things change all the time, and the warehouse should know what changed, where, and what it affects.</p>
+<p>Suppose a source delivers 100,000 records and only five have changed. The warehouse should update those five, leave the rest untouched, and record exactly what happened.</p>
 <p>Now suppose 40,000 records vanish overnight. Were they deleted, or did the extract break?</p>
-<p>Or the load fails halfway. Where should the next run start?</p>
-<p>These are <a href="https://principlesofdataengineering.org/docs/efficient-stable-pipeline/tracking-changes/">basic warehouse disciplines</a>: detecting genuine change, handling deletes deliberately, keeping change timestamps that mean something, and advancing bookmarks only when a load succeeds.</p>
-<p>dbt executes transformations, and does it well. <a href="https://docs.getdbt.com/docs/build/incremental-models">Incremental models</a> cover part of this, one model at a time, but dbt doesn't keep track of what changed row by row, or where each table is up to. So teams build their own bookkeeping around dbt. Then again for Python. And again for the Lakehouse.</p>
+<p>Or a definition changes, and the tests that passed yesterday no longer describe today's data. Or a load fails halfway. Where should the next run start?</p>
+<p>These are <a href="https://principlesofdataengineering.org/docs/efficient-stable-pipeline/tracking-changes/">basic warehouse disciplines</a>: detecting genuine change, handling deletes deliberately, keeping change timestamps that mean something, knowing what each table has already read, and advancing bookmarks only when a load succeeds.</p>
+<p>dbt covers parts of this. <a href="https://docs.getdbt.com/docs/build/incremental-models">Incremental models</a> process new rows one model at a time. <a href="https://docs.getdbt.com/docs/build/snapshots">Snapshots</a> keep the history of a table's rows, with valid-from and valid-to dates and options for recording hard deletes. That answers "what did this row look like last March?". It doesn't answer "what did last night's run change?": there are no per-run counts of inserts, updates and deletes, no record of how far each consumer has read, and nothing for files or Python loads.</p>
+<p>So teams build their own bookkeeping around dbt. Then again for Python. And again for files in the Lakehouse.</p>
 <p>Why should keeping track of a data warehouse be a do-it-yourself project through customisation?</p>
 
-<h2 id="onelake">The fourth seam: OneLake changes how you can develop</h2>
+<h2 id="onelake">The fifth seam: OneLake changes how you can develop</h2>
 <p>OneLake is one of my favourite things about Fabric.</p>
 <p>Some of my government sources take hours to acquire. With <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">OneLake shortcuts</a>, development can reuse that source data without copying or downloading it again. Change a transformation, rebuild the affected objects, inspect, repeat. Dozens of iterations in the time one acquisition would take.</p>
 <p>But shortcuts alone don't give you that workflow. The framework has to know which data is borrowed, which objects it manages locally, and how to deploy changes safely.</p>
+<p>dbt's closest feature is <a href="https://docs.getdbt.com/reference/node-selection/defer">defer</a>: when a developer runs only the models they changed, references to the rest read the production tables instead. That saves rebuilding upstream SQL models. It isn't a development copy of the estate, though. It covers only dbt's own models, not the files and Python loads before them, which are usually the slowest data to acquire again.</p>
 <p>Does the engineering framework take advantage of the innovation Microsoft has put into Fabric, or does it limit how much of it the team can adopt?</p>
 
-<h2 id="the-whole-estate">The fifth seam: who understands the whole Fabric estate?</h2>
+<h2 id="the-whole-estate">The sixth seam: who understands the whole Fabric estate?</h2>
 <p>By now there are many moving parts: notebooks, Lakehouse tables, Warehouse models, pipelines, separate execution histories, tests and deployment configurations.</p>
 <p>When something breaks, where does the team look? Which object failed? What sits downstream of it? What actually changed? Which tests are now stale? Can just the affected work be rerun?</p>
 <p>dbt has lineage and test results. Fabric has monitoring. A shared Git repository and a master pipeline help. Each shows part of the picture.</p>
 <p>This matters more as AI agents take on development work. An agent learns through a tight loop: make a change, run it, read the result, fix it. From a command line, that loop takes seconds.</p>
-<p>Split a pipeline across notebooks and dbt, and the loop breaks at every seam. The dbt half runs from a terminal. The notebook half runs somewhere else, with its results somewhere else again. The agent can change the code, but it struggles to see what its change did. Why should an agent need to learn ten systems to manage one pipeline?</p>
+<p>Split a pipeline across notebooks and dbt, and the loop breaks at every seam. The dbt half runs from a terminal, and dbt Labs' <a href="https://docs.getdbt.com/docs/dbt-ai/about-mcp">MCP server</a> gives an agent access to it. The notebook half runs somewhere else, with its results somewhere else again. The agent can change the code, but it struggles to see what its change did.</p>
 <aside class="callout"><p>The seams start as little inconveniences. As complexity grows, they become the architecture.</p></aside>
 
 <h2 id="what-to-look-for">What to look for in a Fabric data engineering framework</h2>
 <p>What if we designed data engineering around Fabric, rather than fitting Fabric around a SQL framework? Whether you use dbt on its own, build around it, or choose something else, these are the capabilities worth checking against the work you'll do on Fabric:</p>
 <ul>
 <li>One standard for every table, whichever engine populates it.</li>
+<li>Files tracked as carefully as tables: what arrived, what changed, what was withdrawn.</li>
 <li>Dependencies between objects, not jobs, crossing Lakehouse and Warehouse.</li>
+<li>A record of what changed in every run, and how far each consumer has read.</li>
 <li>Loading, testing, auditing and recovery under one set of conventions.</li>
 <li>Development that reuses data through OneLake rather than copying it.</li>
 <li>One operational record of what was deployed, loaded and tested.</li>
@@ -144,11 +160,12 @@
 <p>The question is less about dbt itself than about what a data engineering framework should be responsible for on a multi-engine platform.</p>
 
 <h2 id="in-practice">Putting it into practice: one framework across Fabric</h2>
-<p><a href="/">Weaver</a> is an open-source data engineering framework designed around Fabric's native capabilities. Each seam above has a direct answer in it.</p>
+<p>This is the approach we took with <a href="/">Weaver</a>, an open-source data engineering framework designed around Fabric's native capabilities. It's one way to meet the checklist above:</p>
 <ul>
 <li><strong>One standard for every table.</strong> Python, Spark SQL and Warehouse T-SQL objects share one load contract: staging, declared keys, change detection, explicit deletes, audit columns and data-quality safeguards. Write a Warehouse SELECT and Weaver creates the table and loading procedure around it.</li>
+<li><strong>Files as managed objects.</strong> A Folder records every file it acquires, changes or removes, with per-run counts. Each Table reading it asks for the files added, changed or deleted since its own bookmark, and Folders holding history that can't be acquired again can be protected from a rebuild.</li>
 <li><strong>One dependency graph across Fabric.</strong> Python files, Lakehouse Delta tables, Warehouse tables, semantic models and Reports sit in a single graph. A load runs in dependency order, with Spark and each Warehouse in their own concurrency lanes, and a failure blocks only the work that depends on it.</li>
-<li><strong>Incremental state built in.</strong> Each table keeps its own bookmark, which advances only when its load succeeds, and every run records the rows inserted, updated and deleted.</li>
+<li><strong>Change tracking built in.</strong> Each table keeps its own bookmark, which advances only when its load succeeds, and every run records the rows inserted, updated and deleted. When a definition changes, the tests that depend on it are marked stale.</li>
 <li><strong>Development on existing data.</strong> Mirror sets up a development workspace over existing data through OneLake shortcuts and Warehouse views, and materialises only the objects you change.</li>
 <li><strong>One operational record.</strong> Deployments, loads and tests are recorded in Fabric Warehouse tables. Health shows what is failing or stale, and a Power BI dashboard covers the whole estate.</li>
 <li><strong>Native Power BI.</strong> Deploy PBIP and TMDL semantic models and Reports, apply shared rules, and unit test DAX measures against SQL results.</li>
@@ -162,16 +179,17 @@
 <ul>
 <li>most of your work is SQL transformations in a Fabric Warehouse</li>
 <li>ingestion is handled elsewhere and rarely changes</li>
-<li>you already have a working dbt project and a team that knows it.</li>
+<li>you already have a working dbt project and a team that knows it</li>
 </ul>
 <p>But if your work is spreading across engines, it's worth asking some harder questions.</p>
 <p>How much effort goes into coordinating separate systems?</p>
 <p>How often does the team adapt its engineering to fit the framework?</p>
 <p>Which Fabric capabilities is the team avoiding because they're awkward to integrate?</p>
+<p>The tooling is moving. As at November 2026, Microsoft's <a href="https://learn.microsoft.com/en-us/fabric/data-factory/dbt-job-overview">dbt job runtime</a> runs dbt Core 1.11 with both Fabric adapters, and dbt Labs has said its <a href="https://www.getdbt.com/blog/dbt-labs-integrates-dbt-fusion-engine-in-microsoft-fabric">newer Fusion engine will come to Fabric</a>. Check what is current before deciding.</p>
 <p>There's no reason to abandon an architecture that works. The useful question is how much of your Fabric work dbt covers, and how much you'll build and run beside it.</p>
 <p>See how Weaver compares in practice: <a href="/vs-dbt/">Weaver for dbt developers</a>.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#a-table-is-a-table">A table is a table</a></li><li><a href="#orchestrating-jobs-not-data">Orchestrating jobs, not data</a></li><li><a href="#keeping-track">Keeping track</a></li><li><a href="#onelake">OneLake development</a></li><li><a href="#the-whole-estate">The whole estate</a></li><li><a href="#what-to-look-for">What to look for</a></li><li><a href="#in-practice">Putting it into practice</a></li><li><a href="#deciding">Deciding whether dbt is enough</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#a-table-is-a-table">A table is a table</a></li><li><a href="#files">Files are important too</a></li><li><a href="#orchestrating-jobs-not-data">Orchestrating jobs, not data</a></li><li><a href="#keeping-track">Keeping track of change</a></li><li><a href="#onelake">OneLake development</a></li><li><a href="#the-whole-estate">The whole estate</a></li><li><a href="#what-to-look-for">What to look for</a></li><li><a href="#in-practice">Putting it into practice</a></li><li><a href="#deciding">Deciding whether dbt is enough</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

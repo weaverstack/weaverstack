@@ -40,6 +40,10 @@ class SessionSqlExecutor:
         with self._telemetry.external("tds", "query_result_sets"):
             return self._executor.query_result_sets(statement, parameters)
 
+    def query_limited(self, statement: str, *, limit: int):
+        with self._telemetry.external("tds", "query_limited"):
+            return self._executor.query_limited(statement, limit=limit)
+
     def call_procedure(
         self,
         procedure: str,

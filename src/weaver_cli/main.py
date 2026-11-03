@@ -101,6 +101,19 @@ against the deployed objects and records nothing. Test uses file mode when
 --file is given or no catalogue is configured.\
 """
 
+EXECUTE_DESCRIPTION = """\
+Run T-SQL, Spark SQL, Python or DAX against one item and print what it returns.
+
+  tsql       Warehouse/Name       one batch; every result set, in order
+  spark-sql  Lakehouse/Name       statements in order; the last one's result
+  python     Lakehouse/Name       runs in Fabric with spark attached; its output
+  dax        SemanticModel/Name   one query
+
+The item's target in workspace configuration is used, or else the Fabric item
+of the same name. Each result is read to --limit rows. Nothing is recorded in
+the catalogue, and a submission whose outcome is unknown is not sent again.\
+"""
+
 DOCTOR_DESCRIPTION = """\
 Check Microsoft Fabric connectivity.
 
@@ -284,6 +297,16 @@ def _requires_catalogue_dashboard(args) -> frozenset[str]:
     return requirements(AUTH, RESOLVER, TDS)
 
 
+def _requires_execute(args) -> frozenset[str]:
+    """Spark is not warmed: it starts on use, attached to the named Lakehouse."""
+
+    from weaver.sessions.requirements import AUTH, RESOLVER, TDS, requirements
+
+    if getattr(args, "engine", None) == "tsql":
+        return requirements(AUTH, RESOLVER, TDS)
+    return requirements(AUTH, RESOLVER)
+
+
 def _requires_initialise(args) -> frozenset[str]:
     from weaver.sessions.requirements import AUTH, RESOLVER, requirements
 
@@ -329,6 +352,16 @@ def _positive_concurrency(text):
         raise argparse.ArgumentTypeError(
             "concurrency must be a positive integer"
         ) from exc
+
+
+def _positive_limit(text):
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise argparse.ArgumentTypeError("limit must be a positive integer")
+    return value
 
 
 def _add_concurrency_arg(parser):
@@ -729,6 +762,38 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.set_defaults(
         handler=handle_catalogue_dashboard, requires=_requires_catalogue_dashboard
     )
+
+    execute = subcommands.add_parser(
+        "execute",
+        help="Run T-SQL, Spark SQL, Python or DAX against one item.",
+        description=EXECUTE_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    execute.add_argument("engine", choices=("tsql", "spark-sql", "python", "dax"))
+    execute.add_argument(
+        "item",
+        metavar="ITEM",
+        help="Warehouse/Name for tsql, Lakehouse/Name for spark-sql and python, "
+        "SemanticModel/Name for dax.",
+    )
+    source = execute.add_mutually_exclusive_group(required=True)
+    source.add_argument(
+        "--command", dest="source_text", metavar="SOURCE", help="The source to run."
+    )
+    source.add_argument(
+        "--file", dest="source_file", metavar="PATH", help="A file holding the source."
+    )
+    execute.add_argument(
+        "--limit",
+        type=_positive_limit,
+        default=100,
+        metavar="N",
+        help="Rows read from each result set. Defaults to 100.",
+    )
+    execute.add_argument("--json", action="store_true", help="Emit the result as JSON.")
+    add_non_interactive(execute)
+    _add_workspace_args(execute, include_catalogue=False)
+    execute.set_defaults(handler=handle_execute, requires=_requires_execute)
 
     report = subcommands.add_parser(
         "health",
@@ -1358,10 +1423,12 @@ def _with_command_overrides(workspace, args: argparse.Namespace):
     return replace(workspace, **overrides) if overrides else workspace
 
 
-def _command_context(workspace, *, environment: bool = True) -> dict:
+def _command_context(
+    workspace, *, environment: bool = True, catalogue: bool = True
+) -> dict:
     """Pass command-level catalogue and Environment names to an operation."""
 
-    context = {"catalogue": workspace.catalogue or None}
+    context = {"catalogue": workspace.catalogue or None} if catalogue else {}
     if environment:
         context["environment"] = (
             str(workspace.environment) if workspace.environment else None
@@ -1815,6 +1882,67 @@ def _test_mapping(report, *, targeted: bool) -> dict:
         if node.diagnostics is not None:
             rendered["diagnostics"] = node.diagnostics
     return mapping
+
+
+def handle_execute(args: argparse.Namespace) -> int:
+    workspace = _resolve_workspace(args)
+    with _running_session(args, workspace) as opened:
+        result = weaver.execute(
+            args.engine,
+            args.item,
+            args.source_text,
+            file=args.source_file,
+            limit=args.limit,
+            session=opened,
+            **_command_context(workspace, catalogue=False),
+        )
+    if args.json:
+        print(_json_document(result.to_mapping()))
+    else:
+        print(render_execute(result))
+    return 0
+
+
+def render_execute(result) -> str:
+    lines = []
+    if result.output is not None:
+        lines.append(result.output.rstrip("\n"))
+        if result.output_truncated:
+            lines.append(_style("Output truncated.", _DIM))
+    for number, each in enumerate(result.result_sets, start=1):
+        if len(result.result_sets) > 1:
+            lines.append(_style(f"Result set {number}", _DIM))
+        lines.extend(_execute_table(each))
+        count = len(each.rows)
+        shown = f"{count} row{'s' if count != 1 else ''}"
+        if each.truncated:
+            shown += f"; stopped at --limit {result.limit}"
+        lines.append(_style(f"({shown})", _DIM))
+    if not result.result_sets and result.output is None:
+        lines.append("No result set.")
+    lines.append(
+        _style(f"{result.engine} on {result.target} in {result.seconds:.1f}s", _DIM)
+    )
+    return "\n".join(lines)
+
+
+def _execute_table(result_set) -> list[str]:
+    if not result_set.columns:
+        return []
+    cells = [
+        ["" if value is None else str(value) for value in row]
+        for row in result_set.rows
+    ]
+    widths = [
+        max([len(column), *(len(row[index]) for row in cells)])
+        for index, column in enumerate(result_set.columns)
+    ]
+    rule = "  ".join("-" * width for width in widths)
+    return [
+        "  ".join(c.ljust(w) for c, w in zip(result_set.columns, widths)).rstrip(),
+        rule,
+        *("  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip() for row in cells),
+    ]
 
 
 def handle_catalogue_dashboard(args: argparse.Namespace) -> int:

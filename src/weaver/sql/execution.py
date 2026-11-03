@@ -20,6 +20,15 @@ class ProcedureResult:
     result_sets: tuple[tuple["SqlRow", ...], ...]
 
 
+@dataclass(frozen=True)
+class LimitedRows:
+    """One result set read to a row limit; ``truncated`` when it had more."""
+
+    columns: tuple[str, ...]
+    rows: tuple[tuple[Any, ...], ...]
+    truncated: bool = False
+
+
 class SqlExecutor(Protocol):
     """The SQL surface used by Weaver operations."""
 
@@ -38,6 +47,10 @@ class SqlExecutor(Protocol):
     def query_result_sets(
         self, statement: str, parameters: Sequence[object] | None = None
     ) -> tuple[tuple[SqlRow, ...], ...]: ...
+
+    def query_limited(
+        self, statement: str, *, limit: int
+    ) -> tuple[LimitedRows, ...]: ...
 
     def call_procedure(
         self,
@@ -105,6 +118,16 @@ class PooledSqlExecutor:
             all_result_sets=True,
         )
         return tuple(tuple(rows) for rows in sets)
+
+    def query_limited(self, statement: str, *, limit: int) -> tuple[LimitedRows, ...]:
+        """Every result set in order, each read to at most ``limit`` rows.
+
+        Rows past the limit are never fetched; a set that had more says so.
+        """
+
+        return tuple(
+            self._run(statement, parameters=None, query=True, drain=False, limit=limit)
+        )
 
     def call_procedure(
         self,
@@ -180,6 +203,7 @@ class PooledSqlExecutor:
         drain: bool,
         last_result_set: bool = False,
         all_result_sets: bool = False,
+        limit: int | None = None,
     ):
         with self.pool.lease() as lease:
             connection = lease.connection
@@ -192,7 +216,9 @@ class PooledSqlExecutor:
                     cursor.execute(statement, tuple(parameters))
 
                 if query:
-                    if all_result_sets:
+                    if limit is not None:
+                        rows = _limited_result_sets(cursor, limit)
+                    elif all_result_sets:
                         rows = _every_result_set(cursor)
                     elif last_result_set:
                         rows = _final_rows(cursor)
@@ -309,6 +335,23 @@ def _every_result_set(cursor) -> list[list[SqlRow]]:
     while True:
         if cursor.description is not None:
             sets.append(_rows(cursor))
+        if not cursor.nextset():
+            return sets
+
+
+def _limited_result_sets(cursor, limit: int) -> list[LimitedRows]:
+    sets: list[LimitedRows] = []
+    while True:
+        if cursor.description is not None:
+            columns = tuple(column[0] for column in cursor.description)
+            rows = cursor.fetchmany(limit + 1)
+            sets.append(
+                LimitedRows(
+                    columns=columns,
+                    rows=tuple(tuple(row) for row in rows[:limit]),
+                    truncated=len(rows) > limit,
+                )
+            )
         if not cursor.nextset():
             return sets
 

@@ -156,6 +156,15 @@ and nests within one thread or asyncio task. The CLI workflow runner enters
 `weaver.workflow` on its own Session and keeps sequencing, confirmation and
 findings policy.
 
+`weaver execute` (`operations.execute`) runs ad hoc T-SQL, Spark SQL, Python or
+DAX against one item's configured target, or the item of the same name, and
+reads no catalogue. It records nothing and moves no bookmark. Spark SQL and
+Python reach Fabric through `Session.execute_source`: a self-contained program
+with the named Lakehouse attached, which imports no Weaver and so needs no
+published Environment, and is never resubmitted. A notebook attached to another
+Lakehouse refuses it. Each result is limited where it runs; DAX is limited after
+Power BI returns it.
+
 The fast suite runs against a `TestSession`: a real implementation of the Session
 contract that records what a host was asked to do and does not interpret it. It
 models no Spark, no Delta and no Fabric catalogue, so nothing it proves can be

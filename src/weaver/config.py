@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import Any, Mapping
 
 from .declaration.model import WeaverItemId
 from .errors import ConfigError, IdentityError
 from .workspaces import (
-    BuildConcurrency,
     EnvironmentRef,
     ExecutionSettings,
-    RunConcurrency,
     TargetDeclaration,
     Workspace,
 )
@@ -152,14 +150,17 @@ OVERRIDABLE = (
 
 
 def with_overrides(workspace: Workspace, overrides: Mapping[str, Any]) -> Workspace:
-    """``workspace`` with each given field replaced whole.
+    """``workspace`` with each given setting changed and every other kept.
 
-    Values take the workspace configuration's shapes, or the typed values a
-    Workspace holds, and are validated as configuration is. An empty mapping
-    replaces too. ``None`` is not an override.
+    A scalar replaces its value. ``execution`` changes only the concurrency
+    settings it names; ``targets`` and ``data_sources`` change only the entries
+    they name. Values take the workspace configuration's shapes, or the typed
+    values a Workspace holds, and are validated as configuration is. A typed
+    ``ExecutionSettings`` is complete, so it replaces the whole value. ``None``
+    and an empty mapping change nothing.
     """
 
-    from dataclasses import replace
+    from .semantic_models.expressions import source_mappings
 
     unknown = set(overrides) - set(OVERRIDABLE)
     if unknown:
@@ -170,9 +171,19 @@ def with_overrides(workspace: Workspace, overrides: Mapping[str, Any]) -> Worksp
     if "execution" in changes and not isinstance(
         changes["execution"], ExecutionSettings
     ):
-        changes["execution"] = _execution(changes["execution"], where="execution")
+        changes["execution"] = _execution(
+            changes["execution"], where="execution", base=workspace.execution
+        )
     if "targets" in changes:
-        changes["targets"] = _targets(_target_payload(changes["targets"]))
+        changes["targets"] = {
+            **workspace.targets,
+            **_targets(_target_payload(changes["targets"])),
+        }
+    if "data_sources" in changes:
+        changes["data_sources"] = {
+            **workspace.data_sources,
+            **source_mappings(changes["data_sources"]),
+        }
     if "catalogue_dashboard" in changes:
         changes["catalogue_dashboard"] = _text(
             changes["catalogue_dashboard"], where="catalogue_dashboard"
@@ -210,8 +221,10 @@ def _optional_text(value: Any, *, where: str) -> str | None:
     return None if value is None else _text(value, where=where)
 
 
-def _execution(raw: Any, *, where: str) -> ExecutionSettings:
-    """Parse ``execution``.
+def _execution(
+    raw: Any, *, where: str, base: ExecutionSettings | None = None
+) -> ExecutionSettings:
+    """Parse ``execution`` over ``base``, the defaults unless given.
 
     .. code-block:: yaml
 
@@ -226,28 +239,29 @@ def _execution(raw: Any, *, where: str) -> ExecutionSettings:
             warehouse_concurrency: 4
     """
 
+    base = base if base is not None else ExecutionSettings()
     if raw is None:
-        return ExecutionSettings()
-    if not isinstance(raw, dict):
+        return base
+    if not isinstance(raw, Mapping):
         raise ConfigError(f"{where} must be a mapping")
     unknown = set(raw) - {"build", "run"}
     if unknown:
         raise ConfigError(f"{where} has unknown keys: " + ", ".join(sorted(unknown)))
     return ExecutionSettings(
-        build=_concurrency(raw.get("build"), BuildConcurrency, where=f"{where}.build"),
-        run=_concurrency(raw.get("run"), RunConcurrency, where=f"{where}.run"),
+        build=_concurrency(raw.get("build"), base.build, where=f"{where}.build"),
+        run=_concurrency(raw.get("run"), base.run, where=f"{where}.run"),
     )
 
 
-def _concurrency(raw: Any, kind, *, where: str):
+def _concurrency(raw: Any, base, *, where: str):
     if raw is None:
-        return kind()
-    if not isinstance(raw, dict):
+        return base
+    if not isinstance(raw, Mapping):
         raise ConfigError(f"{where} must be a mapping")
-    unknown = set(raw) - {field.name for field in fields(kind)}
+    unknown = set(raw) - {field.name for field in fields(base)}
     if unknown:
         raise ConfigError(f"{where} has unknown keys: " + ", ".join(sorted(unknown)))
-    return kind(**raw)
+    return replace(base, **raw)
 
 
 def _targets(raw: Any) -> dict[WeaverItemId, TargetDeclaration]:

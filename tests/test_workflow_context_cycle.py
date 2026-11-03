@@ -21,7 +21,6 @@ from weaver.sessions.host import use_or_create_session
 from weaver.sessions.testing import TestSession
 from weaver.workflow import active_workflow
 from weaver.workspaces import (
-    BuildConcurrency,
     ExecutionSettings,
     RunConcurrency,
     TargetDeclaration,
@@ -198,41 +197,82 @@ def test_catalogue_and_environment_change_only_themselves(opened, full):
 
 
 @weaver_test()
-def test_structured_settings_replace_the_configured_value_whole(opened, full):
+def test_structured_settings_change_only_the_entries_they_name(opened, full):
     with weaver.workflow(
         workspace_config=full,
         mirror="Staging/Warehouse/Catalogue",
-        execution={"run": {"spark_concurrency": 2}},
+        execution={"run": {"spark_concurrency": 8}},
         targets={"Lakehouse/Landing": "Landing_Test"},
         data_sources={"Inventory": "Lakehouse/Landing"},
         catalogue_dashboard="Dashboard_Test",
     ) as entered:
         resolved = entered.workspace
 
+    assert _fields(resolved) == _fields(
+        replace(
+            EXPECTED,
+            mirror=resolved.mirror,
+            execution=replace(
+                EXPECTED.execution,
+                run=replace(EXPECTED.execution.run, spark_concurrency=8),
+            ),
+            targets={
+                **EXPECTED.targets,
+                WeaverItemId.parse("Lakehouse/Landing"): TargetDeclaration(
+                    "Landing_Test"
+                ),
+            },
+            data_sources={**EXPECTED.data_sources, "Inventory": "Lakehouse/Landing"},
+            catalogue_dashboard="Dashboard_Test",
+        )
+    )
     assert str(resolved.mirror) == "Staging/Warehouse/Catalogue"
-    # Omitted settings take their defaults, not the file's.
-    assert resolved.execution == ExecutionSettings(
-        build=BuildConcurrency(), run=RunConcurrency(spark_concurrency=2)
-    )
-    assert dict(resolved.targets) == {
-        WeaverItemId.parse("Lakehouse/Landing"): TargetDeclaration("Landing_Test")
-    }
-    assert dict(resolved.data_sources) == {"Inventory": "Lakehouse/Landing"}
-    assert resolved.catalogue_dashboard == "Dashboard_Test"
-    assert (resolved.workspace, resolved.catalogue, resolved.environment) == (
-        EXPECTED.workspace,
-        EXPECTED.catalogue,
-        EXPECTED.environment,
-    )
 
 
 @weaver_test()
-def test_an_empty_mapping_replaces_and_none_does_not(opened, full):
+def test_a_build_setting_leaves_run_settings_and_other_build_settings(opened, full):
     with weaver.workflow(
-        workspace_config=full, targets={}, data_sources=None
+        workspace_config=full, execution={"build": {"onelake_concurrency": 2}}
     ) as entered:
-        assert dict(entered.workspace.targets) == {}
-        assert dict(entered.workspace.data_sources) == dict(EXPECTED.data_sources)
+        execution = entered.workspace.execution
+
+    assert execution.run == EXPECTED.execution.run
+    assert execution.build == replace(EXPECTED.execution.build, onelake_concurrency=2)
+
+
+@weaver_test()
+def test_data_sources_accept_the_command_line_spelling(opened, full):
+    with weaver.workflow(
+        workspace_config=full, data_sources=["Sales=Lakehouse/Landing"]
+    ) as entered:
+        assert dict(entered.workspace.data_sources) == {"Sales": "Lakehouse/Landing"}
+
+
+@weaver_test()
+def test_empty_mappings_and_none_change_nothing(opened, full):
+    with weaver.workflow(
+        workspace_config=full,
+        execution={},
+        targets={},
+        data_sources={},
+        mirror=None,
+    ) as entered:
+        assert _fields(entered.workspace) == _fields(EXPECTED)
+
+
+@weaver_test()
+def test_an_override_leaves_the_inherited_workspace_unchanged(opened):
+    with weaver.workflow(
+        session=TestSession(workspace=EXPECTED),
+        targets={"Lakehouse/Landing": "Landing_Test"},
+        execution={"run": {"spark_concurrency": 8}},
+    ) as entered:
+        assert entered.workspace is not EXPECTED
+
+    assert EXPECTED.targets[WeaverItemId.parse("Lakehouse/Landing")] == (
+        TargetDeclaration("Landing_Dev")
+    )
+    assert EXPECTED.execution.run.spark_concurrency == 6
 
 
 @weaver_test()
@@ -243,8 +283,9 @@ def test_typed_values_are_accepted(opened, full):
     with weaver.workflow(
         workspace_config=full, execution=settings, targets=targets
     ) as entered:
+        # A typed ExecutionSettings is complete, so it is the whole value.
         assert entered.workspace.execution is settings
-        assert dict(entered.workspace.targets) == targets
+        assert dict(entered.workspace.targets) == {**EXPECTED.targets, **targets}
 
 
 @pytest.mark.parametrize(
@@ -448,3 +489,57 @@ def test_one_session_runs_one_workflow_at_a_time_across_threads(opened):
         assert session.workflow_id == entered.workflow_id
 
     assert refused and "another thread" in refused[0]
+
+
+@weaver_test()
+def test_one_session_runs_one_workflow_at_a_time_across_asyncio_tasks(opened):
+    import asyncio
+
+    session = TestSession(workspace=EXPECTED)
+
+    async def hold(entered: asyncio.Event, release: asyncio.Event):
+        with weaver.workflow(session=session) as held:
+            entered.set()
+            await release.wait()
+            return held.workflow_id, session.workflow_id
+
+    async def overlap():
+        with weaver.workflow(session=session):
+            pass
+
+    async def main():
+        entered, release = asyncio.Event(), asyncio.Event()
+        holder = asyncio.create_task(hold(entered, release))
+        await entered.wait()
+        with pytest.raises(CommandError, match="another thread or task"):
+            await asyncio.create_task(overlap())
+        release.set()
+        held, during = await holder
+        # Once the first workflow has ended, the Session takes another.
+        await asyncio.create_task(overlap())
+        return held, during
+
+    held, during = asyncio.run(main())
+    assert during == held
+    assert session.workflow_id is None
+
+
+@weaver_test()
+def test_a_workflow_nests_within_one_asyncio_task(opened):
+    import asyncio
+
+    session = TestSession(workspace=EXPECTED)
+
+    async def nested():
+        with weaver.workflow(session=session) as outer:
+            await asyncio.sleep(0)
+            with pytest.raises(RuntimeError):
+                with weaver.workflow(session=session) as inner:
+                    assert session.workflow_id == inner.workflow_id
+                    await asyncio.sleep(0)
+                    raise RuntimeError
+            return outer.workflow_id, session.workflow_id
+
+    outer, restored = asyncio.run(nested())
+    assert restored == outer
+    assert session.workflow_id is None

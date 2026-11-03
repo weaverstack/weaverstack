@@ -147,7 +147,7 @@ def dispatched(monkeypatch):
     return dispatch
 
 
-def _run(session, *, fault_tolerant=False, targets=(RAW, REPORTING)):
+def _run(session, *, fault_tolerant=False, targets=(RAW, REPORTING), concurrency=None):
     return run_load(
         session.session,
         workspace=session.workspace,
@@ -155,6 +155,7 @@ def _run(session, *, fault_tolerant=False, targets=(RAW, REPORTING)):
         items=targets,
         fault_tolerant=fault_tolerant,
         dry_run=False,
+        concurrency=concurrency,
     )
 
 
@@ -304,17 +305,45 @@ def test_a_descendant_of_a_failed_node_does_not_execute(session, dispatched):
 
 @weaver_test()
 def test_nothing_new_is_scheduled_after_an_intolerant_failure(session, dispatched):
-    """Fail-fast stops scheduling. It does not stop reporting."""
+    """Fail-fast stops scheduling. It does not stop reporting.
+
+    One node at a time, so the failure settles before anything else could
+    start: Sales.Order runs first, its chain being the longest.
+    """
+
+    dispatched.answers[ORDER] = RuntimeError("boom")
+
+    with pytest.raises(LoadError) as raised:
+        _run(session, concurrency=1)
+
+    statuses = {n.node_id: n.status for n in raised.value.report.nodes}
+    assert dispatched.calls == [ORDER]
+    assert statuses[ORDER] == FAILED
+    # Sales.Export depends on nothing that failed; only fail-fast holds it back.
+    assert statuses[EXPORT] == PENDING
+    assert all(not n.executed for n in raised.value.report.nodes if n.status == PENDING)
+
+
+@weaver_test()
+def test_an_intolerant_failure_leaves_every_unstarted_node_unrun(session, dispatched):
+    """In parallel, whatever started before the failure settled finishes.
+
+    How much that is depends on timing, so the claim is about what did not
+    start: it is reported, and never run.
+    """
 
     dispatched.answers[EXPORT] = RuntimeError("boom")
 
     with pytest.raises(LoadError) as raised:
         _run(session)
 
-    statuses = {n.node_id: n.status for n in raised.value.report.nodes}
-    assert statuses[EXPORT] == FAILED
-    assert PENDING in statuses.values() or BLOCKED in statuses.values()
-    assert all(not n.executed for n in raised.value.report.nodes if n.status == PENDING)
+    report = raised.value.report
+    assert report.by_node[EXPORT].status == FAILED
+    for node in report.nodes:
+        started = node.node_id in dispatched.calls
+        assert node.executed is started or node.node_id == REFRESH, node
+        if not started:
+            assert node.status in (PENDING, BLOCKED), node
 
 
 # --- a tolerant run reports ---------------------------------------------------

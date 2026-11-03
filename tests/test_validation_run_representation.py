@@ -216,7 +216,7 @@ def test_a_failing_run_is_reported_and_the_test_task_is_marked_failed():
 def test_a_lakehouse_run_requires_an_environment_before_it_dispatches(tmp_path):
     """A desktop run cannot dispatch Lakehouse code without an Environment.
 
-    Refused after the catalogue read, because a logical request does not say
+    Refused after the catalogue read and selection, because a logical request does not say
     which physical target it is for until the catalogue has answered, and named
     by that physical target because that is where the code would have run.
     """
@@ -226,6 +226,7 @@ def test_a_lakehouse_run_requires_an_environment_before_it_dispatches(tmp_path):
         installed_catalogue,
         item_bindings,
         lakehouse_table,
+        lakehouse_test,
         single_document_repository,
     )
 
@@ -237,7 +238,10 @@ def test_a_lakehouse_run_requires_an_environment_before_it_dispatches(tmp_path):
 
     repository = single_document_repository(
         tmp_path / "estate",
-        documents={"Tables/DWG__Customer.py": lakehouse_table("DWG.Customer")},
+        documents={
+            "Tables/DWG__Customer.py": lakehouse_table("DWG.Customer"),
+            "tests/DWG__CustomerReconcile.py": lakehouse_test("DWG.CustomerReconcile"),
+        },
     )
     state = RunState(
         catalogue=installed_catalogue(repository, item_bindings((ITEM, "Sales_LH")))
@@ -273,6 +277,7 @@ def test_a_run_with_no_item_covers_every_installed_item(tmp_path):
         installed_catalogue,
         item_bindings,
         lakehouse_table,
+        lakehouse_test,
         single_document_repository,
     )
 
@@ -283,7 +288,10 @@ def test_a_run_with_no_item_covers_every_installed_item(tmp_path):
 
     repository = single_document_repository(
         tmp_path / "estate",
-        documents={"Tables/DWG__Customer.py": lakehouse_table("DWG.Customer")},
+        documents={
+            "Tables/DWG__Customer.py": lakehouse_table("DWG.Customer"),
+            "tests/DWG__CustomerReconcile.py": lakehouse_test("DWG.CustomerReconcile"),
+        },
     )
     state = RunState(
         catalogue=installed_catalogue(repository, item_bindings((ITEM, "Sales_LH")))

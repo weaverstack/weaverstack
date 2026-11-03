@@ -224,6 +224,49 @@ def test_a_current_estate_selects_nothing_and_succeeds(prepared):
     assert report.succeeded
 
 
+@weaver_test()
+def test_a_current_lakehouse_needs_no_environment_and_runs_nothing(prepared):
+    workspace, session = prepared
+    catalogue = (
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.Order", loaded=at(5), moved=at(5))
+        .validation(f"{RAW}/Sales.Current", result="succeeded", ran=at(1))
+        .reads(f"{RAW}/Sales.Current", "Sales.Order")
+        .catalogue()
+    )
+    assert workspace.environment is None
+
+    report = run_test(
+        session,
+        workspace=workspace,
+        state=RunState(catalogue=catalogue),
+        items=(RAW_ITEM,),
+        stale=True,
+    )
+
+    assert report.succeeded
+    assert report.nodes == ()
+    assert session.position(workspace) == "client"
+    assert [call for call in session.calls if call.kind in ("python", "spark")] == []
+    assert not [
+        call for call in session.calls if TEST_STATUS in str(getattr(call, "body", ""))
+    ]
+
+
+@weaver_test()
+def test_a_stale_lakehouse_validation_still_needs_an_environment(prepared):
+    workspace, session = prepared
+
+    with pytest.raises(CommandError, match="requires a Fabric Environment"):
+        run_test(
+            session,
+            workspace=workspace,
+            state=RunState(catalogue=mixed_estate().catalogue()),
+            items=(RAW_ITEM,),
+            stale=True,
+        )
+
+
 # --- what the run reads and sends ---------------------------------------------
 
 

@@ -210,9 +210,6 @@ def run_test(
         ).unsettled_identities()
     targets = tuple(installed[item] for item in items)
 
-    _require_lakehouse_environment(
-        session, workspace=workspace, targets=targets, dry_run=dry_run
-    )
     # Fabric requires a Lakehouse attachment before Spark starts.
     session.offer_spark_home(lakehouse_names(targets), workspace=workspace)
     started = datetime.now(timezone.utc)
@@ -228,6 +225,13 @@ def run_test(
     )
     with session.step("Build run graph"):
         runner = validation_runner(workspace, state, request)
+    # Decided after selection, so a stale run with nothing to do needs no runtime.
+    _require_lakehouse_environment(
+        session,
+        workspace=workspace,
+        targets=targets,
+        dry_run=dry_run or not needs_spark(runner.graph),
+    )
 
     run = FabricRun(
         name="test",

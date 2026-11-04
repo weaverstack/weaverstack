@@ -36,16 +36,27 @@ def semantic_source(
         )
     columns = []
     if include_columns:
-        columns = list(
-            session.query_tsql(
-                "SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type "
-                "FROM INFORMATION_SCHEMA.COLUMNS "
-                f"WHERE TABLE_SCHEMA = {literal(schema)} AND TABLE_NAME = {literal(name)} "
-                "ORDER BY ORDINAL_POSITION",
-                target=endpoint,
-                workspace=workspace,
+
+        def listed():
+            return list(
+                session.query_tsql(
+                    "SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type "
+                    "FROM INFORMATION_SCHEMA.COLUMNS "
+                    f"WHERE TABLE_SCHEMA = {literal(schema)} AND TABLE_NAME = {literal(name)} "
+                    "ORDER BY ORDINAL_POSITION",
+                    target=endpoint,
+                    workspace=workspace,
+                )
             )
-        )
+
+        columns = listed()
+        if not columns and item_type == "Lakehouse":
+            # A table the endpoint has not synced yet, such as a new shortcut,
+            # is listed once that table is refreshed.
+            resolver.refresh_sql_endpoint(
+                ItemRef(resolved.name), tables=[(schema, name)]
+            )
+            columns = listed()
     return {
         "item_type": resolved.type,
         "item_name": resolved.name,

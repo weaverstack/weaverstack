@@ -10,7 +10,12 @@ from .changes import FILE as FILE_KIND
 from .changes import STORED_PROCEDURE as PROCEDURE_KIND
 from .changes import added
 from .changes import removed as change_removed
-from .dependencies import object_key, runtime_removal_key, schema_key
+from .dependencies import (
+    object_key,
+    pruned_objects_key,
+    runtime_removal_key,
+    schema_key,
+)
 from .documents import RenderedAction
 from .models import (
     BUILD_PROCEDURE,
@@ -95,8 +100,15 @@ def item_runtime_stages(
             ),
             requires=requires,
             # A removed artefact never shares a path with an installed one, but
-            # ordering after removal keeps a case-folded collision safe.
-            follows={a.id: (runtime_removal_key(target.id),) for a in actions},
+            # ordering after removal keeps a case-folded collision safe. A prune
+            # of an unmanaged file can remove the folder an install writes into.
+            follows={
+                a.id: (
+                    runtime_removal_key(target.id),
+                    pruned_objects_key(target.id),
+                )
+                for a in actions
+            },
         ),
     )
 

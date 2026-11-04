@@ -841,7 +841,9 @@ def _item_prune_stage(
 
     item_slug = _slug(item)
     prefixed = tuple(_prefixed(action, item_slug) for action in actions)
-    # A schema drop needs its remaining objects gone; other prunes are independent.
+    # A schema drop needs its remaining objects gone; other prunes are
+    # independent. Runtime installs follow every prune on the target, because a
+    # prune of an unmanaged file can remove the folder an install writes into.
     objects = pruned_objects_key(target.id)
     return PlannedStage(
         phase=PRUNE,
@@ -862,9 +864,7 @@ def _item_prune_stage(
             ),
         ),
         provides={
-            action.id: (objects,)
-            for action in prefixed
-            if action.kind in (PRUNE_TABLE, PRUNE_VIEW)
+            action.id: (objects,) for action in prefixed if action.kind != PRUNE_SCHEMA
         },
         requires={
             action.id: (objects,) for action in prefixed if action.kind == PRUNE_SCHEMA

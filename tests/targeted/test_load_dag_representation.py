@@ -1017,22 +1017,28 @@ def test_a_folder_shortcut_import_resolves_beneath_files(resolved_producers):
 
 
 @weaver_test()
-def test_a_physical_shortcut_import_is_an_external_read(resolved_producers):
-    """Each of the three points outside the estate, so none of them orders.
+def test_a_physical_shortcut_import_reads_its_installed_destination(
+    resolved_producers,
+):
+    """A table or folder shortcut's destination is installed here, so the
+    consumer reads it, as a relation read of it does; what lies behind it is not
+    Weaver's to order.
 
     ``shortcuts.Reference`` carries no ``Schema__Object`` separator, and a
     schema shortcut is always physical: what appears inside the namespace
-    belongs to the item it points at.
+    belongs to the item it points at, so it stays external.
     """
 
     estate, consumer, _dag = resolved_producers
 
-    assert set(estate.external_references[consumer]) == {
-        "shortcuts.Reference",
-        "shortcuts.Sales__External",
-        "shortcuts.Sales__Incoming",
-    }
-    assert not [edge for edge in estate.edges if edge.downstream == consumer]
+    assert consumer not in estate.external_references
+    upstream = [
+        estate.node(edge.upstream)
+        for edge in estate.edges
+        if edge.downstream == consumer
+    ]
+    assert upstream
+    assert {node.role for node in upstream} == {"shortcut"}
 
 
 @weaver_test()
@@ -1127,17 +1133,20 @@ def test_a_folder_shortcut_and_a_table_of_one_name_are_two_installed_nodes(
 
 
 @weaver_test()
-def test_a_table_importing_the_folder_shortcut_it_shares_a_name_with_is_external(
+def test_a_table_importing_the_folder_shortcut_it_shares_a_name_with_reads_the_folder(
     same_name_estate,
 ):
-    """The declaration answers, so the import is the physical read it is."""
+    """The declaration answers: the import reads the folder shortcut's
+    destination, not the table of the same name."""
 
     item, estate = same_name_estate
     table = WeaverDocumentId.parse(f"{item}/Tables/Sales.Customer")
 
-    assert estate.external_references[table] == ("shortcuts.Sales__Customer",)
+    assert table not in estate.external_references
     assert not estate.unresolved
-    assert not [edge for edge in estate.edges if edge.downstream == table]
+    assert [
+        str(edge.upstream) for edge in estate.edges if edge.downstream == table
+    ] == [f"{item}/Files/Sales.Customer"]
 
 
 @weaver_test()
@@ -1443,9 +1452,12 @@ def test_a_folder_shortcut_and_a_real_table_of_one_name_stay_apart(tmp_path):
     estate = catalogue.dag()
     table = WeaverDocumentId.parse(f"{SOURCE_ITEM}/Tables/{SAME_NAME}")
 
-    # The shortcut is what the import names, so the read is external and the
-    # table is not made to depend on itself.
-    assert estate.external_references[table] == ("shortcuts.Sales__Thing",)
+    # The shortcut is what the import names, so the table reads the folder
+    # pointer and is not made to depend on itself.
+    assert table not in estate.external_references
+    assert [str(e.upstream) for e in estate.edges if e.downstream == table] == [
+        f"{SOURCE_ITEM}/Files/{SAME_NAME}"
+    ]
     assert not estate.unresolved
 
     dag = load_dag(estate, items=(WeaverItemId.parse(SOURCE_ITEM),))

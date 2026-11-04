@@ -126,7 +126,20 @@ def _model_rows() -> dict:
     }
 
 
-def sales(revenue_loaded=EARLIER) -> Catalogue:
+def _dependency(consumer: str, reference: str) -> dict:
+    row = dependency_row(consumer, reference)
+    if reference.startswith("shortcuts."):
+        # Build records no producer for an imported shortcut.
+        row.update(
+            referenced_item_type=None,
+            referenced_item_name=None,
+            referenced_schema_name=None,
+            referenced_object_name=None,
+        )
+    return row
+
+
+def sales(revenue_loaded=EARLIER, *, reference="CORE.Customer") -> Catalogue:
     bridge = WeaverItemId.parse(BRIDGE)
     shortcut = shortcut_row(
         DESTINATION, "Lakehouse/Core_LH/Tables/CORE.Customer", target_type="physical"
@@ -141,7 +154,7 @@ def sales(revenue_loaded=EARLIER) -> Catalogue:
                     *_loadable(REVENUE),
                 ),
                 "Shortcut": (shortcut,),
-                "Dependency": (dependency_row(REVENUE, "CORE.Customer"),),
+                "Dependency": (_dependency(REVENUE, reference),),
                 "LoadStatus": (
                     load_status_row(
                         REVENUE,
@@ -300,3 +313,18 @@ def test_a_thin_report_in_another_workspace_joins_the_model_it_is_bound_to():
     reached = {(each.catalogue, each.object_id): each for each in impact.affected}
     shop_report = reached[("Shop", str(WeaverDocumentId.report_root(SHOP_REPORT)))]
     assert shop_report.kind == "report"
+
+
+@weaver_test()
+def test_a_python_import_of_the_shortcut_carries_the_impact_across():
+    """``from shortcuts import CORE__Customer`` reads the destination, so a
+    central failure reaches what the import feeds."""
+
+    consumer = sales(reference="shortcuts.CORE__Customer")
+    report = assess_joined(
+        members(central(), consumer), as_of=NOW - timedelta(days=1), generated_at=NOW
+    )
+
+    (impact,) = report.impact
+    reached = {each.object_id for each in impact.affected}
+    assert {DESTINATION, REVENUE} <= reached

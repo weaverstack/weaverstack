@@ -787,7 +787,7 @@ def test_excluded_dependency_keeps_its_unresolved_diagnostic(monkeypatch):
 
 
 @weaver_test()
-def test_expansion_retains_physical_read_diagnostics_without_managed_edges(
+def test_expansion_through_a_physical_shortcut_adds_no_managed_edge(
     tmp_path, monkeypatch
 ):
     from test_load_dag_representation import _same_name_estate
@@ -805,10 +805,8 @@ def test_expansion_retains_physical_read_diagnostics_without_managed_edges(
         descendants=True,
     )
 
+    # The table reads its folder shortcut, which holds no load, so nothing
+    # orders it and no read is left external.
     assert calls == ["Customer"]
     assert report.edges == ()
-    assert any(
-        message.code == "dependency_external"
-        and "shortcuts.Sales__Customer" in message.message
-        for message in report.messages
-    )
+    assert not any(message.code == "dependency_external" for message in report.messages)

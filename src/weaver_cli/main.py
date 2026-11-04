@@ -263,7 +263,9 @@ def _requires_health(args) -> frozenset[str]:
 
     items = getattr(args, "items", ()) or ()
     wanted = {AUTH, RESOLVER, TDS}
-    if not items or any(
+    if len(getattr(args, "catalogues", None) or ()) > 1:
+        wanted.add(ONELAKE)
+    elif not items or any(
         _kind_and_name(value)[0].startswith("lakehouse") for value in items
     ):
         wanted.add(ONELAKE)
@@ -834,7 +836,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report.add_argument("--json", action="store_true", help="Emit the report as JSON.")
     add_non_interactive(report)
-    _add_workspace_args(report, include_environment=False)
+    _add_workspace_args(report, include_environment=False, include_catalogue=False)
+    report.add_argument(
+        "--catalogue",
+        dest="catalogues",
+        action="append",
+        metavar="CATALOGUE",
+        help=(
+            "Where the Weaver catalogue lives, for example Warehouse/Weaver. "
+            "Repeat as Workspace/Warehouse/Name to report on several catalogues "
+            "together, joined where one's shortcuts read another's objects."
+        ),
+    )
     # Health reads Lakehouses through storage, not Spark.
     report.set_defaults(handler=handle_health, requires=_requires_health)
 
@@ -1994,6 +2007,11 @@ def handle_health(args: argparse.Namespace) -> int:
 
     import json
 
+    catalogues = list(getattr(args, "catalogues", None) or ())
+    joined = len(catalogues) > 1
+    args.catalogue = None if joined else next(iter(catalogues), None)
+    if joined:
+        _home_from_catalogue(args, catalogues[0])
     workspace = _resolve_workspace(args)
     with _running_session(args, workspace) as opened:
         report = weaver.health(
@@ -2001,13 +2019,70 @@ def handle_health(args: argparse.Namespace) -> int:
             as_of=args.as_of,
             inventories=not args.no_inventory,
             session=opened,
-            **_command_context(workspace, environment=False),
+            **(
+                {"catalogue": catalogues}
+                if joined
+                else _command_context(workspace, environment=False)
+            ),
         )
     if args.json:
         print(json.dumps(report.to_mapping(), indent=2))
+    elif joined:
+        print(render_joined_health(report))
     else:
         print(render_health(report))
     return 0 if report.is_healthy else 1
+
+
+def _home_from_catalogue(args: argparse.Namespace, first: str) -> None:
+    """With nothing else naming a workspace, run in the first catalogue's."""
+
+    from weaver.config import discovered_workspace_config
+    from weaver.workspaces import CatalogueRef
+
+    if args.workspace or args.workspace_config or _session(args) is not None:
+        return
+    if discovered_workspace_config() is None:
+        args.workspace = CatalogueRef.parse(first).workspace
+
+
+def render_joined_health(report) -> str:
+    """Each catalogue's Health, then the crossings and each failure's reach."""
+
+    lines = [f"Weaver Health  {_semantic_status(report.status)}", ""]
+    for each in report.catalogues:
+        lines.append(f"{each.label}  {each.reference}")
+        body = render_health(each.report).splitlines()[2:]
+        lines.extend(f"  {line}" if line else "" for line in body)
+        lines.append("")
+    matched = [crossing for crossing in report.crossings if crossing.producer]
+    unmatched = [crossing for crossing in report.crossings if not crossing.producer]
+    lines.append(f"Crossings  {len(matched)} joined · {len(unmatched)} not joined")
+    for crossing in unmatched:
+        lines.append(f"  {crossing.consumer.replace('::', ': ', 1)}")
+        lines.append(f"          {crossing.reason}")
+    lines.append("")
+    if report.cycles:
+        lines.append("Cycles across catalogues")
+        for members in report.cycles:
+            lines.append("  " + " → ".join(m.replace("::", ": ", 1) for m in members))
+        lines.append("")
+    if report.impact:
+        lines.append("Upstream impact")
+        for impact in report.impact:
+            lines.append(
+                f"  {_semantic_status('red', width=7)}{impact.catalogue}: "
+                f"{impact.object_id}  {impact.status}"
+            )
+            for affected in impact.affected:
+                lines.append(
+                    f"    {affected.catalogue}: {affected.object_id}  "
+                    f"{affected.kind}, {affected.effect}"
+                )
+                for table in affected.tables:
+                    lines.append(f"      table {table.name}  {table.effect}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def render_health(report) -> str:

@@ -14,7 +14,7 @@ from test_item_repository_declaration import (
 
 from weaver.declaration import parse_item_repository, project_bound_documents
 from weaver.declaration.model import WeaverDocumentId, WeaverItemId
-from weaver.errors import BuildError, DiscoveryError, GraphError
+from weaver.errors import BuildError, DiscoveryError
 from weaver.locations import Location
 
 
@@ -249,8 +249,9 @@ def test_dependency_cycle_across_items_is_rejected(tmp_path):
         "Warehouse/Reporting/shortcuts.yml",
         "logical:\n  Warehouse/Reporting/Sales.Curated: Lakehouse/Curated/Tables/Sales.Customer\n",
     )
-    with pytest.raises(GraphError, match="dependency cycle"):
-        parse_item_repository(Location(str(root)))
+    repository = parse_item_repository(Location(str(root)))
+
+    assert len(repository.dependency_graph.cycles) == 1
 
 
 # --- imports name a Lakehouse area ---------------------------------------------

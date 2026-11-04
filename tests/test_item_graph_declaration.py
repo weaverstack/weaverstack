@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
 from support.weaver_test import weaver_test
 from test_item_dependencies_declaration import _dependency_estate
 from test_item_repository_declaration import _estate, _table, _warehouse_table, _write
 
 from weaver.declaration import parse_item_repository
 from weaver.declaration.model import WeaverItemId
-from weaver.errors import GraphError
 from weaver.locations import Location
 
 
@@ -91,13 +89,13 @@ def test_independent_items_share_one_layer(tmp_path):
 
 
 @weaver_test()
-def test_an_item_cycle_is_rejected_even_when_no_document_cycle_exists(tmp_path):
+def test_items_that_read_each_other_without_an_object_cycle_parse(tmp_path):
     """Two items that shortcut each other's different objects.
 
     The document graph stays acyclic, ``Curated.Customer`` feeds
-    ``Reporting.Customer``, and ``Reporting.Audit`` feeds ``Curated.Summary``,
-    so nothing at document level objects. The items still cannot be ordered, and
-    that is a repository fault rather than something to discover at install time.
+    ``Reporting.Customer``, and ``Reporting.Audit`` feeds ``Curated.Summary``.
+    The items form a cycle, which orders presentation only, so the repository
+    parses and both items are placed.
     """
 
     root = _estate(tmp_path)
@@ -133,8 +131,15 @@ def test_an_item_cycle_is_rejected_even_when_no_document_cycle_exists(tmp_path):
         "logical:\n  Warehouse/Reporting/Sales.Landed: Lakehouse/Curated/Tables/Sales.Customer\n",
     )
 
-    with pytest.raises(GraphError, match="cannot be built in dependency order"):
-        parse_item_repository(Location(str(root)))
+    repository = parse_item_repository(Location(str(root)))
+
+    assert repository.item_graph.cycles == (
+        ("Lakehouse/Curated", "Warehouse/Reporting"),
+    )
+    assert repository.dependency_graph.cycles == ()
+    assert {item for layer in repository.item_layers for item in layer} == {
+        item.identity for item in repository.items
+    }
 
 
 @weaver_test()

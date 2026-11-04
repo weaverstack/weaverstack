@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Mapping
 
-from ..errors import GraphError
 from ..graph import Graph
 from .result import RunError
 
@@ -69,15 +68,13 @@ class RunGraph:
 
     @cached_property
     def topology(self) -> Graph:
-        """Build the topology lazily so cycles surface during run planning."""
+        """The dispatch graph. An edge that closes a cycle is left out, so its
+        consumer reads what its producer last left."""
 
-        try:
-            return Graph((node.node_id for node in self.nodes), self.edges)
-        except GraphError as exc:
-            raise RunError(
-                f"Cannot plan the run because its dependencies cycle: {exc}. "
-                "Remove one dependency from the cycle."
-            ) from None
+        found = self.by_id
+        return Graph((node.node_id for node in self.nodes), self.edges).acyclic(
+            key=lambda node: found[node].sort_key
+        )
 
     def upstream(self, node_id: str) -> frozenset[str]:
         return frozenset(self.topology.upstream_of(node_id))

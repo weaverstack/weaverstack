@@ -119,25 +119,74 @@ def test_every_node_appears_in_exactly_one_layer():
 
 
 @weaver_test()
-def test_a_cycle_is_refused_on_construction():
-    with pytest.raises(GraphError, match="dependency cycle"):
-        Graph("AB", [("A", "B"), ("B", "A")])
+def test_a_cycle_is_tolerated_and_ordered_around():
+    graph = Graph("ABCD", [("A", "B"), ("B", "C"), ("C", "B"), ("C", "D")])
+
+    assert graph.order() == ("A", "B", "C", "D")
+    assert graph.cycles == (("B", "C"),)
+    assert [str(edge) for edge in graph.cycle_edges] == ["C -> B"]
 
 
 @weaver_test()
-def test_the_cycle_message_names_the_objects():
+def test_an_acyclic_graph_has_no_cycles_and_is_its_own_acyclic_form():
+    graph = diamond()
+
+    assert graph.cycles == ()
+    assert graph.cycle_edges == ()
+    assert graph.acyclic() is graph
+
+
+@weaver_test()
+def test_the_acyclic_form_leaves_out_only_the_closing_edges():
+    graph = Graph("ABC", [("A", "B"), ("B", "C"), ("C", "A")])
+    acyclic = graph.acyclic()
+
+    assert acyclic.cycles == ()
+    assert {str(edge) for edge in acyclic.edges} == {"A -> B", "B -> C"}
+    assert acyclic.order() == graph.order() == ("A", "B", "C")
+
+
+@weaver_test()
+def test_a_key_decides_where_a_cycle_is_cut():
+    graph = Graph("AB", [("A", "B"), ("B", "A")])
+    first = {"A": 1, "B": 0}
+
+    assert graph.order(key=first.get) == ("B", "A")
+    assert [str(edge) for edge in graph.acyclic(key=first.get).edges] == ["B -> A"]
+
+
+@weaver_test()
+def test_a_cycle_sits_between_its_upstream_and_downstream():
+    graph = Graph("PXYZQ", [("P", "X"), ("X", "Y"), ("Y", "Z"), ("Z", "X"), ("Z", "Q")])
+
+    assert graph.order() == ("P", "X", "Y", "Z", "Q")
+    assert graph.layers() == (("P",), ("X",), ("Y",), ("Z",), ("Q",))
+    assert graph.heights()["P"] == 5
+
+
+@weaver_test()
+def test_traversal_through_a_cycle_reaches_everything_once_and_never_itself():
+    graph = Graph("ABCD", [("A", "B"), ("B", "C"), ("C", "B"), ("C", "D")])
+
+    assert graph.ancestors("C") == ("A", "B")
+    assert graph.descendants("B") == ("C", "D")
+    assert graph.component("B") == ("B", "C")
+    assert graph.component("A") == ("A",)
+
+
+@weaver_test()
+def test_require_acyclic_refuses_and_names_the_cycle():
     with pytest.raises(GraphError) as info:
-        Graph("ABC", [("A", "B"), ("B", "C"), ("C", "A")])
+        Graph("ABC", [("A", "B"), ("B", "C"), ("C", "A")]).require_acyclic()
     message = str(info.value)
+    assert message.startswith("dependency cycle")
     for node in "ABC":
         assert node in message
-    assert "->" in message
 
 
 @weaver_test()
-def test_a_cycle_is_found_among_unrelated_healthy_nodes():
-    with pytest.raises(GraphError, match="dependency cycle"):
-        Graph("ABCDE", [("A", "B"), ("C", "D"), ("D", "E"), ("E", "C")])
+def test_require_acyclic_accepts_a_graph_without_cycles():
+    diamond().require_acyclic()
 
 
 @weaver_test()
@@ -161,8 +210,8 @@ def _names(count: int) -> list[str]:
 
 @weaver_test()
 def test_a_chain_deeper_than_the_recursion_limit_still_orders():
-    """Valid and very deep. Ordering is iterative, and so is the check for a
-    cycle it is about to conclude there is none of."""
+    """Valid and very deep. Ordering is iterative, and so is the search for a
+    cycle it concludes there is none of."""
 
     names = _names(DEEP)
     edges = list(zip(names, names[1:]))
@@ -171,16 +220,17 @@ def test_a_chain_deeper_than_the_recursion_limit_still_orders():
 
 
 @weaver_test()
-def test_a_cycle_deeper_than_the_recursion_limit_is_reported_as_a_cycle():
+def test_a_cycle_deeper_than_the_recursion_limit_is_found_and_ordered():
     names = _names(DEEP)
     edges = list(zip(names, names[1:])) + [(names[-1], names[0])]
+    graph = Graph(names, edges)
 
+    assert graph.cycles == (tuple(names),)
+    assert graph.order() == tuple(names)
     with pytest.raises(GraphError) as info:
-        Graph(names, edges)
-
+        graph.require_acyclic()
     reported = str(info.value).removeprefix("dependency cycle: ").split(" -> ")
-    assert reported[0] == names[0]
-    assert reported[-1] == names[0]
+    assert reported[0] == reported[-1] == names[0]
     assert len(reported) == DEEP + 1
 
 
@@ -195,7 +245,7 @@ def test_an_acyclic_tail_attached_to_a_deep_cycle_reports_the_cycle():
     ]
 
     with pytest.raises(GraphError) as info:
-        Graph(names + ["tail"], edges)
+        Graph(names + ["tail"], edges).require_acyclic()
 
     reported = str(info.value).removeprefix("dependency cycle: ").split(" -> ")
     assert "tail" not in reported
@@ -209,22 +259,24 @@ def test_a_disconnected_cyclic_component_is_found_from_a_healthy_start():
     edges = [("A", "B"), ("Y", "Z"), ("Z", "Y")]
 
     with pytest.raises(GraphError) as info:
-        Graph("ABYZ", edges)
+        Graph("ABYZ", edges).require_acyclic()
 
     assert "dependency cycle: Y -> Z -> Y" in str(info.value)
 
 
 @weaver_test()
-def test_the_same_graph_always_reports_the_same_cycle():
+def test_the_same_graph_always_orders_and_reports_a_cycle_the_same_way():
     edges = [("C", "D"), ("D", "E"), ("E", "C"), ("A", "C")]
-    reported = set()
+    orders, reported = set(), set()
 
     for _attempt in range(5):
+        graph = Graph("ABCDE", edges)
+        orders.add(graph.order())
         with pytest.raises(GraphError) as info:
-            Graph("ABCDE", edges)
+            graph.require_acyclic()
         reported.add(str(info.value))
 
-    assert len(reported) == 1
+    assert len(orders) == len(reported) == 1
 
 
 # --- traversal ---------------------------------------------------------------

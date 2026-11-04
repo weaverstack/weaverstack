@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Iterable, Mapping
 
-from ..errors import BuildError, DiscoveryError, GraphError
+from ..errors import BuildError, DiscoveryError
 from ..graph import Graph
 from .metadata import DAX, ObjectId
 from .model import (
@@ -312,11 +312,11 @@ def _document_graph(
 def _item_graph(
     repository: WeaverRepository, resolved: tuple[ItemDependency, ...]
 ) -> Graph:
-    """Build the acyclic item order for a multi-item build.
+    """Build the item order for a multi-item build.
 
     Shortcut sources create item dependencies even without a consumer. Internal
-    item edges stay in the document graph. A project with an item cycle has no
-    valid build order.
+    item edges stay in the document graph. Items that read one another share an
+    order of presentation; execution follows the objects' own edges.
     """
 
     edges: set[tuple[str, str]] = set()
@@ -332,13 +332,7 @@ def _item_graph(
         # Repository parsing rejects a same-item shortcut, so every shortcut is an
         # edge between two distinct items.
         edges.add((str(shortcut.source.item), str(shortcut.destination.item)))
-    try:
-        return Graph((str(item.identity) for item in repository.items), sorted(edges))
-    except GraphError as exc:
-        raise GraphError(
-            f"Project items cannot be built in dependency order: {exc}. "
-            "Remove one of the dependencies in the cycle."
-        ) from exc
+    return Graph((str(item.identity) for item in repository.items), sorted(edges))
 
 
 def _resolve_destination(

@@ -78,6 +78,7 @@ CERTIFIED_MISSING = "certified_missing"
 DEPENDENCY_UNRESOLVED = "dependency_unresolved"
 AMBIGUOUS_INSTALLATION = "ambiguous_installation"
 INSTALLATION_INCONSISTENT = "installation_inconsistent"
+DEPENDENCY_CYCLE = "dependency_cycle"
 
 #: Default age of a processed load before it is stale.
 DEFAULT_AGE_HOURS = 24
@@ -690,13 +691,15 @@ class _LoadHealth:
         load hold no load state, so the walk passes through them. A skipped
         Static ancestor takes part like any other: its row is the object's
         latest lifecycle touch, so a descendant last touched before it is
-        behind.
+        behind. Nodes in a cycle with this one are left out: each reads what
+        the others last loaded, so one is always newer.
         """
 
+        cycle = set(self.dag.graph.component(node.node_id))
         return tuple(
             ancestor
             for ancestor in self.dag.ancestors(node.identity)
-            if participates_in_load_state(ancestor)
+            if ancestor.node_id not in cycle and participates_in_load_state(ancestor)
         )
 
     def established_at(self, identity) -> datetime | None:
@@ -1157,6 +1160,7 @@ class _Assessment:
         findings.extend(self._missing_validation_artefacts())
         findings.extend(self._declared_but_not_installed())
         findings.extend(self._unresolved_reads())
+        findings.extend(self._cycles())
         findings.extend(self._ambiguous_addresses())
         findings.extend(self._inconsistent_installations())
         findings.extend(self._absent_from_inventory())
@@ -1209,6 +1213,22 @@ class _Assessment:
             if node is None or not self._in_scope(node):
                 continue
             yield _finding(BUILD, DEPENDENCY_UNRESOLVED, RED, node, None, messages[0])
+
+    def _cycles(self):
+        for members in self.dag.graph.cycles:
+            nodes = [self.dag.by_id[member] for member in members]
+            in_scope = [node for node in nodes if self._in_scope(node)]
+            if not in_scope:
+                continue
+            yield _finding(
+                BUILD,
+                DEPENDENCY_CYCLE,
+                GREEN,
+                in_scope[0],
+                None,
+                "These objects read one another, so each loads once and the "
+                "first reads what the last loaded before: " + ", ".join(members),
+            )
 
     def _ambiguous_addresses(self):
         for target, found in sorted(
@@ -1346,6 +1366,7 @@ __all__ = [
     "AMBER",
     "AMBIGUOUS_INSTALLATION",
     "INSTALLATION_INCONSISTENT",
+    "DEPENDENCY_CYCLE",
     "AREAS",
     "BUILD",
     "CERTIFIED_MISSING",

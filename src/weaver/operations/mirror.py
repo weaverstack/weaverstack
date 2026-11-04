@@ -558,7 +558,6 @@ def _in_producer_order(items, shortcuts) -> tuple[MirrorItem, ...]:
     items retain their requested order.
     """
 
-    from ..errors import GraphError
     from ..graph import Graph
 
     by_name = {str(each.item): each for each in items}
@@ -570,13 +569,7 @@ def _in_producer_order(items, shortcuts) -> tuple[MirrorItem, ...]:
         producer, consumer = str(shortcut.target_item), str(shortcut.destination.item)
         if producer != consumer and producer in by_name and consumer in by_name:
             edges.append((producer, consumer))
-    try:
-        ordered = Graph(by_name, edges).order(key=given.get)
-    except GraphError as exc:
-        raise CommandError(
-            f"mirror cannot order the items it was given: {exc}. A recreated "
-            "shortcut must follow its producer. Mirror the items in separate runs."
-        ) from exc
+    ordered = Graph(by_name, edges).order(key=given.get)
     return tuple(by_name[name] for name in ordered)
 
 

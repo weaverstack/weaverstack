@@ -96,7 +96,13 @@ definitions.
 
 `weaver.graph.Graph` is the topology. The authored repository graphs, the
 installed estate graph and the runtime graph each carry their own node metadata
-and hand ordering, layers, ancestry and subgraphs to it. `Catalogue.dag()`
+and hand ordering, layers, ancestry and subgraphs to it. A graph tolerates
+cycles, because teams that read one another's data will form them: each cycle
+is ordered deterministically, its closing edges (`cycle_edges`) read what the
+producer last left, Load and Run dispatch over `acyclic()`, Health ignores
+staleness within a cycle and reports it, and items that read one another share
+a presentation layer. Only the physical mutation plan calls
+`require_acyclic()`, because an action cannot wait on itself. `Catalogue.dag()`
 derives the installed managed graph from catalogue rows already in memory, and
 it is the one place a persisted `dependency_reference` is interpreted. Load
 planning, validation planning and health read it. Build publishes it per item

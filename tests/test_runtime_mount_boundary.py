@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from support.weaver_test import weaver_test
 
-from weaver.lakehouse import Lakehouse, release_mounts
+from weaver.lakehouse import Lakehouse, files_changed, release_mounts
 
 
 @weaver_test()
@@ -67,6 +67,8 @@ def _mounting(monkeypatch, fs):
 
     monkeypatch.setattr(module, "_notebook_utils", lambda: SimpleNamespace(fs=fs))
     monkeypatch.setattr(module, "_MOUNTS", {})
+    monkeypatch.setattr(module, "_SUPERSEDED", [])
+    monkeypatch.setattr(module, "_GENERATIONS", {})
     return module
 
 
@@ -136,3 +138,48 @@ def test_a_failed_mount_has_nothing_to_unmount(monkeypatch):
     with pytest.raises(LoadError, match="refused"):
         Lakehouse(name="Sales_LH", spark_root="abfss://ws@host/lh").files_root()
     assert not fs.unmounted and not module._MOUNTS
+
+
+@weaver_test()
+def test_a_files_change_moves_later_paths_to_a_new_mount(monkeypatch):
+    """A mount caches a failed lookup, so a change needs a mount made after it.
+
+    Paths already handed out stay usable until the run releases its mounts.
+    """
+
+    fs = _Fs()
+    module = _mounting(monkeypatch, fs)
+    sales = Lakehouse(name="Sales_LH", spark_root="abfss://ws@host/sales")
+    other = Lakehouse(name="Other_LH", spark_root="abfss://ws@host/other")
+    before, untouched = sales.files_root(), other.files_root()
+
+    files_changed("abfss://ws@host/sales/")
+    files_changed("abfss://ws@host/sales")
+    after = sales.files_root()
+
+    assert after != before
+    assert sales.files_root() == after
+    assert other.files_root() == untouched
+    assert len(fs.mounted) == 3 and not fs.unmounted
+    assert module._SUPERSEDED == [fs.mounted[0]]
+
+    release_mounts()
+    assert sorted(fs.unmounted) == sorted(fs.mounted)
+    assert not module._MOUNTS and not module._SUPERSEDED
+
+
+@weaver_test()
+def test_a_failed_replacement_mount_keeps_the_current_one(monkeypatch):
+    from weaver.errors import LoadError
+
+    fs = _Fs()
+    module = _mounting(monkeypatch, fs)
+    sales = Lakehouse(name="Sales_LH", spark_root="abfss://ws@host/sales")
+    sales.files_root()
+    files_changed(sales.spark_root)
+    fs.mount_error = RuntimeError("refused")
+
+    with pytest.raises(LoadError, match="refused"):
+        sales.files_root()
+    assert module._MOUNTS[sales.spark_root].point == fs.mounted[0]
+    assert not module._SUPERSEDED

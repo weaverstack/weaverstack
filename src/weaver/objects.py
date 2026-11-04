@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .errors import LoadError, WeaverError
-from .lakehouse import Lakehouse, default_lakehouse
+from .lakehouse import Lakehouse, default_lakehouse, files_changed
 from .spark import identifier
 
 if TYPE_CHECKING:  # pragma: no cover - for type readers only
@@ -354,6 +354,8 @@ class Folder(WeaverObject):
         The path uses the resolved Lakehouse rather than the notebook's default.
         A listing through it can lag a delete made elsewhere; list with
         :meth:`current_files`, :meth:`files_since` or :meth:`latest_files`.
+        Call it when the files are needed: a path kept from before a Folder
+        load published can miss what it published.
         """
 
         return self.lakehouse.folder_path(*self.identity)
@@ -512,27 +514,21 @@ class Folder(WeaverObject):
 
         issued = new_staging_folder(destination, staging)
         self._issued_staging = issued
+        publishing = False
         try:
             staged, deletes = self._read_result()
             if staged is None:
                 _refuse_no_staging(contract, "folder", "self.staging_folder()")
-            if staged is None and deletes is None:
-                result = LoadResult(succeeded=True)
-            elif staged is None:
-                result = load_folder(
-                    contract=contract,
-                    destination=destination,
-                    staging=staging,
-                    deletes=deletes,
-                    fault_tolerant=fault_tolerant,
-                )
-            elif staged is not issued:
+            if staged is not None and staged is not issued:
                 raise LoadError(
                     f"{type(self).__name__}.read() returned "
                     f"{type(staged).__name__} {staged!r} rather than the folder "
                     "self.staging_folder() issued. Return self.staging_folder()."
                 )
+            if staged is None and deletes is None:
+                result = LoadResult(succeeded=True)
             else:
+                publishing = True
                 result = load_folder(
                     contract=contract,
                     destination=destination,
@@ -540,11 +536,25 @@ class Folder(WeaverObject):
                     deletes=deletes,
                     fault_tolerant=fault_tolerant,
                 )
+                publishing = _changed_files(result)
         finally:
             # Never hand a later load this load's staging directory.
             self._issued_staging = None
+            if publishing:
+                # Even a failed publication may have changed files, and a mount
+                # made before it can keep reporting a new file as missing.
+                files_changed(self.lakehouse.spark_root)
         remove_staging(staging)
         return self._bookmarked(result, began)
+
+
+def _changed_files(result) -> bool:
+    return bool(
+        result.rows_inserted
+        or result.rows_updated
+        or result.rows_deleted
+        or result.rows_rejected
+    )
 
 
 class Table(WeaverObject):

@@ -234,15 +234,46 @@ def mounted_lakehouse(
     OneLake address, and Spark paths are composed from it as they always are.
     """
 
-    from weaver.lakehouse import _MOUNTS, Lakehouse, _Mount
+    from weaver import lakehouse as module
 
     root = f"abfss://ws@onelake.dfs.fabric.microsoft.com/{name}"
-    _MOUNTS[root] = _Mount(point=f"/weaver/{name}/test", local=str(directory))
-    return Lakehouse(
+    _MOUNTED_DIRECTORIES[root] = str(directory)
+    if not getattr(module._mount, "stands_in", False):
+        module._mount = _directory_mount(module._mount)
+    module._MOUNTS[root] = module._Mount(
+        point=f"/weaver/{name}/test",
+        local=str(directory),
+        generation=module._GENERATIONS.get(root, 0),
+    )
+    return module.Lakehouse(
         name=name,
         spark_root=root,
         store=OneLakeDirectory(root, directory, deleted=deleted),
     )
+
+
+#: Directories standing in for a Lakehouse's Files, by OneLake root.
+_MOUNTED_DIRECTORIES: dict[str, str] = {}
+
+
+def _directory_mount(host_mount):
+    """Mount a registered root at its directory again, as Fabric would mount OneLake."""
+
+    from weaver import lakehouse as module
+
+    def mount(name, spark_root, generation):
+        directory = _MOUNTED_DIRECTORIES.get(spark_root)
+        if directory is None:
+            return host_mount(name, spark_root, generation)
+        module._MOUNTS[spark_root] = module._Mount(
+            point=f"/weaver/{name}/test-{generation}",
+            local=directory,
+            generation=generation,
+        )
+        return directory
+
+    mount.stands_in = True
+    return mount
 
 
 class OneLakeDirectory:

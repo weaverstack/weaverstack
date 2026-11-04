@@ -160,6 +160,45 @@ def test_an_identical_reload_adds_no_change_document(landing):
     assert _documents(landing) == before
 
 
+def _mount_generation(folder: Folder) -> int:
+    from weaver import lakehouse
+
+    folder.path()
+    return lakehouse._MOUNTS[folder.lakehouse.spark_root].generation
+
+
+@weaver_test()
+def test_a_publication_moves_downstream_paths_to_a_mount_made_after_it(landing):
+    """A mount made earlier can keep reporting a published file as missing."""
+
+    landing.files = {"June.csv": "june"}
+    before = _mount_generation(landing)
+    landing.load()
+    published = _mount_generation(landing)
+
+    landing.load()
+
+    assert published > before
+    assert _mount_generation(landing) == published
+
+
+@weaver_test()
+def test_a_failed_publication_still_moves_downstream_paths(landing, monkeypatch):
+    import weaver.runtime.folder_load as runtime
+
+    def fails(*args, **kwargs):
+        raise LoadError("publication failed")
+
+    landing.files = {"June.csv": "june"}
+    before = _mount_generation(landing)
+    monkeypatch.setattr(runtime, "_write_change_document", fails)
+
+    with pytest.raises(LoadError, match="publication failed"):
+        landing._load()
+
+    assert _mount_generation(landing) > before
+
+
 @weaver_test()
 def test_timestamp_collisions_do_not_replace_an_immutable_event(landing, monkeypatch):
     import weaver.runtime.folder_load as runtime

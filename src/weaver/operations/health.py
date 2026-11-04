@@ -324,12 +324,51 @@ def _joined_health(
                 )
                 for member, member_workspace in zip(members, member_workspaces)
             }
+            with opened.step("Read Report bindings"):
+                report_models = _report_models(opened, members, member_workspaces)
             return assess_joined(
                 members,
                 as_of=resolved_as_of,
                 generated_at=started,
                 observed=observed,
+                report_models=report_models,
             )
+
+
+def _report_models(session, members, member_workspaces) -> dict[str, str]:
+    """The semantic model each installed Report is bound to, by Report node.
+
+    Power BI holds the binding, so a Report bound to a model in another
+    workspace is read here rather than from any catalogue.
+    """
+
+    from ..catalogues import qualify
+
+    found = {}
+    for member, member_workspace in zip(members, member_workspaces):
+        for item, target in member.dag.installations.items():
+            if item.item_type != "Report":
+                continue
+            node = next(
+                (
+                    each
+                    for each in member.dag.nodes
+                    if each.item == item and each.object_type == "report"
+                ),
+                None,
+            )
+            if node is None:
+                continue
+            try:
+                binding = session.report_item(
+                    target.name, workspace=member_workspace
+                ).get_binding()
+            except Exception:  # noqa: BLE001 - an unreadable binding joins nothing
+                continue
+            model = (binding or {}).get("datasetId")
+            if model:
+                found[qualify(member.label, node.node_id)] = str(model)
+    return found
 
 
 def _requested_by_label(items, labels, places, home_workspace):

@@ -204,8 +204,15 @@ def labels_for(references: Sequence[tuple[str, str]]) -> tuple[str, ...]:
     )
 
 
-def join(members: Sequence[Member]) -> CatalogueSet:
-    """Join catalogues where a physical shortcut lands on another's object."""
+def join(
+    members: Sequence[Member], *, report_models: Mapping[str, str] | None = None
+) -> CatalogueSet:
+    """Join catalogues where a physical shortcut lands on another's object.
+
+    ``report_models`` maps a qualified Report node to the GUID of the semantic
+    model Power BI binds it to. A Report bound to a model another catalogue
+    installs joins that model, as a thin Report on a central model does.
+    """
 
     installed: dict[tuple[str, str, str], list[tuple[Member, WeaverItemId]]] = {}
     for member in members:
@@ -224,6 +231,7 @@ def join(members: Sequence[Member]) -> CatalogueSet:
             if shortcut.is_logical or shortcut.target_item is None:
                 continue
             crossings.extend(_crossings(member, shortcut, installed))
+    crossings.extend(_report_crossings(members, report_models or {}))
 
     nodes: list[str] = []
     edges: list[tuple[str, str]] = []
@@ -245,6 +253,38 @@ def join(members: Sequence[Member]) -> CatalogueSet:
     return CatalogueSet(
         members=tuple(members), crossings=tuple(crossings), graph=Graph(nodes, edges)
     )
+
+
+def _report_crossings(members, report_models: Mapping[str, str]):
+    from .installed import SEMANTIC_MODEL
+
+    models = {}
+    for member in members:
+        for item in member.dag.installations:
+            if item.item_type != SEMANTIC_MODEL:
+                continue
+            row = next(
+                iter(member.catalogue.rows.get(item, {}).get(INSTALLATION.name, ())),
+                {},
+            )
+            if row.get("item_id"):
+                models[str(row["item_id"]).casefold()] = qualify(
+                    member.label, str(WeaverDocumentId.model_root(item))
+                )
+    found = []
+    for report, model in sorted(report_models.items()):
+        producer = models.get(str(model).casefold())
+        found.append(
+            Crossing(
+                report,
+                f"SemanticModel {model}",
+                producer=producer,
+                reason=None
+                if producer
+                else f"No catalogue given installs the semantic model {model}.",
+            )
+        )
+    return found
 
 
 def _crossings(member: Member, shortcut: "InstalledShortcut", installed):

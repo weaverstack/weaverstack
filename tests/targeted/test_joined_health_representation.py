@@ -254,3 +254,49 @@ def test_one_catalogue_alone_does_not_see_the_central_failure():
     (each,) = report.catalogues
     assert not [f for f in each.report.findings if f.object_id == REVENUE]
     assert report.impact == ()
+
+
+SHOP_REPORT = WeaverItemId.parse("Report/Shop Overview")
+MODEL_GUID = "11111111-2222-3333-4444-555555555555"
+
+
+def shop() -> Catalogue:
+    root = WeaverDocumentId.report_root(SHOP_REPORT)
+    return Catalogue(
+        rows={
+            SHOP_REPORT: {
+                "Installation": (installation_row(SHOP_REPORT, "Shop Overview"),),
+                "Registry": (registry_row(root, object_type="report"),),
+            }
+        }
+    )
+
+
+def sales_with_model_guid() -> Catalogue:
+    consumer = sales()
+    rows = {item: dict(tables) for item, tables in consumer.rows.items()}
+    (installation,) = rows[MODEL]["Installation"]
+    rows[MODEL]["Installation"] = ({**installation, "item_id": MODEL_GUID},)
+    return Catalogue(rows=rows)
+
+
+@weaver_test()
+def test_a_thin_report_in_another_workspace_joins_the_model_it_is_bound_to():
+    producer, consumer, thin = central(), sales_with_model_guid(), shop()
+    joined_members = [
+        *members(producer, consumer),
+        Member("Shop", "Shop", "Weaver", thin, thin.dag()),
+    ]
+    report_node = f"Shop::{WeaverDocumentId.report_root(SHOP_REPORT)}"
+
+    report = assess_joined(
+        joined_members,
+        as_of=NOW - timedelta(days=1),
+        generated_at=NOW,
+        report_models={report_node: MODEL_GUID.upper()},
+    )
+
+    (impact,) = report.impact
+    reached = {(each.catalogue, each.object_id): each for each in impact.affected}
+    shop_report = reached[("Shop", str(WeaverDocumentId.report_root(SHOP_REPORT)))]
+    assert shop_report.kind == "report"

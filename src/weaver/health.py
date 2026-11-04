@@ -1232,20 +1232,22 @@ def assess_joined(
     as_of: datetime,
     generated_at: datetime,
     observed: Mapping[str, Observed] | None = None,
+    report_models: Mapping[str, str] | None = None,
 ) -> JoinedHealthReport:
     """Several catalogues' Health, joined where their shortcuts cross.
 
     ``members`` are :class:`weaver.catalogues.Member` values. ``observed`` maps
-    a member's label to what its targets were found to hold. Each catalogue is
-    assessed with ancestry through the others, and each failed load's reach is
-    listed across all of them.
+    a member's label to what its targets were found to hold. ``report_models``
+    maps a qualified Report node to the semantic model GUID Power BI binds it
+    to. Each catalogue is assessed with ancestry through the others, and each
+    failed load's reach is listed across all of them.
     """
 
     from .catalogues import join, qualify
     from .impact import impacts
 
     observed = dict(observed or {})
-    joined = join(members)
+    joined = join(members, report_models=report_models)
     statuses = {}
     for member in members:
         effective = effective_load_state(member.catalogue, source=member.source)

@@ -152,13 +152,28 @@ def test_rest_outside_a_fabric_session_says_so():
 
 
 @weaver_test()
-def test_session_resolution_refuses_a_different_configured_workspace():
-    with pytest.raises(CommandError, match="not configured Workspace"):
-        FabricSessionResolver(
-            Workspace(workspace="Other"),
-            runtime=_runtime(),
-            lakehouse=_LakehouseUtils(),
-        )
+def test_another_workspace_is_found_by_name_with_the_session_identity(monkeypatch):
+    from weaver.fabric import session as module
+    from weaver.fabric.resources import WorkspaceItem
+
+    asked = []
+
+    def find_workspace(name, *, client):
+        asked.append((name, client))
+        return WorkspaceItem("other-id", name)
+
+    monkeypatch.setattr("weaver.fabric.resources.find_workspace", find_workspace)
+    supplied = object()
+    resolver = module.FabricSessionResolver(
+        Workspace(workspace="Other"),
+        runtime=_runtime(),
+        lakehouse=_LakehouseUtils(),
+        client=supplied,
+    )
+
+    assert asked == []
+    assert resolver.workspace == WorkspaceItem("other-id", "Other")
+    assert asked == [("Other", supplied)]
 
 
 @dataclass

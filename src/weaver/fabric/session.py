@@ -1,4 +1,4 @@
-"""Resolve Fabric items from inside the current workspace session."""
+"""Resolve Fabric items from inside a Fabric session, in its workspace or another."""
 
 from __future__ import annotations
 
@@ -49,14 +49,15 @@ class FabricSessionResolver(FabricResolver):
         workspace_id = _value(context, "currentWorkspaceId")
         if not workspace_name or not workspace_id:
             raise CommandError("Fabric runtime context carries no current workspace")
-        if workspace_name != workspace.workspace:
-            raise CommandError(
-                f"this session runs in workspace {workspace_name!r}, "
-                f"not configured Workspace {workspace.workspace!r}"
-            )
 
         self.configuration = workspace
-        self._workspace = WorkspaceItem(id=str(workspace_id), name=str(workspace_name))
+        # Another workspace, as a run across catalogues reaches, is found by
+        # name with the session's own identity when first needed.
+        self._workspace = (
+            WorkspaceItem(id=str(workspace_id), name=str(workspace_name))
+            if workspace_name == workspace.workspace
+            else None
+        )
         self._lakehouse_utils = lakehouse
         self._credentials = credentials
         self._client = client
@@ -64,6 +65,12 @@ class FabricSessionResolver(FabricResolver):
 
     @property
     def workspace(self) -> WorkspaceItem:
+        if self._workspace is None:
+            from .resources import find_workspace
+
+            self._workspace = find_workspace(
+                self.configuration.workspace, client=self.client
+            )
         return self._workspace
 
     @property

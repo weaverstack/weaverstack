@@ -667,7 +667,7 @@ class _LoadHealth:
                 AMBER,
                 node,
                 status.result,
-                f"{unestablished} has not been processed since it was built",
+                _unestablished(*unestablished),
                 status,
             )
         newer = self._newer_ancestor(node)
@@ -691,16 +691,19 @@ class _LoadHealth:
         load hold no load state, so the walk passes through them. A skipped
         Static ancestor takes part like any other: its row is the object's
         latest lifecycle touch, so a descendant last touched before it is
-        behind. Nodes in a cycle with this one are left out: each reads what
-        the others last loaded, so one is always newer.
+        behind.
         """
 
-        cycle = set(self.dag.graph.component(node.node_id))
         return tuple(
             ancestor
             for ancestor in self.dag.ancestors(node.identity)
-            if ancestor.node_id not in cycle and participates_in_load_state(ancestor)
+            if participates_in_load_state(ancestor)
         )
+
+    def _cycle(self, node: InstalledNode) -> frozenset[str]:
+        """The nodes that read this one and that it reads, itself included."""
+
+        return frozenset(self.dag.graph.component(node.node_id))
 
     def established_at(self, identity) -> datetime | None:
         """When this node was last processed, or ``None`` if it has not.
@@ -714,30 +717,66 @@ class _LoadHealth:
             return None
         return status.completed_at
 
-    def _unestablished_ancestor(self, node: InstalledNode) -> str | None:
+    def _unestablished_ancestor(self, node: InstalledNode) -> tuple[str, str] | None:
+        """The ancestor that has processed nothing, and its last result.
+
+        A failed load names the cause before a Pending one does. Cycle members
+        count: a failed member leaves every other member without its data.
+        """
+
         behind = [
-            ancestor.node_id
+            (ancestor.node_id, _result(self.statuses.get(ancestor.identity)))
             for ancestor in self._lifecycle_ancestors(node)
             if self.established_at(ancestor.identity) is None
         ]
-        return sorted(behind)[0] if behind else None
+        return min(behind, key=_cause_order) if behind else None
 
     def _newer_ancestor(self, node: InstalledNode) -> str | None:
         """The ancestor processed after this object last loaded.
 
         A rebuilt View settles when its build succeeds, so a new View definition
-        puts everything materialised from it behind.
+        puts everything materialised from it behind. Members of a cycle with
+        this object are not compared: each reads what the others last loaded,
+        so one is always newer.
         """
 
         loaded = self.established_at(node.identity)
         if loaded is None:
             return None
+        cycle = self._cycle(node)
         newer = [
             ancestor.node_id
             for ancestor in self._lifecycle_ancestors(node)
-            if (self.established_at(ancestor.identity) or loaded) > loaded
+            if ancestor.node_id not in cycle
+            and (self.established_at(ancestor.identity) or loaded) > loaded
         ]
         return sorted(newer)[0] if newer else None
+
+
+def _result(status: RuntimeStatus | None) -> str:
+    return PENDING if status is None else status.result
+
+
+#: The order in which an unestablished ancestor is named as the cause.
+_CAUSES = (FAILED, ERROR, BLOCKED)
+
+
+def _cause_order(found: tuple[str, str]) -> tuple[int, str]:
+    name, result = found
+    rank = _CAUSES.index(result) if result in _CAUSES else len(_CAUSES)
+    return rank, name
+
+
+def _unestablished(name: str, result: str) -> str:
+    """Why an ancestor has no data for this object to have read."""
+
+    if result == FAILED:
+        return f"the last load of {name} failed"
+    if result == ERROR:
+        return f"the last load of {name} raised an error"
+    if result == BLOCKED:
+        return f"the last load of {name} was blocked"
+    return f"{name} has not been processed since it was built"
 
 
 def participates_in_load_state(node: InstalledNode) -> bool:

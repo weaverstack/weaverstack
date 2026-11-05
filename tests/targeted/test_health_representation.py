@@ -1545,3 +1545,177 @@ def test_stale_selection_takes_the_local_descendant_and_never_the_mirror():
     assert [str(identity) for identity in assessment.unsettled_identities()] == [
         f"{REPORTING}/Sales.Summary"
     ]
+
+
+# --- an upstream that processed nothing ---------------------------------------
+
+
+@weaver_test()
+@pytest.mark.parametrize(
+    ("result", "said"),
+    [
+        ("failed", "the last load of {} failed"),
+        ("error", "the last load of {} raised an error"),
+        ("blocked", "the last load of {} was blocked"),
+        ("pending", "{} has not been processed since it was built"),
+    ],
+)
+def test_an_unestablished_ancestor_is_named_with_its_last_result(result, said):
+    report = (
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(1), result=result)
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(5), moved=at(5))
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.A")
+        .report()
+    )
+
+    (finding,) = about(report.load, LOAD_ANCESTOR_UNESTABLISHED)
+    assert finding.object_id == f"{RAW}/Tables/Sales.B"
+    assert finding.severity == AMBER
+    assert finding.message == said.format(f"{RAW}/Tables/Sales.A")
+
+
+@weaver_test()
+def test_a_failed_ancestor_is_named_before_a_pending_one():
+    report = (
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", result="pending")
+        .table(f"{RAW}/Tables/Sales.Z", loaded=at(1), result="failed")
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(5), moved=at(5))
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.A")
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.Z")
+        .report()
+    )
+
+    (finding,) = about(report.load, LOAD_ANCESTOR_UNESTABLISHED)
+    assert finding.message == f"the last load of {RAW}/Tables/Sales.Z failed"
+
+
+# --- cycles -------------------------------------------------------------------
+
+
+def _cycle(estate: _Estate) -> _Estate:
+    """Sales.A and Sales.B read one another."""
+
+    return estate.reads(f"{RAW}/Tables/Sales.A", "Sales.B").reads(
+        f"{RAW}/Tables/Sales.B", "Sales.A"
+    )
+
+
+@weaver_test()
+def test_cycle_members_loaded_at_different_times_are_not_behind_one_another():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(4), moved=at(4))
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(2), moved=at(2))
+    ).report()
+
+    assert about(report.load, LOAD_STALE_ANCESTOR) == ()
+    assert about(report.load, LOAD_ANCESTOR_UNESTABLISHED) == ()
+    assert report.load.status == GREEN
+    assert report.build.status == GREEN
+    assert [each.code for each in report.findings if each.code == "dependency_cycle"]
+
+
+@weaver_test()
+def test_a_failed_cycle_member_leaves_the_other_without_its_data():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(4), result="failed")
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(2), moved=at(2))
+    ).report()
+
+    assert [each.object_id for each in about(report.load, LOAD_FAILED)] == [
+        f"{RAW}/Tables/Sales.A"
+    ]
+    (behind,) = about(report.load, LOAD_ANCESTOR_UNESTABLISHED)
+    assert behind.object_id == f"{RAW}/Tables/Sales.B"
+    assert behind.message == f"the last load of {RAW}/Tables/Sales.A failed"
+
+
+@weaver_test()
+def test_a_failure_before_a_cycle_reaches_every_member_and_beyond():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.Source", loaded=at(1), result="failed")
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(4), moved=at(4))
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(3), moved=at(3))
+        .table(f"{RAW}/Tables/Sales.After", loaded=at(2), moved=at(2))
+        .reads(f"{RAW}/Tables/Sales.A", "Sales.Source")
+        .reads(f"{RAW}/Tables/Sales.After", "Sales.B")
+    ).report()
+
+    assert sorted(
+        each.object_id for each in about(report.load, LOAD_ANCESTOR_UNESTABLISHED)
+    ) == [
+        f"{RAW}/Tables/Sales.A",
+        f"{RAW}/Tables/Sales.After",
+        f"{RAW}/Tables/Sales.B",
+    ]
+
+
+@weaver_test()
+def test_a_pending_cycle_member_is_reported_to_the_other():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", result="pending")
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(2), moved=at(2))
+    ).report()
+
+    (behind,) = about(report.load, LOAD_ANCESTOR_UNESTABLISHED)
+    assert behind.object_id == f"{RAW}/Tables/Sales.B"
+
+
+@weaver_test()
+def test_a_newer_producer_outside_a_cycle_puts_its_members_behind():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.Source", loaded=at(1), moved=at(1))
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(4), moved=at(4))
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(3), moved=at(3))
+        .reads(f"{RAW}/Tables/Sales.A", "Sales.Source")
+    ).report()
+
+    stale = about(report.load, LOAD_STALE_ANCESTOR)
+    assert sorted(each.object_id for each in stale) == [
+        f"{RAW}/Tables/Sales.A",
+        f"{RAW}/Tables/Sales.B",
+    ]
+    assert all(f"{RAW}/Tables/Sales.Source" in each.message for each in stale)
+
+
+@weaver_test()
+def test_a_cycle_member_past_as_of_is_still_overdue():
+    report = _cycle(
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(30), moved=at(30))
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(2), moved=at(2))
+    ).report()
+
+    assert [each.object_id for each in about(report.load, LOAD_STALE_TIME)] == [
+        f"{RAW}/Tables/Sales.A"
+    ]
+
+
+@weaver_test()
+def test_reading_back_through_another_object_is_not_a_cycle():
+    """A -> View -> B: the View reads A and B reads the View; no node repeats."""
+
+    report = (
+        _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(1), moved=at(1))
+        .view(f"{CURATED}/Tables/Sales.Live")
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(5), moved=at(5))
+        .shortcut(f"{CURATED}/Tables/Sales.A", f"{RAW}/Tables/Sales.A")
+        .reads(f"{CURATED}/Tables/Sales.Live", "Sales.A")
+        .shortcut(f"{RAW}/Tables/Sales.Live", f"{CURATED}/Tables/Sales.Live")
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.Live")
+        .report()
+    )
+
+    assert [
+        each.code for each in report.findings if each.code == "dependency_cycle"
+    ] == []
+    assert [each.object_id for each in about(report.load, LOAD_STALE_ANCESTOR)] == [
+        f"{RAW}/Tables/Sales.B"
+    ]

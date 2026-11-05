@@ -509,3 +509,98 @@ def test_a_new_item_kind_names_the_workflow_steps_it_needs(tmp_path, fabric):
 def test_a_rerun_with_nothing_new_has_no_guidance(tmp_path, fabric):
     setup(tmp_path, fabric)
     assert setup(tmp_path, fabric).guidance == ()
+
+
+# --- an Environment in another workspace ---------------------------------------
+
+
+def _shared_environment(fabric) -> None:
+    fabric.held.append(resources.Item("shared", "Weaver", "Environment", "platform"))
+
+
+@weaver_test()
+def test_an_environment_in_another_workspace_is_used_as_it_is(tmp_path, fabric):
+    _shared_environment(fabric)
+
+    report = setup(tmp_path, fabric, environment="Platform/Weaver")
+
+    assert "Environment/Weaver" not in fabric.created
+    assert not (tmp_path / "Environment").exists()
+    assert (
+        "environment: Platform/Weaver"
+        in (tmp_path / "workspace-config.yml").read_text()
+    )
+    shared = [each for each in report.resources if each.role == "Environment"]
+    assert [(each.name, each.status) for each in shared] == [
+        ("Platform/Weaver", "existing")
+    ]
+    assert report.environment_publication == "not applicable"
+
+
+@weaver_test()
+def test_an_environment_another_workspace_does_not_hold_is_refused(tmp_path, fabric):
+    with pytest.raises(InitialiseError, match="no Environment named Missing"):
+        setup(tmp_path, fabric, environment="Platform/Missing")
+
+    assert fabric.created == []
+
+
+@weaver_test()
+def test_an_environment_in_another_workspace_is_not_published_from_here(
+    tmp_path, fabric
+):
+    _shared_environment(fabric)
+
+    with pytest.raises(InitialiseError, match="published from"):
+        setup(tmp_path, fabric, environment="Platform/Weaver", publish_environment=True)
+    assert fabric.created == [] and not fabric.published
+
+
+# --- a project of Reports alone -------------------------------------------------
+
+
+def _thin_report(path) -> None:
+    import json
+
+    folder = path / "PowerBI" / "Overview" / "Overview.Report"
+    (folder / "definition" / "pages" / "overview").mkdir(parents=True)
+    model = "5b26945d-e7df-45fc-b60a-80d98bff7ee6"
+    (folder / "definition.pbir").write_text(
+        json.dumps(
+            {
+                "version": "4.0",
+                "datasetReference": {
+                    "byConnection": {
+                        "connectionString": (
+                            "Data Source=powerbi://api.powerbi.com/v1.0/myorg/"
+                            f"Central;Initial Catalog={model};semanticModelId={model};"
+                        )
+                    }
+                },
+            }
+        )
+    )
+    (folder / "definition" / "version.json").write_text('{"version": "2.0.0"}')
+    (folder / "definition" / "report.json").write_text("{}")
+    (folder / "definition" / "pages" / "pages.json").write_text(
+        '{"pageOrder": ["overview"], "activePageName": "overview"}'
+    )
+    (folder / "definition" / "pages" / "overview" / "page.json").write_text(
+        '{"name": "overview", "displayName": "Overview"}'
+    )
+
+
+@weaver_test()
+def test_a_project_of_reports_alone_gets_a_catalogue_and_no_environment(
+    tmp_path, fabric
+):
+    _thin_report(tmp_path)
+
+    report = weaver.initialise(tmp_path, workspace="Analytics", session=fabric.session)
+
+    assert fabric.created == ["Warehouse/Catalogue"]
+    config = (tmp_path / "workspace-config.yml").read_text()
+    assert "catalogue: Warehouse/Catalogue" in config
+    assert "environment:" not in config
+    assert report.catalogue_configured
+    assert report.environment_publication == "not applicable"

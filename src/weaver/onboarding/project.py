@@ -39,6 +39,9 @@ class ProjectRequest:
     source_items: tuple[str, ...] = ()
     #: Lakehouse and Warehouse items the project folder already declares.
     adopted_items: tuple[str, ...] = ()
+    #: An existing Environment in another workspace, as ``Workspace/Name``. The
+    #: project uses it as it is, so ``environment`` is then ``None``.
+    shared_environment: str | None = None
 
     def __post_init__(self) -> None:
         if self.example is not None and self.example not in ("Parcel", "Sales"):
@@ -53,6 +56,12 @@ class ProjectRequest:
             value = getattr(self, field)
             if field == "workspace" or value is not None:
                 object.__setattr__(self, field, validate_name(value, what=field))
+        if self.shared_environment is not None:
+            from ..workspaces import EnvironmentRef
+
+            shared = EnvironmentRef.parse(self.shared_environment)
+            validate_fabric_name(shared.name, "Environment")
+            object.__setattr__(self, "shared_environment", str(shared))
         for kind, value in (
             ("Lakehouse", self.lakehouse),
             ("Warehouse", self.warehouse),
@@ -76,6 +85,12 @@ class ProjectRequest:
     @property
     def catalogue_reference(self) -> str | None:
         return f"{WAREHOUSE}/{self.catalogue}" if self.catalogue else None
+
+    @property
+    def environment_reference(self) -> str | None:
+        """The Environment workspace configuration names."""
+
+        return self.shared_environment or self.environment
 
     @property
     def example_model(self) -> str | None:
@@ -161,8 +176,8 @@ def semantic_extension():
 
 def _workspace_config(request: ProjectRequest) -> str:
     lines = [f"workspace: {_scalar(request.workspace)}"]
-    if request.environment:
-        lines.append(f"environment: {_scalar(request.environment)}")
+    if request.environment_reference:
+        lines.append(f"environment: {_scalar(request.environment_reference)}")
     if request.catalogue:
         lines.append(f"catalogue: {_scalar(request.catalogue_reference)}")
     lines.extend(["", "targets:"])

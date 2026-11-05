@@ -72,7 +72,11 @@ def resolve_places(
     if len({(w.casefold(), c.casefold()) for w, c in owners}) != len(owners):
         raise CommandError(f"{operation} was given the same catalogue more than once")
     places = tuple(
-        Place(label=label, catalogue_name=name, workspace=place_workspace(home, owner, name))
+        Place(
+            label=label,
+            catalogue_name=name,
+            workspace=place_workspace(home, owner, name),
+        )
         for label, (owner, name) in zip(labels_for(owners), owners)
     )
     return home, places
@@ -146,7 +150,9 @@ def home_places(places: Sequence[Place], home: Workspace) -> tuple[Place, ...]:
         if place.workspace.workspace.casefold() == home.workspace.casefold()
     ]
     own = (home.catalogue or "").rpartition("/")[2].casefold()
-    return tuple(sorted(local, key=lambda place: place.catalogue_name.casefold() != own))
+    return tuple(
+        sorted(local, key=lambda place: place.catalogue_name.casefold() != own)
+    )
 
 
 def requested_by_label(

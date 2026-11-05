@@ -849,8 +849,7 @@ class _LoadHealth:
         newer.extend(
             ancestor.name
             for ancestor in self._foreign_ancestors(node)
-            if not ancestor.in_cycle
-            and (ancestor.established_at or loaded) > loaded
+            if not ancestor.in_cycle and (ancestor.established_at or loaded) > loaded
         )
         return sorted(newer)[0] if newer else None
 

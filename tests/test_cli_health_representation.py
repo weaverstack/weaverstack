@@ -564,3 +564,92 @@ def test_an_unscoped_report_still_shows_the_whole_estate(captured, capsys):
 
     assert f"{SELECTED}/Sales.Order" in printed
     assert f"{UNSELECTED}/Sales.Order" in printed
+
+
+# --- several catalogues -------------------------------------------------------
+
+
+def _joined():
+    from weaver.health import CatalogueHealth, JoinedHealthReport
+
+    return JoinedHealthReport(
+        generated_at=NOW,
+        as_of=NOW - timedelta(hours=24),
+        catalogues=(
+            CatalogueHealth("Central", "Central/Warehouse/Weaver", report=_report()),
+            CatalogueHealth(
+                "Archive",
+                "Archive/Warehouse/Weaver",
+                error="Its catalogue could not be read: refused",
+            ),
+            CatalogueHealth("Sales", "Sales/Warehouse/Weaver", report=_report()),
+        ),
+    )
+
+
+def _run_joined(*args):
+    return main(
+        [
+            "health",
+            *args,
+            "--workspace",
+            "Sales",
+            "--catalogue",
+            "Central/Warehouse/Weaver",
+            "--catalogue",
+            "Archive/Warehouse/Weaver",
+            "--catalogue",
+            "Sales/Warehouse/Weaver",
+        ]
+    )
+
+
+@weaver_test()
+def test_several_catalogues_reach_the_operation_in_the_order_given(captured):
+    captured["report"] = _joined()
+
+    _run_joined()
+
+    assert captured["catalogue"] == [
+        "Central/Warehouse/Weaver",
+        "Archive/Warehouse/Weaver",
+        "Sales/Warehouse/Weaver",
+    ]
+
+
+@weaver_test()
+def test_each_catalogue_is_printed_in_order_with_one_not_assessed(captured, capsys):
+    captured["report"] = _joined()
+
+    assert _run_joined() == 1
+    out = capsys.readouterr().out
+
+    assert out.index("Central") < out.index("Archive") < out.index("Sales  Sales")
+    assert "not assessed" in out and "refused" in out
+    assert "Crossings" not in out and "impact" not in out.casefold()
+    assert "Cycles" not in out
+
+
+@weaver_test()
+def test_several_catalogues_as_json_are_json_in_order(captured, capsys):
+    captured["report"] = _joined()
+
+    _run_joined("--json")
+    payload = json.loads(capsys.readouterr().out)
+
+    assert [each["label"] for each in payload["catalogues"]] == [
+        "Central",
+        "Archive",
+        "Sales",
+    ]
+    assert payload["complete"] is False
+    assert payload["catalogues"][1]["report"] is None
+    assert set(payload) == {
+        "format_version",
+        "generated_at",
+        "as_of",
+        "status",
+        "complete",
+        "catalogues",
+        "cycles",
+    }

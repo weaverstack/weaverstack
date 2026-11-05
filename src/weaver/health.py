@@ -69,6 +69,7 @@ LOAD_REJECTED = "load_rejected"
 LOAD_STALE_TIME = "load_stale_time"
 LOAD_STALE_ANCESTOR = "load_stale_ancestor"
 LOAD_ANCESTOR_UNESTABLISHED = "load_ancestor_unestablished"
+LOAD_ANCESTOR_UNOBSERVED = "load_ancestor_unobserved"
 TEST_PENDING = "test_pending"
 TEST_FAILED = "test_failed"
 TEST_STALE_DEPENDENCY = "test_stale_dependency"
@@ -444,49 +445,66 @@ class HealthReport(ReportAlias):
 
 
 #: The format version of :meth:`JoinedHealthReport.to_mapping`.
-JOINED_FORMAT_VERSION = 4
+JOINED_FORMAT_VERSION = 1
 
 
 @dataclass(frozen=True)
 class CatalogueHealth:
-    """One catalogue's report within a joined one."""
+    """One catalogue's report within a joined one, or why there is none."""
 
     label: str
     reference: str
-    report: HealthReport
+    report: HealthReport | None = None
+    #: Why this catalogue could not be assessed.
+    error: str | None = None
 
     def to_mapping(self) -> dict:
         return {
             "label": self.label,
             "catalogue": self.reference,
-            "report": self.report.to_mapping(),
+            "status": AMBER if self.report is None else self.report.status,
+            "report": None if self.report is None else self.report.to_mapping(),
+            "error": self.error,
         }
 
 
 @dataclass(frozen=True)
 class JoinedHealthReport(ReportAlias):
-    """Several catalogues' Health, the crossings that join them, and what each
-    failure reaches across them."""
+    """Each catalogue's Health, in the order given, assessed with ancestry through
+    the others."""
 
     generated_at: datetime
     as_of: datetime
     catalogues: tuple[CatalogueHealth, ...]
-    crossings: tuple = ()
-    impact: tuple = ()
+    #: Cycles whose members are in more than one catalogue, by qualified node.
     cycles: tuple[tuple[str, ...], ...] = ()
 
     @property
     def status(self) -> str:
-        return worst(each.report.status for each in self.catalogues)
+        """The worst catalogue's status. One not assessed is Amber at best."""
+
+        return worst(
+            AMBER if each.report is None else each.report.status
+            for each in self.catalogues
+        )
 
     @property
     def is_healthy(self) -> bool:
         return self.status == GREEN
 
     @property
+    def complete(self) -> bool:
+        """Whether every catalogue given was assessed."""
+
+        return all(each.report is not None for each in self.catalogues)
+
+    @property
     def findings(self) -> tuple[HealthFinding, ...]:
         return tuple(
-            finding for each in self.catalogues for finding in each.report.findings
+            finding
+            for each in self.catalogues
+            if each.report is not None
+            for finding in each.report.findings
         )
 
     def to_mapping(self) -> dict:
@@ -495,9 +513,8 @@ class JoinedHealthReport(ReportAlias):
             "generated_at": _isoformat(self.generated_at),
             "as_of": _isoformat(self.as_of),
             "status": self.status,
+            "complete": self.complete,
             "catalogues": [each.to_mapping() for each in self.catalogues],
-            "crossings": [each.to_mapping() for each in self.crossings],
-            "impact": [each.to_mapping() for each in self.impact],
             "cycles": [list(members) for members in self.cycles],
         }
 
@@ -741,6 +758,17 @@ class _LoadHealth:
                 node,
                 status.result,
                 f"{newer} has been established since this object was loaded",
+                status,
+            )
+        for target in () if self.across is None else self.across.unobserved(node):
+            yield _finding(
+                LOAD,
+                LOAD_ANCESTOR_UNOBSERVED,
+                AMBER,
+                node,
+                status.result,
+                f"it reads {target}, whose catalogue could not be read, so whether "
+                "it is current is unverified",
                 status,
             )
 
@@ -1226,66 +1254,102 @@ class Observed:
     installation_faults: Mapping[WeaverItemId, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class Unread:
+    """A catalogue given that could not be read, and why."""
+
+    label: str
+    workspace: str
+    reference: str
+    reason: str
+
+
 def assess_joined(
-    members,
+    entries,
     *,
     as_of: datetime,
     generated_at: datetime,
     observed: Mapping[str, Observed] | None = None,
-    report_models: Mapping[str, str] | None = None,
+    reported: Sequence[str] | None = None,
 ) -> JoinedHealthReport:
-    """Several catalogues' Health, joined where their shortcuts cross.
+    """Several catalogues' Health, in the order given.
 
-    ``members`` are :class:`weaver.catalogues.Member` values. ``observed`` maps
-    a member's label to what its targets were found to hold. ``report_models``
-    maps a qualified Report node to the semantic model GUID Power BI binds it
-    to. Each catalogue is assessed with ancestry through the others, and each
-    failed load's reach is listed across all of them.
+    ``reported`` limits the report to those labels; every entry still joins.
+
+    ``entries`` are :class:`weaver.catalogues.Member` values and
+    :class:`Unread` ones, in the order the catalogues were given. Each member is
+    assessed with ancestry through the others. One whose assessment fails is
+    reported with the error, and an object that reads a catalogue that could
+    not be read is reported as unverified.
     """
 
-    from .catalogues import join, qualify
-    from .impact import impacts
+    from .catalogues import Member, join
 
     observed = dict(observed or {})
-    joined = join(members, report_models=report_models)
-    statuses = {}
-    for member in members:
-        effective = effective_load_state(member.catalogue, source=member.source)
-        for node in member.dag.nodes:
-            status = effective.statuses.get(node.identity)
-            if status is not None:
-                statuses[qualify(member.label, node.node_id)] = status
-    instants = {
-        qualified: established(status) for qualified, status in statuses.items()
-    }
+    members = [entry for entry in entries if isinstance(entry, Member)]
+    unread = tuple(entry.workspace for entry in entries if isinstance(entry, Unread))
+    joined = join(members)
+    statuses = joined_statuses(members)
     reports = []
-    for member in members:
-        seen = observed.get(member.label, Observed())
-        reports.append(
-            CatalogueHealth(
-                label=member.label,
-                reference=member.reference,
-                report=assess(
-                    member.catalogue,
-                    as_of=as_of,
-                    generated_at=generated_at,
-                    targets=seen.targets,
-                    items=seen.items or None,
-                    inventories=seen.inventories,
-                    source=member.source,
-                    installation_faults=seen.installation_faults,
-                    across=joined.across(member, statuses),
-                ),
+    for entry in entries:
+        if (
+            reported is not None
+            and entry.label not in reported
+            and not isinstance(entry, Unread)
+        ):
+            continue
+        if isinstance(entry, Unread):
+            reports.append(
+                CatalogueHealth(entry.label, entry.reference, error=entry.reason)
             )
-        )
+            continue
+        seen = observed.get(entry.label, Observed())
+        try:
+            report = assess(
+                entry.catalogue,
+                as_of=as_of,
+                generated_at=generated_at,
+                targets=seen.targets,
+                items=seen.items or None,
+                inventories=seen.inventories,
+                source=entry.source,
+                installation_faults=seen.installation_faults,
+                across=joined.across(entry, statuses, unread),
+            )
+        except Exception as exc:  # noqa: BLE001 - one catalogue's rows stop only it
+            reports.append(
+                CatalogueHealth(
+                    entry.label,
+                    entry.reference,
+                    error=f"Its catalogue could not be assessed: {exc}",
+                )
+            )
+            continue
+        reports.append(CatalogueHealth(entry.label, entry.reference, report=report))
     return JoinedHealthReport(
         generated_at=generated_at,
         as_of=as_of,
         catalogues=tuple(reports),
-        crossings=joined.crossings,
-        impact=impacts(joined, statuses),
         cycles=joined.spanning_cycles(),
     )
+
+
+def joined_statuses(members) -> dict:
+    """Each member node's effective load status, by qualified node."""
+
+    from .catalogues import qualify
+
+    statuses = {}
+    for member in members:
+        try:
+            effective = effective_load_state(member.catalogue, source=member.source)
+        except Exception:  # noqa: BLE001 - its own assessment reports the error
+            continue
+        for node in member.dag.nodes:
+            status = effective.statuses.get(node.identity)
+            if status is not None:
+                statuses[qualify(member.label, node.node_id)] = status
+    return statuses
 
 
 class _Assessment:

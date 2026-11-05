@@ -66,10 +66,11 @@ def health(
 
     ``catalogue`` names one catalogue, or several as ``Workspace/Warehouse/Name``.
     Several are read together and joined where a physical shortcut in one lands
-    on an object another installs: each catalogue is reported, an object behind
-    a source in another catalogue is reported as behind, and each failed load's
-    reach across all of them is listed. ``items`` then names
-    ``Workspace/Kind/Name`` for an item outside this workspace's catalogue.
+    on an object another installs. Each is reported in the order given, and an
+    object behind a source in another catalogue is reported as behind. One that
+    cannot be read is reported in its place with the reason. ``items`` then
+    names ``Workspace/Kind/Name`` for an item outside this workspace's
+    catalogue, and a bare workspace name every item of its catalogue.
 
     ``items`` restricts the subjects reported on. With none, every target the
     catalogue binds an item to. Managed ancestry outside the selection is still
@@ -144,15 +145,23 @@ def run_health(
     )
 
 
-def _read(session, workspace, *, label: str | None = None):
-    """A catalogue and, where it mirrors one, its source catalogue."""
+def _read(session, workspace, *, steps: bool = True):
+    """A catalogue and, where it mirrors one, its source catalogue.
+
+    Without ``steps`` the reads are not framed, for a caller reading several
+    catalogues at once.
+    """
+
+    from contextlib import nullcontext
 
     from ..catalogue.connection import catalogue_connection
     from ..catalogue.state import read_installed_catalogue
 
+    def step(name):
+        return session.step(name) if steps else nullcontext()
+
     connection = catalogue_connection(session, workspace)
-    where = f" {label}" if label else ""
-    with session.step(f"Read catalogue{where}"):
+    with step("Read catalogue"):
         # Read current state and its supporting statistics together.
         catalogue = read_installed_catalogue(
             connection, tables=HEALTH_TABLES, load_history=True
@@ -162,7 +171,7 @@ def _read(session, workspace, *, label: str | None = None):
     if catalogue.mirrors:
         from .mirror import mirrored_source
 
-        with session.step(f"Read the mirrored catalogue{where}"):
+        with step("Read the mirrored catalogue"):
             # Mirrored load state comes from the catalogue where rows are written.
             source = mirrored_source(
                 catalogue,
@@ -205,11 +214,18 @@ def _report(
     )
 
 
-def _observe(session, *, workspace, catalogue, items, inventories: bool):
+def _observe(
+    session, *, workspace, catalogue, items, inventories: bool, steps: bool = True
+):
     """The selected targets, what they hold, and installations that no longer
     name their Fabric item."""
 
+    from contextlib import nullcontext
+
     from ..health import Observed
+
+    def step(name):
+        return session.step(name) if steps else nullcontext()
 
     dag = catalogue.dag()
     # Report physical targets bound by the catalogue's installations.
@@ -225,7 +241,7 @@ def _observe(session, *, workspace, catalogue, items, inventories: bool):
     read = {}
     faults = {}
     if inventories:
-        with session.step("Check installed items"):
+        with step("Check installed items"):
             faults = _installation_faults(
                 session,
                 workspace=workspace,
@@ -234,7 +250,7 @@ def _observe(session, *, workspace, catalogue, items, inventories: bool):
                 items=tuple(items),
                 targets=selected,
             )
-        with session.step("Read installed objects"):
+        with step("Read installed objects"):
             # A target whose item was replaced is reported, not read by name.
             broken = {dag.installations[item] for item in faults}
             read = _inventories(
@@ -262,143 +278,76 @@ def _joined_health(
     session,
     started: datetime,
 ):
-    from dataclasses import replace
-
-    from ..catalogues import Member, labels_for
-    from ..errors import CommandError
-    from ..health import assess_joined
+    from ..catalogues import Member
+    from ..health import Unread, assess_joined
     from ..sessions.host import use_or_create_session
-    from ..workspaces import CatalogueRef
+    from .joined import concurrently, requested_by_label, resolve_places, retried
 
-    references = [CatalogueRef.parse(each) for each in catalogues]
-    home = operation_workspace(
+    home, places = resolve_places(
         "health",
-        workspace=workspace or references[0].workspace,
+        catalogues,
+        workspace=workspace,
         workspace_config=workspace_config,
         session=session,
-        needs_catalogue=False,
     )
-    places = [
-        (reference.owner(home.workspace), reference.name) for reference in references
-    ]
-    if len(set((w.casefold(), c.casefold()) for w, c in places)) != len(places):
-        raise CommandError("health was given the same catalogue more than once")
-    labels = labels_for(places)
-    member_workspaces = [
-        replace(
-            home,
-            workspace=owner,
-            catalogue=f"Warehouse/{name}",
-            targets=home.targets if owner == home.workspace else {},
-            mirror=home.mirror if owner == home.workspace else None,
-        )
-        for owner, name in places
-    ]
-    requested = _requested_by_label(items, labels, places, home.workspace)
+    requested = (
+        {} if items is None else requested_by_label("health", items, places, home)
+    )
     resolved_as_of = resolve_as_of(as_of, started=started)
 
     with use_or_create_session(session, workspace=home) as opened:
         with opened.task("Health", f"{len(places)} catalogues"):
-            members = []
-            for label, (owner, name), member_workspace in zip(
-                labels, places, member_workspaces
-            ):
-                catalogue, source = _read(opened, member_workspace, label=label)
-                members.append(
-                    Member(
-                        label=label,
-                        workspace=owner,
-                        catalogue_name=name,
+
+            def read(place):
+                with opened.concurrent_substep(f"Read {place.reference}"):
+                    catalogue, source = retried(
+                        lambda: _read(opened, place.workspace, steps=False)
+                    )
+                    member = Member(
+                        label=place.label,
+                        workspace=place.workspace.workspace,
+                        catalogue_name=place.catalogue_name,
                         catalogue=catalogue,
                         dag=catalogue.dag(),
                         source=source,
                     )
-                )
-            observed = {
-                member.label: _observe(
-                    opened,
-                    workspace=member_workspace,
-                    catalogue=member.catalogue,
-                    items=requested.get(member.label, ()),
-                    inventories=inventories,
-                )
-                for member, member_workspace in zip(members, member_workspaces)
-            }
-            with opened.step("Read Report bindings"):
-                report_models = _report_models(opened, members, member_workspaces)
+                    seen = retried(
+                        lambda: _observe(
+                            opened,
+                            workspace=place.workspace,
+                            catalogue=catalogue,
+                            items=requested.get(place.label, ()),
+                            inventories=inventories,
+                            steps=False,
+                        )
+                    )
+                return member, seen
+
+            with opened.step(f"Read {len(places)} catalogues"):
+                outcomes = concurrently(places, read)
+            entries, observed = [], {}
+            for place, outcome in zip(places, outcomes):
+                if isinstance(outcome, Exception):
+                    entries.append(
+                        Unread(
+                            place.label,
+                            place.workspace.workspace,
+                            place.reference,
+                            f"Its catalogue could not be read: {outcome}",
+                        )
+                    )
+                    continue
+                member, seen = outcome
+                entries.append(member)
+                observed[place.label] = seen
             return assess_joined(
-                members,
+                entries,
                 as_of=resolved_as_of,
                 generated_at=started,
                 observed=observed,
-                report_models=report_models,
+                # With items named, the other catalogues give context only.
+                reported=tuple(requested) or None,
             )
-
-
-def _report_models(session, members, member_workspaces) -> dict[str, str]:
-    """The semantic model each installed Report is bound to, by Report node.
-
-    Power BI holds the binding, so a Report bound to a model in another
-    workspace is read here rather than from any catalogue.
-    """
-
-    from ..catalogues import qualify
-
-    found = {}
-    for member, member_workspace in zip(members, member_workspaces):
-        for item, target in member.dag.installations.items():
-            if item.item_type != "Report":
-                continue
-            node = next(
-                (
-                    each
-                    for each in member.dag.nodes
-                    if each.item == item and each.object_type == "report"
-                ),
-                None,
-            )
-            if node is None:
-                continue
-            try:
-                binding = session.report_item(
-                    target.name, workspace=member_workspace
-                ).get_binding()
-            except Exception:  # noqa: BLE001 - an unreadable binding joins nothing
-                continue
-            model = (binding or {}).get("datasetId")
-            if model:
-                found[qualify(member.label, node.node_id)] = str(model)
-    return found
-
-
-def _requested_by_label(items, labels, places, home_workspace):
-    """Each catalogue's requested items. ``Workspace/Kind/Name`` names one
-    outside this workspace's catalogue; a bare ``Kind/Name`` is this one's."""
-
-    from ..errors import CommandError
-
-    if items is None:
-        return {}
-    values = (items,) if isinstance(items, str) else tuple(items)
-    by_workspace: dict[str, list[str]] = {}
-    for label, (owner, _name) in zip(labels, places):
-        by_workspace.setdefault(owner.casefold(), []).append(label)
-    found: dict[str, list[WeaverItemId]] = {}
-    for value in values:
-        parts = str(value).strip().strip("/").split("/")
-        owner, text = (
-            (parts[0], "/".join(parts[1:]))
-            if len(parts) == 3
-            else (home_workspace, str(value))
-        )
-        candidates = by_workspace.get(owner.casefold(), [])
-        if len(candidates) != 1:
-            raise CommandError(
-                f"{value} names workspace {owner}, which holds "
-                f"{'none' if not candidates else 'more than one'} of the catalogues given"
-            )
-        found.setdefault(candidates[0], []).extend(requested_items(text, what="health"))
-    return {label: tuple(dict.fromkeys(items)) for label, items in found.items()}
 
 
 def _installation_faults(session, *, workspace, catalogue, dag, items, targets):

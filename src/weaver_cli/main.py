@@ -2047,40 +2047,22 @@ def _home_from_catalogue(args: argparse.Namespace, first: str) -> None:
 
 
 def render_joined_health(report) -> str:
-    """Each catalogue's Health, then the crossings and each failure's reach."""
+    """Each catalogue's Health in the order given, as one catalogue's would be."""
 
     lines = [f"Weaver Health  {_semantic_status(report.status)}", ""]
     for each in report.catalogues:
         lines.append(f"{each.label}  {each.reference}")
-        body = render_health(each.report).splitlines()[2:]
-        lines.extend(f"  {line}" if line else "" for line in body)
+        if each.report is None:
+            lines.append(f"  {_semantic_status('amber', width=7)}not assessed")
+            lines.append(f"          {each.error}")
+        else:
+            body = render_health(each.report).splitlines()[2:]
+            lines.extend(f"  {line}" if line else "" for line in body)
         lines.append("")
-    matched = [crossing for crossing in report.crossings if crossing.producer]
-    unmatched = [crossing for crossing in report.crossings if not crossing.producer]
-    lines.append(f"Crossings  {len(matched)} joined · {len(unmatched)} not joined")
-    for crossing in unmatched:
-        lines.append(f"  {crossing.consumer.replace('::', ': ', 1)}")
-        lines.append(f"          {crossing.reason}")
-    lines.append("")
     if report.cycles:
         lines.append("Cycles across catalogues")
         for members in report.cycles:
             lines.append("  " + " → ".join(m.replace("::", ": ", 1) for m in members))
-        lines.append("")
-    if report.impact:
-        lines.append("Upstream impact")
-        for impact in report.impact:
-            lines.append(
-                f"  {_semantic_status('red', width=7)}{impact.catalogue}: "
-                f"{impact.object_id}  {impact.status}"
-            )
-            for affected in impact.affected:
-                lines.append(
-                    f"    {affected.catalogue}: {affected.object_id}  "
-                    f"{affected.kind}, {affected.effect}"
-                )
-                for table in affected.tables:
-                    lines.append(f"      table {table.name}  {table.effect}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

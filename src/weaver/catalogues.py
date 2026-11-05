@@ -70,14 +70,8 @@ class Crossing:
     target: str
     producer: str | None = None
     reason: str | None = None
-
-    def to_mapping(self) -> dict:
-        return {
-            "consumer": self.consumer,
-            "target": self.target,
-            "producer": self.producer,
-            "reason": self.reason,
-        }
+    #: The workspace the shortcut lands in.
+    workspace: str | None = None
 
 
 @dataclass(frozen=True)
@@ -122,29 +116,47 @@ class CatalogueSet:
             if len({split(each)[0] for each in members}) > 1
         )
 
-    def across(self, member: Member, statuses) -> "Across":
+    def across(self, member: Member, statuses, unread=()) -> "Across":
         """What Health needs about ``member``'s nodes from the other catalogues.
 
         ``statuses`` maps a qualified node to its effective load status.
+        ``unread`` names the workspaces of catalogues given that could not be
+        read.
         """
 
-        return Across(self, member, statuses)
+        return Across(self, member, statuses, unread)
 
 
 class Across:
     """Ancestry beyond one catalogue, for that catalogue's Health."""
 
-    def __init__(self, joined: CatalogueSet, member: Member, statuses) -> None:
+    def __init__(
+        self, joined: CatalogueSet, member: Member, statuses, unread=()
+    ) -> None:
         self._joined = joined
         self._member = member
         self._statuses = statuses
         crossed = set()
+        unobserved: dict[str, set[str]] = {}
+        unread = {workspace.casefold() for workspace in unread}
         for crossing in joined.crossings:
-            if crossing.producer is None or crossing.consumer not in joined.graph:
+            if crossing.consumer not in joined.graph:
                 continue
-            crossed.add(crossing.consumer)
-            crossed.update(joined.graph.descendants(crossing.consumer))
+            reached = {crossing.consumer, *joined.graph.descendants(crossing.consumer)}
+            if crossing.producer is not None:
+                crossed.update(reached)
+            elif (crossing.workspace or "").casefold() in unread:
+                for each in reached:
+                    unobserved.setdefault(each, set()).add(crossing.target)
         self._crossed = frozenset(crossed)
+        self._unobserved = unobserved
+
+    def unobserved(self, node: "InstalledNode") -> tuple[str, ...]:
+        """What this node reads, directly or not, in a catalogue that could not be
+        read."""
+
+        qualified = qualify(self._member.label, node.node_id)
+        return tuple(sorted(self._unobserved.get(qualified, ())))
 
     def cycle(self, node: "InstalledNode") -> frozenset[str]:
         """The node IDs in this catalogue that share a cycle with ``node``."""
@@ -204,14 +216,11 @@ def labels_for(references: Sequence[tuple[str, str]]) -> tuple[str, ...]:
     )
 
 
-def join(
-    members: Sequence[Member], *, report_models: Mapping[str, str] | None = None
-) -> CatalogueSet:
+def join(members: Sequence[Member]) -> CatalogueSet:
     """Join catalogues where a physical shortcut lands on another's object.
 
-    ``report_models`` maps a qualified Report node to the GUID of the semantic
-    model Power BI binds it to. A Report bound to a model another catalogue
-    installs joins that model, as a thin Report on a central model does.
+    A shortcut that cannot be matched is a crossing with a reason, so one
+    catalogue's malformed row leaves the others joined.
     """
 
     installed: dict[tuple[str, str, str], list[tuple[Member, WeaverItemId]]] = {}
@@ -230,8 +239,17 @@ def join(
         for shortcut in member.dag.shortcuts:
             if shortcut.is_logical or shortcut.target_item is None:
                 continue
-            crossings.extend(_crossings(member, shortcut, installed))
-    crossings.extend(_report_crossings(members, report_models or {}))
+            try:
+                crossings.extend(_crossings(member, shortcut, installed))
+            except Exception as exc:  # noqa: BLE001 - one row joins nothing
+                crossings.append(
+                    Crossing(
+                        qualify(member.label, str(shortcut.destination)),
+                        str(shortcut.target_item),
+                        reason=f"Its target could not be matched: {exc}",
+                        workspace=shortcut.target_workspace or member.workspace,
+                    )
+                )
 
     nodes: list[str] = []
     edges: list[tuple[str, str]] = []
@@ -255,38 +273,6 @@ def join(
     )
 
 
-def _report_crossings(members, report_models: Mapping[str, str]):
-    from .installed import SEMANTIC_MODEL
-
-    models = {}
-    for member in members:
-        for item in member.dag.installations:
-            if item.item_type != SEMANTIC_MODEL:
-                continue
-            row = next(
-                iter(member.catalogue.rows.get(item, {}).get(INSTALLATION.name, ())),
-                {},
-            )
-            if row.get("item_id"):
-                models[str(row["item_id"]).casefold()] = qualify(
-                    member.label, str(WeaverDocumentId.model_root(item))
-                )
-    found = []
-    for report, model in sorted(report_models.items()):
-        producer = models.get(str(model).casefold())
-        found.append(
-            Crossing(
-                report,
-                f"SemanticModel {model}",
-                producer=producer,
-                reason=None
-                if producer
-                else f"No catalogue given installs the semantic model {model}.",
-            )
-        )
-    return found
-
-
 def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
     from .installed import stored_identity
 
@@ -306,6 +292,7 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
                 consumer,
                 target,
                 reason=f"No catalogue given installs {workspace}/{item}.",
+                workspace=workspace,
             ),
         )
     if len(found) > 1:
@@ -315,6 +302,7 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
                 consumer,
                 target,
                 reason=f"{workspace}/{item} is installed by more than one catalogue given: {names}.",
+                workspace=workspace,
             ),
         )
     producer, logical = found[0]
@@ -343,6 +331,7 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
                         qualify(member.label, str(destination)),
                         target,
                         producer=qualify(producer.label, node.node_id),
+                        workspace=workspace,
                     )
                 )
         return tuple(reached)
@@ -355,6 +344,7 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
                     consumer,
                     target,
                     reason="Only a Schema/Folder path names one installed folder.",
+                    workspace=workspace,
                 ),
             )
         identity = stored_identity(logical, f"Files/{parts[0]}", parts[1])
@@ -368,10 +358,16 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
                 consumer,
                 target,
                 reason=f"{identity} is not installed in {producer.label}.",
+                workspace=workspace,
             ),
         )
     return (
-        Crossing(consumer, target, producer=qualify(producer.label, str(identity))),
+        Crossing(
+            consumer,
+            target,
+            producer=qualify(producer.label, str(identity)),
+            workspace=workspace,
+        ),
     )
 
 

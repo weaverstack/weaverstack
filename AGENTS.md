@@ -124,15 +124,18 @@ in-place rewrite leaves signatures valid.
 
 Each team keeps its own workspace and catalogue; Build stays within one.
 Several catalogues are read together by passing more than one `catalogue`
-(`Workspace/Warehouse/Name`), with nothing declared for the join.
+(`Workspace/Warehouse/Name`), with nothing declared for the join. The working
+workspace resolves by the ordinary precedence (`operations.joined`); the
+catalogues supply context, and their order is presentation order.
 `weaver.catalogues.join` matches each physical `_.Shortcut` row to the
 catalogue whose `_.Installation` binds that workspace's item, and the path gives
 the producer object (`stored_identity`), so the graphs join as a `CatalogueSet`
-whose node IDs are qualified by catalogue label. Health then assesses each
-catalogue with ancestry through the others (`Across`), and `weaver.impact`
-lists each failed load's reach, classing a materialised object `behind`, a View,
-shortcut or Direct Lake model table `live`, and an Import model table `frozen`.
-`health.assess_joined` is pure; the operation only reads.
+whose node IDs are qualified by catalogue label. Health assesses each catalogue
+with ancestry through the others (`Across`) and reports them in the order given,
+as single-catalogue reports. A catalogue that cannot be read or assessed keeps
+its place with the error, and an object that reads it is reported as
+unverified. `health.assess_joined` is pure; the operation only reads, and makes
+no Power BI call to find bindings.
 
 The Catalogue Dashboard observes a catalogue and is no part of its lifecycle.
 `weaver catalogue-dashboard` (`operations.catalogue_dashboard`) writes the

@@ -96,7 +96,7 @@ def dispatch_primitive(
     if kind == ENDPOINT_REFRESH:
         return _endpoint_refresh(node, session, workspace)
     if kind == ONELAKE_PUBLICATION:
-        return _onelake_publication(node, session, workspace, publication)
+        return _onelake_publication(node, session, workspace, publication, state)
     raise RunError(
         f"Cannot run {node.node_id}: deployed object type {kind!r} is unsupported"
     )
@@ -218,8 +218,11 @@ def _refuse_outdated_procedure(node, sql, procedure: str, inputs, exc) -> None:
     ) from exc
 
 
-def _onelake_publication(node, session, workspace, publication):
-    """Wait for this Warehouse load to become readable by its consumers."""
+def _onelake_publication(node, session, workspace, publication, state=None):
+    """Wait for this Warehouse load to become readable by its consumers.
+
+    A consumer in another catalogue's workspace opens its path from there.
+    """
 
     from ..runtime.load_result import LoadResult
     from .publication import await_publication
@@ -238,6 +241,11 @@ def _onelake_publication(node, session, workspace, publication):
         workspace,
         before=publication.baseline(producer),
         readiness=tuple(node.publication_targets),
+        where=None
+        if state is None
+        else lambda readiness: state.workspace_for(
+            getattr(readiness, "owner", None), workspace
+        ),
     )
     return LoadResult(succeeded=True)
 

@@ -643,3 +643,62 @@ def test_a_planned_installed_run_also_exits_zero(captured, capsys):
 
 
 # --- evidence crossing the desktop-to-Fabric boundary --------------------------
+
+
+# --- several catalogues -------------------------------------------------------
+
+
+@weaver_test()
+def test_every_option_reaches_a_test_run_across_catalogues(captured):
+    main(
+        [
+            "test",
+            "Sales",
+            "Finance",
+            "--workspace",
+            "Sales",
+            "--catalogue",
+            "Sales/Warehouse/Weaver",
+            "--catalogue",
+            "Finance/Warehouse/Weaver",
+            "--name",
+            "MART.SummaryHasRows",
+            "--stale",
+            "--dry-run",
+            "--concurrency",
+            "2",
+        ]
+    )
+
+    assert list(captured["items"]) == ["Sales", "Finance"]
+    assert captured["catalogue"] == [
+        "Sales/Warehouse/Weaver",
+        "Finance/Warehouse/Weaver",
+    ]
+    assert captured["names"] == ["MART.SummaryHasRows"]
+    assert captured["stale"] and captured["dry_run"]
+    assert captured["concurrency"] == 2
+
+
+@weaver_test()
+def test_files_across_catalogues_are_refused_before_any_work(
+    desktop_credential, capsys
+):
+    assert (
+        main(
+            [
+                "test",
+                "--workspace",
+                "Sales",
+                "--catalogue",
+                "Sales/Warehouse/Weaver",
+                "--catalogue",
+                "Finance/Warehouse/Weaver",
+                "--file",
+                "tests/Mart/Check.sql",
+                "--non-interactive",
+            ]
+        )
+        != 0
+    )
+    assert "one catalogue" in capsys.readouterr().err

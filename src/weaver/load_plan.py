@@ -28,6 +28,7 @@ from .installed import (
     InstalledNode,
     refuse_uncertified_models,
 )
+from .joined_dag import owner_of
 from .load_report import DAG_CYCLE, DEPENDENCY_EXTERNAL, LoadMessage, info
 from .selection import name_patterns
 from .targets import PhysicalObjectRef, PhysicalTargetRef
@@ -56,6 +57,8 @@ class OneLakeReadiness:
     target: PhysicalTargetRef
     schema: str
     object: str
+    #: The catalogue whose workspace holds ``target``, when several are joined.
+    owner: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,8 @@ class LoadNode:
     #: A semantic refresh only. Every recorded source is read in Direct Lake,
     #: which uses single sign-on, so no connection is bound or needed.
     direct_lake: bool = False
+    #: The catalogue that owns this node, when several are joined.
+    owner: str | None = None
 
     @property
     def sort_key(self) -> tuple[str, str, str, str]:
@@ -283,11 +288,10 @@ class _Planner:
         ancestors: bool,
         descendants: bool,
     ) -> tuple[InstalledNode, ...]:
+        # Over the whole graph, so a path through an unrequested item still
+        # reaches a requested ancestor or descendant; only requested items run.
         allowed_items = frozenset(requested)
-        scoped = self.dag.graph.subgraph(
-            node.node_id for node in self.dag.nodes if node.item in allowed_items
-        )
-        expanded = scoped.subgraph(
+        expanded = self.dag.graph.subgraph(
             (node.node_id for node in seeds),
             with_ancestors=ancestors,
             with_descendants=descendants,
@@ -296,6 +300,7 @@ class _Planner:
             self.dag.by_id[node_id]
             for node_id in expanded.order()
             if self.dag.by_id[node_id].can_load
+            and self.dag.by_id[node_id].item in allowed_items
         )
 
     def _order_untraced_models_last(self) -> None:
@@ -316,7 +321,10 @@ class _Planner:
         ]
         others = [node_id for node_id in self.nodes if node_id not in models]
         self.edges.update(
-            (upstream, model) for model in untraced for upstream in others
+            (upstream, model)
+            for model in untraced
+            for upstream in others
+            if self.nodes[upstream].owner == self.nodes[model].owner
         )
 
     def _seeds(
@@ -419,29 +427,28 @@ class _Planner:
             installed, allowed_items=allowed_items
         ):
             upstream_id = self._select(producer, visited, allowed_items=allowed_items)
-            if crossed is None:
-                self.edges.add((upstream_id, node.node_id))
-            elif (
-                isinstance(crossed, OneLakeReadiness) or crossed == ONELAKE_PUBLICATION
-            ):
-                # OneLake publishes a Warehouse commit after the transaction, so
-                # the barrier replaces the direct edge, as the refresh does.
-                barrier = self._publication_node(
-                    self.nodes[upstream_id],
-                    None if crossed == ONELAKE_PUBLICATION else crossed,
-                )
-                self.edges.add((upstream_id, barrier.node_id))
-                self.edges.add((barrier.node_id, node.node_id))
-            else:
-                # A shortcut read as SQL: the producer's endpoint has to catch up
-                # before the consumer can see it, so the barrier replaces the
-                # direct edge rather than sitting beside it. The refresh waits
-                # for what is read through it, and other loads in the Lakehouse
-                # run beside it.
-                refresh_id = self._refresh_node(crossed, read).node_id
-                self.edges.add((upstream_id, refresh_id))
-                self.edges.add((refresh_id, node.node_id))
+            # Barriers are listed from the consumer outwards; each replaces the
+            # direct edge, so the consumer waits for the last of them.
+            downstream_id = node.node_id
+            for barrier in crossed:
+                barrier_id = self._barrier(self.nodes[upstream_id], barrier, read)
+                self.edges.add((barrier_id, downstream_id))
+                downstream_id = barrier_id
+            self.edges.add((upstream_id, downstream_id))
         return node.node_id
+
+    def _barrier(self, producer: LoadNode, crossed, read) -> str:
+        """The barrier one crossing needs between ``producer`` and its reader.
+
+        OneLake publishes a Warehouse commit after the transaction, and a SQL
+        analytics endpoint has to catch up with what a Lakehouse holds.
+        """
+
+        if isinstance(crossed, OneLakeReadiness) or crossed == ONELAKE_PUBLICATION:
+            return self._publication_node(
+                producer, None if crossed == ONELAKE_PUBLICATION else crossed
+            ).node_id
+        return self._refresh_node(crossed, read).node_id
 
     def _report_external(self, installed: InstalledNode) -> None:
         for reference in self.dag.external_references.get(installed.identity, ()):
@@ -465,10 +472,12 @@ class _Planner:
                 raise LoadError(
                     f"{exc}. Build {installed.item} before loading it."
                 ) from exc
-        node_id = (
+        owner = owner_of(installed.identity)
+        node_id = _scoped(
+            owner,
             f"load:{installed.target}"
             if installed.artefact_kind == SEMANTIC_REFRESH
-            else f"load:{installed.target}/{installed.load_key}"
+            else f"load:{installed.target}/{installed.load_key}",
         )
         node = self.nodes.get(node_id)
         if node is None:
@@ -492,6 +501,7 @@ class _Planner:
                     if edge.semantic_table is not None
                 }
                 == {"directLake"},
+                owner=owner,
             )
             self.nodes[node_id] = node
         return node
@@ -500,7 +510,10 @@ class _Planner:
         """The one publication barrier behind this Warehouse load."""
 
         identity = producer.logical_id
-        node_id = f"publish:{producer.physical_target}/{identity.object_id.qualified}"
+        node_id = _scoped(
+            producer.owner,
+            f"publish:{producer.physical_target}/{identity.object_id.qualified}",
+        )
         node = self.nodes.get(node_id)
         readiness = () if node is None else node.publication_targets
         node = LoadNode(
@@ -515,6 +528,7 @@ class _Planner:
                 )
             ),
             produced_by=producer.node_id,
+            owner=producer.owner,
         )
         self.nodes[node_id] = node
         return node
@@ -522,12 +536,13 @@ class _Planner:
     def _refresh_node(self, target: PhysicalTargetRef, read: InstalledNode) -> LoadNode:
         """The one refresh barrier for this Lakehouse, syncing what is read through it."""
 
-        node_id = f"refresh:{target}"
+        node_id = _scoped(owner_of(target), f"refresh:{target}")
         node = self.refresh_nodes.get(node_id) or LoadNode(
             node_id=node_id,
             logical_id=None,
             physical_target=target,
             primitive_kind=ENDPOINT_REFRESH,
+            owner=owner_of(target),
         )
         table = _endpoint_table(read)
         tables = (
@@ -547,34 +562,47 @@ class _Planner:
         installed: InstalledNode,
         *,
         allowed_items: frozenset[WeaverItemId],
-    ) -> tuple[tuple[InstalledNode, object, InstalledNode | None], ...]:
-        """The in-scope loadable ancestors, where each hop crossed, and what it read.
+    ) -> tuple[tuple[InstalledNode, tuple, InstalledNode | None], ...]:
+        """The selected loadable ancestors, the barriers each path crosses, and
+        what the consumer's engine read where it crossed.
 
         Passing through non-loadable producers is what makes a view a conduit:
         it owns no load work, so it is not a node here, but a consumer still
         depends on whatever fills the tables behind it. A loadable the selection
-        leaves out is crossed the same way. The traversal stops at the
-        requested-item boundary even so.
+        leaves out, or one in an item not requested, is crossed the same way, so
+        two selected loadables keep their order through work that does not run.
+
+        The barriers are listed from the consumer outwards. The closest read
+        that leaves the consumer's engine decides the first; a shortcut onto
+        another catalogue's Warehouse table adds the OneLake publication its
+        Lakehouse path waits for.
         """
 
-        found: dict[str, tuple[InstalledNode, object, InstalledNode | None]] = {}
-        seen: set[tuple[str, object]] = set()
-        frontier: list[tuple[InstalledNode, object, InstalledNode | None]] = [
-            (installed, None, None)
+        found: dict[str, tuple[InstalledNode, tuple, InstalledNode | None]] = {}
+        seen: set[tuple[str, tuple]] = set()
+        frontier: list[tuple[InstalledNode, tuple, InstalledNode | None]] = [
+            (installed, (), None)
         ]
         while frontier:
             current, crossing, read = frontier.pop()
-            for producer, hop in self._direct_producers(current):
-                if producer.item not in allowed_items:
-                    continue
-                crossed = crossing or hop
+            for producer, hop, stacks in self._direct_producers(current):
+                if hop is None:
+                    crossed = crossing
+                elif stacks:
+                    crossed = (*crossing, hop)
+                else:
+                    crossed = crossing or (hop,)
                 # What the consumer's engine reads at the crossing.
                 at = read if crossing else (producer if hop else None)
-                if producer.can_load and self._is_chosen(producer):
+                if (
+                    producer.item in allowed_items
+                    and producer.can_load
+                    and self._is_chosen(producer)
+                ):
                     # A closer crossing wins: the barrier belongs to the hop that
                     # actually left the consumer's engine.
                     prior = found.get(producer.node_id)
-                    if prior is None or prior[1] is None:
+                    if prior is None or not prior[1]:
                         found[producer.node_id] = (producer, crossed, at)
                     continue
                 if (producer.node_id, crossed) in seen:
@@ -585,8 +613,9 @@ class _Planner:
 
     def _direct_producers(
         self, consumer: InstalledNode
-    ) -> tuple[tuple[InstalledNode, object], ...]:
-        """What one object reads directly, and the barrier each read crosses.
+    ) -> tuple[tuple[InstalledNode, object, bool], ...]:
+        """What one object reads directly, the barrier each read crosses, and
+        whether that barrier stacks on one nearer the consumer.
 
         A shortcut conduit follows its installed source. The read that crosses
         is the one the consumer declared, which
@@ -598,7 +627,8 @@ class _Planner:
             raise LoadError(unresolved[0])
         if consumer.role == ROLE_SHORTCUT:
             return tuple(
-                (producer, None) for producer in self.dag.parents(consumer.node_id)
+                (producer, hop, True)
+                for producer, hop in self.dag.shortcut_sources(consumer)
             )
         producers = []
         for edge in self.dag.reads(consumer.identity):
@@ -618,7 +648,7 @@ class _Planner:
                     and edge.source_mode == "directLake"
                 ):
                     crossing = ONELAKE_PUBLICATION
-            producers.append((producer, crossing))
+            producers.append((producer, crossing, False))
         return tuple(producers)
 
     def _crossing(self, producer: InstalledNode, consumer: InstalledNode, through):
@@ -639,6 +669,14 @@ class _Planner:
                 object=through.object_id.object,
             )
         return None
+
+
+def _scoped(owner: str | None, node_id: str) -> str:
+    """A node ID, qualified by its catalogue where several are joined."""
+
+    from .catalogues import qualify
+
+    return node_id if owner is None else qualify(owner, node_id)
 
 
 def _endpoint_table(read: InstalledNode | None) -> tuple[str, str] | None:

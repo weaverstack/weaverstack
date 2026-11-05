@@ -52,7 +52,7 @@ def load(
     descendants: bool = False,
     source=None,
     workspace: str | None = None,
-    catalogue: str | None = None,
+    catalogue: str | Sequence[str] | None = None,
     environment: str | None = None,
     workspace_config: str | Path | None = None,
     fault_tolerant: bool = False,
@@ -99,10 +99,21 @@ def load(
     Selecting nothing is a success. ``as_of`` is the freshness cutoff that
     selection measures against, and it requires ``stale``.
 
+    ``catalogue`` names one catalogue, or several as ``Workspace/Warehouse/Name``.
+    Several are read together and joined where a physical shortcut in one lands
+    on an object another installs, and one graph runs across them. The
+    catalogues supply context; ``items`` still decide what runs, and naming none
+    runs the working workspace's catalogue. ``Workspace/Kind/Name`` names an
+    item in another workspace's catalogue, and a bare workspace name every item
+    of its catalogue. Each object runs in its own workspace, with the working
+    Environment, and is recorded in its own catalogue under one workflow ID.
+    ``stale`` judges each object against its sources in every catalogue given.
+
     A supplied ``session`` carries its resolved Workspace and is left open.
     """
 
     from ..concurrency import validate_concurrency
+    from .joined import is_joined
 
     validate_concurrency(concurrency)
     started = datetime.now(timezone.utc)
@@ -111,6 +122,28 @@ def load(
     # Before the workspace is resolved, so a malformed instant is refused
     # without reaching a tenant.
     threshold = resolve_as_of(as_of, started=started)
+    if is_joined(catalogue):
+        return _joined_load(
+            items,
+            tuple(catalogue),
+            names=selected_names,
+            ancestors=ancestors,
+            descendants=descendants,
+            workspace=workspace,
+            environment=environment,
+            workspace_config=workspace_config,
+            fault_tolerant=fault_tolerant,
+            dry_run=dry_run,
+            reload=reload,
+            ignore_stability_threshold=ignore_stability_threshold,
+            stale=stale,
+            as_of=threshold,
+            concurrency=concurrency,
+            session=session,
+            started=started,
+        )
+    if not isinstance(catalogue, (str, type(None))):
+        catalogue = next(iter(catalogue), None)
 
     from .workspace import operation_workspace
 
@@ -363,6 +396,211 @@ def run_load(
     return report
 
 
+def _joined_load(
+    items,
+    catalogues,
+    *,
+    names,
+    ancestors: bool,
+    descendants: bool,
+    workspace,
+    environment,
+    workspace_config,
+    fault_tolerant: bool,
+    dry_run: bool,
+    reload: bool,
+    ignore_stability_threshold: bool,
+    stale: bool,
+    as_of: datetime,
+    concurrency,
+    session,
+    started: datetime,
+) -> LoadRunReport:
+    from ..sessions.host import use_or_create_session
+    from .joined import default_request, requested_by_label, resolve_places
+
+    home, places = resolve_places(
+        "load",
+        catalogues,
+        workspace=workspace,
+        workspace_config=workspace_config,
+        environment=environment,
+        session=session,
+    )
+    requested = (
+        requested_by_label("load", items, places, home)
+        if items
+        else default_request("load", places, home)
+    )
+    with use_or_create_session(session, workspace=home) as opened:
+        with opened.task(
+            "Load (dry run)" if dry_run else "Load", f"{len(places)} catalogues"
+        ) as frame:
+            report = run_joined_load(
+                opened,
+                home=home,
+                places=places,
+                requested=requested,
+                names=names,
+                ancestors=ancestors,
+                descendants=descendants,
+                fault_tolerant=fault_tolerant,
+                dry_run=dry_run,
+                reload=reload,
+                ignore_stability_threshold=ignore_stability_threshold,
+                stale=stale,
+                as_of=as_of,
+                concurrency=concurrency,
+            )
+            frame.failed = not report.succeeded
+            return report
+
+
+def run_joined_load(
+    session,
+    *,
+    home,
+    places,
+    requested,
+    names=(),
+    ancestors: bool = False,
+    descendants: bool = False,
+    fault_tolerant: bool = False,
+    dry_run: bool = False,
+    reload: bool = False,
+    ignore_stability_threshold: bool = False,
+    stale: bool = False,
+    as_of: datetime | None = None,
+    concurrency: int | None = None,
+) -> LoadRunReport:
+    """One load across several catalogues, read once and run as one graph."""
+
+    from ..run import RunRequest, RunState
+    from ..run.entry import run_load_in_fabric
+    from ..run.runner import needs_spark
+    from ..sessions.program import FabricRun
+    from .joined import (
+        context_lines,
+        offer_spark_homes,
+        owned_items,
+        places_mapping,
+        read_run_places,
+    )
+
+    started = datetime.now(timezone.utc)
+    with session.step(f"Read {len(places)} catalogues"):
+        state = RunState.joined(
+            read_run_places(
+                session,
+                places,
+                tables=(*READABLE_TABLES, LOAD_STATUS) if stale else None,
+            )
+        )
+    items = owned_items(state, requested, what="load")
+    session.report(context_lines(state, items))
+
+    selected = None
+    left = ()
+    if stale:
+        selected, left = _stale_across(
+            session,
+            state,
+            items,
+            as_of=as_of if as_of is not None else resolve_as_of(None, started=started),
+        )
+
+    spark_workspace = offer_spark_homes(session, state, items)
+    request = RunRequest.load(
+        items,
+        names=names,
+        selected=selected,
+        ancestors=ancestors,
+        descendants=descendants,
+        fault_tolerant=fault_tolerant,
+        dry_run=dry_run,
+        reload=reload,
+        ignore_stability_threshold=ignore_stability_threshold,
+        concurrency=concurrency,
+    )
+    with session.step("Build run graph"):
+        runner = load_runner(session, home, state, request)
+        if reload:
+            _refuse_unsupported_reload(runner.plan())
+
+    run = FabricRun(
+        name="load",
+        needs_spark=not dry_run and needs_spark(runner.graph),
+        call=lambda here: execute_load(
+            here, workspace=home, runner=runner, started=started
+        ),
+        entry=run_load_in_fabric,
+        arguments=lambda: {
+            "catalogue": state.catalogue.to_mapping(),
+            "places": places_mapping(state),
+            "request": request.to_mapping(),
+            "started": started.isoformat(),
+        },
+        decode=LoadRunReport.from_mapping,
+    )
+    report = session.execute_run(run, workspace=spark_workspace)
+    if left:
+        report = replace(report, messages=(*report.messages, *left))
+    if not fault_tolerant and not dry_run:
+        _raise_for_failure(report)
+    return report
+
+
+def _stale_across(session, state, items, *, as_of):
+    """The requested loadables not green, judged against every catalogue, and
+    the mirrored ones a load leaves where they are mirrored from."""
+
+    from ..catalogues import Member, join
+    from ..health import joined_statuses
+    from ..joined_dag import Owned
+    from .mirror import mirrored_source
+
+    members = [
+        Member(
+            label=place.label,
+            workspace=place.workspace.workspace,
+            catalogue_name=place.catalogue_name,
+            catalogue=place.catalogue,
+            dag=place.catalogue.dag(),
+            # Mirrored load state is recorded at its source.
+            source=mirrored_source(
+                place.catalogue,
+                workspace=place.workspace,
+                session=session,
+                operation="load --stale",
+                tables=(LOAD_STATUS,),
+            ),
+        )
+        for place in state.places
+    ]
+    joined = join(members)
+    statuses = joined_statuses(members)
+    selected, left = [], []
+    for member in members:
+        chosen = [item.value for item in items if item.owner == member.label]
+        if not chosen:
+            continue
+        assessment = assess_load(
+            member.catalogue,
+            as_of=as_of,
+            items=chosen,
+            source=member.source,
+            across=joined.across(member, statuses),
+        )
+        selected.extend(
+            Owned(member.label, identity)
+            for identity in assessment.unsettled_identities()
+        )
+        left.extend(
+            _mirrored_behind(assessment, state.by_label[member.label].workspace)
+        )
+    return tuple(selected), tuple(left)
+
+
 def _mirrored_behind(assessment, workspace) -> tuple:
     """Say which stale objects a load here leaves, because they are mirrored."""
 
@@ -393,41 +631,72 @@ def load_runner(session, workspace, state, request):
 
 
 def execute_load(session, *, workspace, runner, started) -> LoadRunReport:
-    """Execute a planned load and record what it did, where ``session`` runs."""
+    """Execute a planned load and record what it did, where ``session`` runs.
 
-    from ..run import dispatch_primitive, open_run_record
+    Each node is recorded in the catalogue that owns it, under one workflow ID.
+    """
+
+    from ..run import dispatch_primitive
     from ..run.runner import Lanes
 
     # A dry run must not create run evidence or move bookmarks, and a workspace
     # with no catalogue has nowhere to record it.
-    record = (
+    records = (
         None
-        if runner.request.dry_run or not workspace.catalogue
-        else open_run_record(
-            runner.state.catalogue,
-            workspace=workspace,
-            task_type=TASK_TYPE,
-            session=session,
+        if runner.request.dry_run or not (runner.state.places or workspace.catalogue)
+        else open_run_records(
+            runner.state, workspace, task_type=TASK_TYPE, session=session
         )
     )
     with session.step("Execute"):
         result = runner.run(
             session=session,
             dispatch=dispatch_primitive,
-            on_node=None if record is None else record.settled,
+            on_node=None if records is None else records.settled,
             before_node=None
-            if record is None or not runner.request.reload
-            else _reset_before(record),
+            if records is None or not runner.request.reload
+            else _reset_before(records),
             # Independent branches of a load run at once.
             lanes=Lanes.configured(workspace),
         )
 
-    if record is not None:
+    if records is not None:
         # Flush durable evidence before reporting success or raising failure.
         with session.step("Record what the run did"):
-            record.flush()
+            records.flush()
 
-    return _as_load_report(result, started=started, record=record)
+    return _as_load_report(result, started=started, record=records)
+
+
+def open_run_records(state, workspace, *, task_type: str, session):
+    """A run's record in each catalogue it reads, sharing one workflow ID."""
+
+    from ..run import new_workflow_id, open_run_record
+    from ..run.record import RunRecords
+
+    if not state.places:
+        return RunRecords(
+            {
+                None: open_run_record(
+                    state.catalogue,
+                    workspace=workspace,
+                    task_type=task_type,
+                    session=session,
+                )
+            }
+        )
+    workflow_id = session.workflow_id or new_workflow_id()
+    return RunRecords(
+        {
+            place.label: open_run_record(
+                place.catalogue,
+                workspace=place.workspace,
+                task_type=task_type,
+                workflow_id=workflow_id,
+            )
+            for place in state.places
+        }
+    )
 
 
 #: The primitive kinds a reload can reconstruct.
@@ -446,7 +715,7 @@ def _refuse_unsupported_reload(graph) -> None:
         )
 
 
-def _reset_before(record):
+def _reset_before(records):
     """Invalidate each reloaded object's load state as the run reaches it.
 
     Per node, so a node the run never dispatches keeps its bookmark.
@@ -454,7 +723,7 @@ def _reset_before(record):
 
     def reset(node) -> None:
         if node.primitive_kind in RELOADABLE_KINDS and node.logical_id is not None:
-            record.reset(node.logical_id)
+            records.reset(node)
 
     return reset
 
@@ -480,6 +749,7 @@ def _as_load_report(result, *, started, record) -> LoadRunReport:
                 result=node.result,
                 started_at=node.started_at,
                 finished_at=node.finished_at,
+                catalogue=node.catalogue,
             )
             for node in result.nodes
         ),
@@ -490,6 +760,7 @@ def _as_load_report(result, *, started, record) -> LoadRunReport:
         workflow_id=None if record is None else record.workflow_id,
         started_at=started.isoformat(),
         finished_at=result.finished_at,
+        catalogues=result.catalogues,
     )
 
 
@@ -625,4 +896,12 @@ def _load_names(names: str | Sequence[str] | None) -> tuple[str, ...]:
     return tuple(text for text, _ in name_patterns(names, error=CommandError))
 
 
-__all__ = ["SUMMARY_STATUSES", "TASK_TYPE", "load", "run_load", "status_counts"]
+__all__ = [
+    "SUMMARY_STATUSES",
+    "TASK_TYPE",
+    "load",
+    "open_run_records",
+    "run_joined_load",
+    "run_load",
+    "status_counts",
+]

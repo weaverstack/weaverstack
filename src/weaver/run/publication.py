@@ -39,12 +39,23 @@ def await_publication(
     readiness,
     timeout: float = PUBLICATION_TIMEOUT,
     poll: float = PUBLICATION_POLL_INTERVAL,
+    where=None,
 ) -> None:
+    """Wait until every consumer path can open the files a new commit added.
+
+    ``workspace`` holds the Warehouse. ``where`` gives the workspace holding
+    each readiness path, which defaults to the same one; each consumer's files
+    are opened from its own workspace.
+    """
 
     object_id = node.publication_of.object_id
     store = session.transport_store(workspace)
     log = _commit_log(node.physical_target.name, object_id, session, workspace)
-    roots = tuple(_shortcut_root(one, session, workspace) for one in readiness)
+    places = [workspace if where is None else where(one) for one in readiness]
+    roots = tuple(
+        (place, _shortcut_root(one, session, place))
+        for one, place in zip(readiness, places)
+    )
     deadline = time.monotonic() + timeout
     commits: tuple[str, ...] = ()
     last_error: Exception | None = None
@@ -53,15 +64,32 @@ def await_publication(
             # Re-list on every attempt so concurrent commits join the same wait.
             commits = _new_commits(store, log, before) or commits
             if commits:
-                statements = _probe_statements(_added_files(store, log, commits), roots)
-                if statements:
-                    session.execute_spark_sql_batch(statements, workspace=workspace)
+                added = _added_files(store, log, commits)
+                for place, statements in _by_place(added, roots):
+                    session.execute_spark_sql_batch(statements, workspace=place)
                 return
         except Exception as exc:  # Fabric settles this surface asynchronously.
             last_error = exc
         if time.monotonic() >= deadline:
             raise _not_published(node, commits, last_error, timeout)
         time.sleep(poll)
+
+
+def _by_place(paths, roots):
+    """Probe statements grouped by the workspace that opens them, in order."""
+
+    grouped: list = []
+    for place, root in roots:
+        statements = _probe_statements(paths, (root,))
+        if not statements:
+            continue
+        for entry in grouped:
+            if entry[0] is place:
+                entry[1].extend(statements)
+                break
+        else:
+            grouped.append((place, list(statements)))
+    return grouped
 
 
 def _commit_log(target_name, object_id, session, workspace):

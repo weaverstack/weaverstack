@@ -210,6 +210,9 @@ class RunNodeResult:
     #: diagnostic rows carry whatever a check selected, and a durable record of
     #: them would put data into the estate's own evidence.
     diagnostics: Any = field(default=None, compare=False, repr=False)
+    #: The label of the catalogue that recorded this node, when several are
+    #: joined.
+    catalogue: str | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -217,6 +220,7 @@ class RunNodeResult:
 
     def to_mapping(self) -> dict[str, Any]:
         return {
+            **({"catalogue": self.catalogue} if self.catalogue else {}),
             "node_id": self.node_id,
             "logical_id": self.logical_id,
             "physical_target": self.physical_target,
@@ -261,6 +265,8 @@ class RunResult:
     started_at: str | None = None
     finished_at: str | None = None
     workspace: str | None = None
+    #: The catalogues a joined run read, in the order given.
+    catalogues: tuple[str, ...] = ()
 
     @property
     def succeeded(self) -> bool:
@@ -289,6 +295,7 @@ class RunResult:
                 else self.selection
             ),
             "workspace": self.workspace,
+            **({"catalogues": list(self.catalogues)} if self.catalogues else {}),
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "order": list(self.order),

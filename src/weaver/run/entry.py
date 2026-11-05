@@ -40,16 +40,19 @@ def run_staged(entry, *, session, workspace, stage: str, workflow_id=None) -> di
 
 
 def run_load_in_fabric(
-    *, session, workspace, catalogue: dict, request: dict, started: str
+    *, session, workspace, catalogue: dict, request: dict, started: str, places=None
 ) -> dict:
-    """Plan and execute a load a client sent, against the catalogue it read."""
+    """Plan and execute a load a client sent, against the catalogues it read.
+
+    ``places`` carries each catalogue of a load across several.
+    """
 
     from datetime import datetime
 
     from ..operations.load import execute_load, load_runner
 
     runner = load_runner(
-        session, workspace, *_planned(session, workspace, catalogue, request)
+        session, workspace, *_planned(session, workspace, catalogue, request, places)
     )
     report = execute_load(
         session,
@@ -61,9 +64,9 @@ def run_load_in_fabric(
 
 
 def run_test_in_fabric(
-    *, session, workspace, catalogue: dict, request: dict, started: str
+    *, session, workspace, catalogue: dict, request: dict, started: str, places=None
 ) -> dict:
-    """Plan and execute a test run a client sent, against the catalogue it read.
+    """Plan and execute a test run a client sent, against the catalogues it read.
 
     A named run's diagnostic rows cross beside the report, which never holds them.
     """
@@ -73,7 +76,7 @@ def run_test_in_fabric(
     from ..operations.test import execute_test, validation_runner
 
     runner = validation_runner(
-        workspace, *_planned(session, workspace, catalogue, request)
+        workspace, *_planned(session, workspace, catalogue, request, places)
     )
     report = execute_test(
         session,
@@ -83,9 +86,7 @@ def run_test_in_fabric(
     )
     carried = report.to_mapping()
     carried["diagnostics"] = {
-        node.logical_id: list(node.diagnostics)
-        for node in report.nodes
-        if node.diagnostics
+        node.key: list(node.diagnostics) for node in report.nodes if node.diagnostics
     }
     return carried
 
@@ -125,7 +126,7 @@ def run_source_test_in_fabric(
     return carried
 
 
-def _planned(session, workspace, catalogue: dict, request: dict):
+def _planned(session, workspace, catalogue: dict, request: dict, places=None):
     """The state and request a client planned against, writing through here."""
 
     from ..catalogue.state import Catalogue
@@ -133,10 +134,17 @@ def _planned(session, workspace, catalogue: dict, request: dict):
     from .runner import RunRequest
     from .state import RunState
 
-    read = Catalogue.from_mapping(
-        catalogue, writer=writer_for(session, workspace), session=session
-    )
-    return RunState(catalogue=read), RunRequest.from_mapping(request)
+    if places:
+        from ..operations.joined import places_from_mapping
+
+        state = RunState.joined(places_from_mapping(session, workspace, places))
+    else:
+        state = RunState(
+            catalogue=Catalogue.from_mapping(
+                catalogue, writer=writer_for(session, workspace), session=session
+            )
+        )
+    return state, RunRequest.from_mapping(request)
 
 
 __all__ = [

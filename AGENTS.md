@@ -137,6 +137,23 @@ its place with the error, and an object that reads it is reported as
 unverified. `health.assess_joined` is pure; the operation only reads, and makes
 no Power BI call to find bindings.
 
+A load or test given several catalogues is one run. It reads each catalogue
+once (`operations.joined.read_run_places`) into `RunState.joined`, whose places
+supply each catalogue's Workspace and writable catalogue. `weaver.joined_dag`
+presents the members' installed graphs as one, qualifying identities, items and
+targets by catalogue label (`Owned`), and the ordinary load planner and
+`Runner` run it. Each `RunNode.owner` names the place that supplies its
+workspace, runtime scope and catalogue record; `logical_id` and
+`physical_target` stay local to it. Items bound what runs, and traversal passes
+through unrequested items, so two selected objects keep their order through a
+View or shortcut another team owns. A physical shortcut onto another
+catalogue's Warehouse table adds that table's OneLake publication before the
+reader's endpoint refresh. Warehouse lanes are keyed by workspace, the total
+cap is one per invocation, every record shares one workflow ID, and a run with
+Spark work is sent to Fabric once, to the first catalogue with a requested
+Lakehouse. A catalogue that cannot be read refuses the run. A failed refresh or
+publication blocks its readers even in a fault-tolerant run.
+
 The Catalogue Dashboard observes a catalogue and is no part of its lifecycle.
 `weaver catalogue-dashboard` (`operations.catalogue_dashboard`) writes the
 `dashboard` fragment as an ordinary Power BI project and builds it without a

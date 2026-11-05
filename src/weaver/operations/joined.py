@@ -253,8 +253,157 @@ def retried(work, *, session=None, workspace=None):
         return work()
 
 
+def read_run_places(session, places, *, tables=None):
+    """Each catalogue read once, at once, retried once, as a run's places.
+
+    A load or test never runs on a partial plan, so one that cannot be read
+    refuses the run.
+    """
+
+    from ..run.state import RunPlace, read_installed_catalogue
+
+    def read(place):
+        return retried(
+            lambda: read_installed_catalogue(
+                session=session, workspace=place.workspace, tables=tables
+            )
+        )
+
+    found, failed = [], []
+    for place, outcome in zip(places, concurrently(places, read)):
+        if isinstance(outcome, Exception):
+            failed.append(f"{place.reference}: {outcome}")
+            continue
+        found.append(RunPlace(place.label, place.workspace, outcome))
+    if failed:
+        raise CommandError("These catalogues could not be read: " + "; ".join(failed))
+    return tuple(found)
+
+
+def owned_items(state, requested, *, what: str) -> tuple:
+    """The requested items of each catalogue, qualified by its label."""
+
+    from ..joined_dag import Owned
+    from .items import installed_items
+
+    found = []
+    for place in state.places:
+        if place.label not in requested:
+            continue
+        chosen = requested[place.label] or installed_items(
+            place.catalogue.dag(), what=what, catalogue=place.reference
+        )
+        installed = place.catalogue.dag().installations
+        for item in chosen:
+            if item not in installed:
+                raise CommandError(
+                    f"{place.reference} records no installation of {item}"
+                )
+            found.append(Owned(place.label, item))
+    return tuple(found)
+
+
+def default_request(operation: str, places, home) -> dict:
+    """What an operation given no items runs: the working workspace's catalogue."""
+
+    local = home_places(places, home)
+    if not local:
+        raise CommandError(
+            f"None of the catalogues given to {operation} is in {home.workspace}. "
+            "Name the items to run, or the workspace whose catalogue they are in."
+        )
+    return {local[0].label: ()}
+
+
+def context_lines(state, items) -> tuple[str, ...]:
+    """The catalogues a run reads, and the items it runs in each."""
+
+    lines = ["Catalogues"]
+    for place in state.places:
+        lines.append(f"  {place.reference}")
+        installed = place.catalogue.dag().installations
+        for item in items:
+            if item.owner != place.label:
+                continue
+            physical = str(installed[item.value])
+            logical = str(item.value)
+            lines.append(
+                f"    {logical}"
+                if logical == physical
+                else f"    {logical} → {physical}"
+            )
+    return tuple(lines)
+
+
+def offer_spark_homes(session, state, items) -> object:
+    """Offer each catalogue's requested Lakehouses as Spark attachments, and
+    return the Workspace a run with Spark work is sent to.
+
+    That is the first catalogue with a requested Lakehouse, its working one
+    first; otherwise the first catalogue.
+    """
+
+    from ..targets import lakehouse_names
+
+    chosen = None
+    for place in state.places:
+        installed = place.catalogue.dag().installations
+        names = lakehouse_names(
+            installed[item.value] for item in items if item.owner == place.label
+        )
+        session.offer_spark_home(names, workspace=place.workspace)
+        if names and chosen is None:
+            chosen = place.workspace
+    return chosen or state.places[0].workspace
+
+
+def places_mapping(state) -> list[dict]:
+    """A run's places as data, for the run Fabric executes."""
+
+    return [
+        {
+            "label": place.label,
+            "workspace": place.workspace.workspace,
+            "catalogue_name": place.catalogue_name,
+            "catalogue": place.catalogue.to_mapping(),
+        }
+        for place in state.places
+    ]
+
+
+def places_from_mapping(session, workspace, places: list[dict]):
+    """A run's places where Fabric executes it, writing to each catalogue."""
+
+    from ..catalogue.state import Catalogue
+    from ..catalogue.writer import writer_for
+    from ..run.state import RunPlace
+
+    found = []
+    for each in places:
+        resolved = place_workspace(workspace, each["workspace"], each["catalogue_name"])
+        found.append(
+            RunPlace(
+                each["label"],
+                resolved,
+                Catalogue.from_mapping(
+                    each["catalogue"],
+                    writer=writer_for(session, resolved),
+                    session=session,
+                ),
+            )
+        )
+    return tuple(found)
+
+
 __all__ = [
     "Place",
+    "context_lines",
+    "default_request",
+    "offer_spark_homes",
+    "owned_items",
+    "places_from_mapping",
+    "places_mapping",
+    "read_run_places",
     "concurrently",
     "home_places",
     "is_joined",

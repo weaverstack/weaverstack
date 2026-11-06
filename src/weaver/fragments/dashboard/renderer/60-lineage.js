@@ -9,7 +9,11 @@ var DEPTHS = [0, 1, 2, -1];
    graph can fill the page. Nodes are coloured by kind, or by last outcome with
    derived readiness ringed. */
 function graphWorkspace(body, m, options) {
-  var s = pageState(options.page), estate = layoutEstate(m);
+  var s = pageState(options.page), whole = m;
+  if (s.mirrors === undefined) s.mirrors = true;
+  // Hiding mirrors changes what is drawn, never what is assessed.
+  m = s.mirrors ? whole : withoutMirrors(whole);
+  var estate = layoutEstate(m), scoped = scopedKeys(m);
   s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
   if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
   if (s.up === undefined) s.up = 1;
@@ -22,11 +26,12 @@ function graphWorkspace(body, m, options) {
   function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(m, q)); return matched.get(q); }
   /* The selected objects and every match of each wildcard term. */
   function seeds() {
+    if (!s.selection.length && !s.patterns.length && scoped.length) return scoped.slice();
     var out = s.selection.slice(), seen = new Set(out);
     s.patterns.forEach(function (q) { matches(q).forEach(function (k) { if (!seen.has(k)) { seen.add(k); out.push(k); } }); });
     return out;
   }
-  var health = options.health ? assessHealth(m) : null;
+  var health = options.health ? assessHealth(whole) : null;
   s.mode = s.mode || options.mode;
   var view, f = workspaceFrame(s, function () { if (view) view.resize(); });
   var host = f.host, side = f.side, line = f.line, legendHost = f.legend;
@@ -72,22 +77,24 @@ function graphWorkspace(body, m, options) {
     view.setWindow(win, lay);
     status(win);
     renderChips();
-    details(side, m, s.focus, { onOpen: select, health: health, emptyText: options.empty });
+    details(side, whole, s.focus, { onOpen: select, health: health, emptyText: options.empty });
     if (refit) { if (win) view.fitWindow(true); else view.fitAll(true); }
     saveState();
   }
   function renderChips() {
     selectionChips(f.chips, s.selection, s.focus, function (key) { var n = m.nodes.get(key); return { kind: n.kind, label: n.label, title: n.item + " · " + qualified(n) }; },
-      function (key) { s.focus = key; details(side, m, key, { onOpen: select, health: health }); renderChips(); view.fitKeys([key], true); }, select,
+      function (key) { s.focus = key; details(side, whole, key, { onOpen: select, health: health }); renderChips(); view.fitKeys([key], true); }, select,
       { list: s.patterns, count: function (q) { return matches(q).length; }, remove: removePattern });
   }
   function status(win) {
     line.textContent = "";
     if (!win) {
       line.appendChild(document.createTextNode(fmt(m.nodes.size) + " objects in " + fmt(estate.bands.length) + " items. Search or select an object to follow its lineage."));
+      if (m.hiddenMirrors) line.appendChild(document.createTextNode(" · " + fmt(m.hiddenMirrors) + " mirrored objects hidden"));
       return;
     }
-    var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 ? " · " + win.seeds.size + " selected" : "")];
+    var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 && (s.selection.length || s.patterns.length) ? " · " + win.seeds.size + " selected" : "")];
+    if (m.hiddenMirrors) parts.push(fmt(m.hiddenMirrors) + " mirrored objects hidden; a path through one is drawn as via a hidden mirror");
     if (win.expanded.size) parts.push(fmt(win.expanded.size) + " expanded");
     if (win.hidden) parts.push(fmt(win.hidden) + " more beside them; select a ‹‹ or ›› marker to expand");
     if (win.truncated) parts.push(el("b", { "class": "wd-warn-text", text: "lineage cut to the " + fmt(win.lineage.size) + " nearest of " + fmt(win.reach) + "; lower a depth" }));
@@ -100,12 +107,17 @@ function graphWorkspace(body, m, options) {
     s.focus = s.selection[s.selection.length - 1] || null;
     apply(true);
   } }, [el("option", { value: "", text: "Every item" })].concat(estate.bands.map(function (b) {
-    return el("option", { value: b.item.label, selected: b.item.label === s.item ? "selected" : null, text: b.item.label });
+    return el("option", { value: b.item.label, selected: b.item.label === s.item ? "selected" : null, text: shownItem(b.item.label) });
   })));
   if (options.above) body.appendChild(options.above);
+  var mirrorToggle = el("label", { "class": "wd-check", title: "Hiding mirrored objects changes the drawing only; Health still reads them." }, [
+    el("input", { type: "checkbox", checked: s.mirrors ? "checked" : null, onchange: function () { s.mirrors = this.checked; saveState(); redraw(); } }),
+    "Show mirrored objects"
+  ]);
   f.mount(body, [
     nodeSearch(m, select, addPattern),
-    itemPicker,
+    m.scope && m.scope.length ? scopeLabel(m) : itemPicker,
+    mirrorToggle,
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Colour", ["load", "kind"], s.mode, function (v) {
@@ -127,8 +139,60 @@ function graphWorkspace(body, m, options) {
   view = new GraphView(host, m, estate, { state: s, mode: s.mode, onSelect: select, onReveal: expand, onMove: moved, label: options.label });
   apply(false);
   // A remembered viewport is kept unless it no longer shows the focus or the estate.
-  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || s.item) view.fitWindow(false); else view.fitAll(false); }
+  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || s.item || scoped.length) view.fitWindow(false); else view.fitAll(false); }
   return { select: select };
+}
+
+/* The objects of the items a scoped page shows. */
+function scopedKeys(m) {
+  var out = [];
+  (m.scope || []).forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
+  return out;
+}
+
+/* What the page shows, and how the reader changes it. */
+function scopeLabel(m) {
+  var names = m.scope.map(shownItem);
+  var text = names.length === 1 ? names[0] : names.length + " items";
+  return el("span", { "class": "wd-scope", title: names.join(", ") }, [
+    el("b", { text: text }),
+    m.scopePicked ? null : el("span", { "class": "wd-muted", text: " · the first item; choose others in the Items list" })
+  ]);
+}
+
+/* The graph without mirrored objects. An edge that passed through one is
+   drawn from the nearest shown upstream, marked as via a hidden mirror. */
+function withoutMirrors(m) {
+  var hidden = new Set();
+  m.nodes.forEach(function (n, k) { if (n.isMirrored) hidden.add(k); });
+  if (!hidden.size) return m;
+  var nodes = new Map(), items = new Map();
+  m.nodes.forEach(function (n, k) {
+    if (hidden.has(k)) return;
+    var c = Object.create(n);
+    c.vup = []; c.vdown = []; c.kinds = Object.assign({}, n.kinds);
+    nodes.set(k, c);
+  });
+  nodes.forEach(function (c, k) {
+    var seen = new Set(), stack = m.nodes.get(k).vup.map(function (u) { return [u, false]; });
+    while (stack.length) {
+      var top = stack.pop(), u = top[0];
+      if (seen.has(u)) continue;
+      seen.add(u);
+      if (hidden.has(u)) { m.nodes.get(u).vup.forEach(function (x) { stack.push([x, true]); }); continue; }
+      c.vup.push(u); nodes.get(u).vdown.push(k);
+      if (top[1]) c.kinds[u] = "Hidden mirror";
+    }
+  });
+  m.items.forEach(function (it, label) {
+    var own = it.nodes.filter(function (n) { return nodes.has(n.key); });
+    var c = Object.create(it);
+    c.nodes = own.map(function (n) { return nodes.get(n.key); });
+    items.set(label, c);
+  });
+  var shown = Object.create(m);
+  shown.nodes = nodes; shown.items = items; shown.hiddenMirrors = hidden.size;
+  return shown;
 }
 
 /* The frame both graph pages share: a toolbar, the selection as chips, a status
@@ -224,7 +288,7 @@ function orchestrationPage(body, m) {
   var lists = el("div", { "class": "wd-columns-2" }, [
     section("Ready · " + ready.length, [dataTable([
       { key: "object", title: "Object", value: function (r) { return r.n.label; } },
-      { key: "item", title: "Item", value: function (r) { return r.n.item; } },
+      { key: "item", title: "Item", value: function (r) { return shownItem(r.n.item); } },
       { key: "outcome", title: "Last outcome", render: function (r) { var s = effectiveLoad(r.n); return chip(s ? s.result : null, s ? null : "None"); }, value: function (r) { var s = effectiveLoad(r.n); return s ? s.result : ""; } }
     ], ready, { limit: 100, sort: "object", desc: false, emptyText: "Nothing is ready to load." })]),
     section("Waiting · " + waiting.length, [dataTable([

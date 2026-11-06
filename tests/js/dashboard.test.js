@@ -800,3 +800,108 @@ test("a largest change keeps its own counts, with the loads around it", () => {
   assert.equal(around.filter((r) => r.current).length, 1);
   assert.equal(around.find((r) => r.current).title, "w1");
 });
+
+// --- several catalogues ------------------------------------------------------
+
+const O = (value, code) => value + D.OWNER + code;
+const INSTALL = ["item", "workspace", "target", "version", "workspaceid", "targetid"];
+const SHORTCUT = ["item", "schema", "object", "type", "workspace", "targettype", "target", "targetschema", "targetobject"];
+
+// Hub (catalogue 1, workspace HUB) owns Warehouse/Hub. Spoke (catalogue 2,
+// workspace SPOKE) has a Lakehouse shortcut to Hub's table and a Warehouse
+// that reads it through its own shortcut. Both catalogues name an item Mart.
+function federated(overrides = {}) {
+  return table("page", ["name"], [[overrides.page || "orchestration"]]) +
+    table("meta", ["at", "format"], [[AT, 2]]) +
+    table("catalogues", ["code", "label", "reference"], [["1", "HUB", "HUB/Warehouse/Weaver"], ["2", "SPOKE", "SPOKE/Warehouse/Weaver"]]) +
+    table("items", INSTALL, [
+      [O("Warehouse/Hub", 1), "HUB", "Hub_WH", "1", "w-hub", "i-hub"], [O("Warehouse/Mart", 1), "HUB", "HubMart_WH", "1", "w-hub", "i-hubmart"],
+      [O("Lakehouse/Bridge", 2), "SPOKE", "Bridge_LH", "1", "w-spoke", "i-bridge"], [O("Warehouse/Mart", 2), "SPOKE", "Mart_WH", "1", "w-spoke", "i-mart"]]) +
+    table("nodes", NODE, [
+      [O("h", 1), O("Warehouse/Hub", 1), "HUB", "Customer", "Table", "HUB.Customer", 9, ""],
+      [O("hm", 1), O("Warehouse/Mart", 1), "MART", "Summary", "Table", "MART.Summary", 9, ""],
+      [O("b", 2), O("Lakehouse/Bridge", 2), "Tables/HUB", "Customer", "Shortcut", "HUB.Customer", overrides.mirrored ? 4 : 0, ""],
+      [O("s", 2), O("Warehouse/Mart", 2), "HUB", "Customer", "Shortcut", "HUB.Customer", 0, ""],
+      [O("m", 2), O("Warehouse/Mart", 2), "MART", "Summary", "Table", "MART.Summary", 9, ""]]) +
+    table("edges", EDGE, [[O("s", 2), O("b", 2), "S", "", ""], [O("m", 2), O("b", 2), "D", O("s", 2), ""], [O("hm", 1), O("h", 1), "D", "", ""]]) +
+    table("shortcuts", SHORTCUT, [[O("Lakehouse/Bridge", 2), "Tables/HUB", "Customer", "Table", "HUB", "Warehouse", "Hub_WH", "Tables/HUB", "Customer"]]) +
+    table("loads", LOAD, overrides.loads || [
+      [O("Warehouse/Hub", 1), "HUB", "Customer", "Failed", "w", AT - H, AT - H, 1],
+      [O("Warehouse/Mart", 2), "MART", "Summary", "Succeeded", "w", AT - 2 * H, AT - 2 * H, 1]]) +
+    (overrides.extra || "");
+}
+
+function federatedModel(overrides) { const p = D.parsePayload(federated(overrides)); return D.buildModel(p.tables, p.problems); }
+
+test("items and nodes of two catalogues stay apart, and an item is shown with its catalogue", () => {
+  const m = federatedModel();
+  assert.ok(m.items.has(O("Warehouse/Mart", 1)) && m.items.has(O("Warehouse/Mart", 2)));
+  assert.equal(m.items.get(O("Warehouse/Mart", 1)).nodes.length, 1);
+  assert.equal(D.shownItem(O("Warehouse/Mart", 2)), "Warehouse/Mart · SPOKE");
+});
+
+test("a physical shortcut joins the catalogue that installs its target", () => {
+  const m = federatedModel();
+  const joined = m.crossings.filter((c) => c.producer);
+  assert.deepEqual(joined.map((c) => [c.producer, c.consumer]), [[O("h", 1), O("b", 2)]]);
+  assert.ok(m.nodes.get(O("b", 2)).up.includes(O("h", 1)));
+});
+
+test("a failure in another catalogue reaches the readers that join it", () => {
+  const m = federatedModel();
+  const health = D.assessHealth(m, { asOf: AT - 24 * H });
+  const mart = health.load.filter((f) => f.node && f.node.key === O("m", 2));
+  assert.deepEqual(mart.map((f) => f.code), ["load_ancestor_unestablished"]);
+  assert.match(mart[0].message, /HUB\.Customer failed/);
+});
+
+test("members of a cycle never make each other stale, but a failed member still reaches the others", () => {
+  const nodes = [["a", "Warehouse/W", "S", "A", "Table", "S.A", 9, ""], ["b", "Warehouse/W", "S", "B", "Table", "S.B", 9, ""]];
+  const edges = [["a", "b", "Dependency", "", ""], ["b", "a", "Dependency", "", ""]];
+  const loads = (a, b) => [["Warehouse/W", "S", "A", a, "w", AT - 2 * H, AT - 2 * H, 1], ["Warehouse/W", "S", "B", b, "w", AT - H, AT - H, 1]];
+  const build = (a, b) => {
+    const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 1]]) + table("nodes", NODE, nodes) + table("edges", EDGE, edges) + table("loads", LOAD, loads(a, b)));
+    return D.assessHealth(D.buildModel(p.tables, p.problems), { asOf: AT - 24 * H });
+  };
+  assert.deepEqual(build("Succeeded", "Succeeded").load.map((f) => f.code), []);
+  assert.deepEqual(build("Succeeded", "Failed").load.map((f) => [f.node.object, f.code]),
+    [["B", "load_failed"], ["A", "load_ancestor_unestablished"]]);
+});
+
+test("hiding mirrors keeps paths through them, marked, and changes no assessment", () => {
+  const m = federatedModel({ mirrored: true });
+  const shown = D.withoutMirrors(m);
+  assert.equal(shown.hiddenMirrors, 1);
+  assert.ok(!shown.nodes.has(O("b", 2)));
+  const reader = shown.nodes.get(O("s", 2));
+  assert.deepEqual(reader.vup, [O("h", 1)]);
+  assert.equal(reader.kinds[O("h", 1)], "Hidden mirror");
+  assert.equal(m.nodes.size, 5);
+});
+
+test("the estate counts direct dependencies between workspaces, not reach or repeats", () => {
+  const items = table("itemedges", ["up", "down", "count"], [[O("Lakehouse/Bridge", 2), O("Warehouse/Mart", 2), 1]]) +
+    table("itemobjects", ["item", "objects"], [[O("Warehouse/Hub", 1), 1], [O("Lakehouse/Bridge", 2), 1], [O("Warehouse/Mart", 2), 2]]);
+  const p = D.parsePayload(federated({ page: "estate", extra: items + table("shortcuts", SHORTCUT, [
+    [O("Lakehouse/Bridge", 2), "Tables/HUB", "Customer", "Table", "HUB", "Warehouse", "Hub_WH", "Tables/HUB", "Customer"],
+    [O("Lakehouse/Bridge", 2), "Tables/HUB", "Gone", "Table", "ELSEWHERE", "Warehouse", "Other_WH", "Tables/HUB", "Gone"]]) }));
+  const topo = D.estateTopology(D.buildModel(p.tables, p.problems));
+  const hub = topo.workspaces.get("HUB"), spoke = topo.workspaces.get("SPOKE");
+  assert.deepEqual([hub.supplies.size, hub.outgoing, hub.receives.size], [1, 1, 0]);
+  assert.deepEqual([spoke.receives.size, spoke.incoming, spoke.supplies.size, spoke.unmatched], [1, 1, 0, 1]);
+  // The Hub workspace's two Warehouses are two items; nothing loops.
+  assert.equal(hub.items.length, 2);
+  assert.deepEqual(topo.workspaceLoops, []);
+});
+
+test("a chain A, B, C counts one supplier each, and A and B reading each other is a loop", () => {
+  const edges = [{ up: "A", down: "B", count: 2 }, { up: "B", down: "C", count: 1 }];
+  assert.deepEqual(D.topologyColumns(["A", "B", "C", "D"], edges), [["A", "D"], ["B"], ["C"]]);
+  assert.deepEqual(D.loopsOf(["A", "B", "C"], edges), []);
+  assert.deepEqual(D.loopsOf(["A", "B", "C"], edges.concat([{ up: "B", down: "A", count: 1 }])), [["A", "B"]]);
+});
+
+test("view state is kept apart for each set of catalogues", () => {
+  const m = federatedModel();
+  assert.notEqual(D.storeKey(m), D.storeKey({ catalogues: [{ reference: "HUB/Warehouse/Weaver" }] }));
+});

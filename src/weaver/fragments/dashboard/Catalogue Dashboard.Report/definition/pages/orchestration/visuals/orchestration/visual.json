@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
   "name": "orchestration",
   "position": {
-    "x": 0,
+    "x": 280,
     "y": 0,
     "z": 0,
     "height": 1080,
-    "width": 1920,
+    "width": 1640,
     "tabOrder": 0
   },
   "visual": {

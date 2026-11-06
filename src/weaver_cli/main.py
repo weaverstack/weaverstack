@@ -746,11 +746,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     dashboard = subcommands.add_parser(
         "catalogue-dashboard",
-        help="Deploy or update the Catalogue Dashboard over a catalogue.",
+        help="Deploy or update the Catalogue Dashboard over catalogues.",
         description=(
-            "Create or update the Catalogue Dashboard's SemanticModel and Report. "
-            "The model reads the catalogue's tables over Direct Lake; the catalogue "
-            "is only read. The Report needs the HTML Content visual."
+            "Create or update the Catalogue Dashboard's SemanticModel and Report in "
+            "the workspace. The model reads up to ten catalogues over Direct Lake, "
+            "or imports them with --ImportMode; each catalogue is only read. The "
+            "Report needs the HTML Content visual."
         ),
     )
     _add_workspace_args(dashboard, include_catalogue=False, include_environment=False)
@@ -760,8 +761,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="REFERENCE",
         help=(
-            "The catalogue Warehouse to read, as Workspace/Warehouse/Name or "
-            "Warehouse/Name. Defaults to catalogue: in workspace configuration."
+            "A catalogue Warehouse to read, as Workspace/Warehouse/Name or "
+            "Warehouse/Name. Repeat for each catalogue, in the order the Dashboard "
+            "lists them. Defaults to catalogue: in workspace configuration."
+        ),
+    )
+    dashboard.add_argument(
+        "--ImportMode",
+        dest="import_mode",
+        action="store_true",
+        help=(
+            "Import the catalogues instead of reading them over Direct Lake. "
+            "Required for more than ten. Each SQL endpoint needs a connection the "
+            "model can refresh with."
         ),
     )
     dashboard.add_argument(
@@ -774,7 +786,7 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument(
         "--dry-run",
         action="store_true",
-        help="Resolve the source and the Dashboard's items without changing them.",
+        help="Resolve the catalogues and the Dashboard's items without changing them.",
     )
     dashboard.add_argument(
         "--json", action="store_true", help="Emit the result as JSON."
@@ -2002,6 +2014,7 @@ def handle_catalogue_dashboard(args: argparse.Namespace) -> int:
         result = weaver.deploy_catalogue_dashboard(
             catalogue=args.source_catalogues,
             name=args.name,
+            import_mode=args.import_mode,
             dry_run=args.dry_run,
             session=opened,
         )
@@ -2013,15 +2026,20 @@ def handle_catalogue_dashboard(args: argparse.Namespace) -> int:
 
 
 def render_catalogue_dashboard(result) -> str:
+    mode = "Import" if result.mode == "import" else "Direct Lake"
+    catalogues = result.catalogues or (result.catalogue,)
     lines = [
         f"Catalogue Dashboard  {result.name}  in {result.workspace}",
-        f"  Reads  {result.catalogue}  ({len(result.sources)} tables)",
+        f"  Reads  {len(result.sources)} tables of each catalogue over {mode}",
+        *(f"    {reference}" for reference in catalogues),
     ]
     for item in result.items:
         status = f"would be {item.status}" if result.dry_run else item.status
         lines.append(f"  {item.kind:<14}{item.name}  {status}")
     for error in result.errors:
         lines.append(f"  error: {error}")
+    for warning in result.warnings:
+        lines.append(f"  warning: {warning}")
     if result.dry_run:
         lines.append("No changes were made.")
     return "\n".join(lines) + "\n"

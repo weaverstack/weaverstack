@@ -6,15 +6,16 @@ var GANTT = { LABEL: 560, ROW: 20, AXIS: 28 };
 function logRows(m) {
   if (m.logRows) return m.logRows;
   var byTarget = targetItems(m), flows = new Map((m.tables.logflows || []).map(function (r) { return [r.index, r.workflow]; }));
+  function itemOf(r) { return byTarget.get((r.catalogue || "") + "|" + r.targettype + "|" + r.target) || null; }
   m.logRows = (m.tables.log || []).filter(function (r) {
-    var item = byTarget.get(r.targettype + "|" + r.target);
+    var item = itemOf(r);
     return !(item && isInternal(m, item, r.schema)) && !(r.object && INTERNAL_SCHEMA.test(r.schema || ""));
   }).map(function (r) {
-    var item = byTarget.get(r.targettype + "|" + r.target) || null;
+    var item = itemOf(r);
     var node = item && r.object ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
     var started = num(r.started), completed = num(r.completed);
     return { id: r.id, workflow: flows.get(r.flow) || null, task: r.task, target: r.target, schema: r.schema, object: r.object, result: r.result,
-      item: item || (r.targettype && r.target ? r.targettype + "/" + r.target : null),
+      item: item || (r.targettype && r.target ? owned(r.targettype + "/" + r.target, r.catalogue) : null),
       started: started !== null ? started : completed, completed: completed !== null ? completed : started, duration: num(r.duration),
       node: node, message: r.message, envelope: !r.object,
       label: node ? node.label : r.object ? qualified({ item: item, schema: r.schema, object: r.object }) : (r.message || r.task || "") };
@@ -63,7 +64,7 @@ function ganttPage(body, m) {
       side.textContent = "";
       side.appendChild(el("div", { "class": "wd-eyebrow" }, [kind ? kindMark(kind) : null, (kind ? " " : "") + (r.envelope ? taskName(r.task) + " record" : "Record")]));
       side.appendChild(el("h2", { "class": "wd-detail-title", text: r.label }));
-      side.appendChild(el("div", { "class": "wd-mono wd-muted", text: r.item || "" }));
+      side.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(r.item) }));
     }
     var facts = el("dl", { "class": "wd-facts" });
     function fact(label, value) { facts.appendChild(el("dt", { text: label })); facts.appendChild(el("dd", {}, [value])); }
@@ -161,7 +162,7 @@ function ganttChart(rows, sum, s, m, select) {
       ctx.fillStyle = r.envelope ? P.muted : P.ink;
       ctx.fillText(clip(ctx, r.label + (r.envelope ? " · " + r.task : ""), col.objectEnd - col.object, "11px " + P.sans), r.envelope ? 8 : col.object, mid);
       ctx.fillStyle = P.muted;
-      if (col.item && r.item && !r.envelope) ctx.fillText(clip(ctx, r.item, col.itemEnd - col.item, "11px " + P.sans), col.item, mid);
+      if (col.item && r.item && !r.envelope) ctx.fillText(clip(ctx, shownItem(r.item), col.itemEnd - col.item, "11px " + P.sans), col.item, mid);
       if (col.task && !r.envelope) ctx.fillText(taskName(r.task), col.task, mid);
       var x1 = Math.max(labelW, time(r.started)), x2 = Math.min(width - 8, time(r.completed));
       if (x2 >= labelW && x1 <= width - 8) {
@@ -226,7 +227,7 @@ function ganttChart(rows, sum, s, m, select) {
     if (!r) { tip.hidden = true; return; }
     tip.textContent = "";
     tip.appendChild(el("b", { text: r.label }));
-    if (r.item && !r.envelope) tip.appendChild(el("div", { "class": "wd-muted", text: r.item }));
+    if (r.item && !r.envelope) tip.appendChild(el("div", { "class": "wd-muted", text: shownItem(r.item) }));
     tip.appendChild(el("div", {}, [chip(r.result), " " + taskName(r.task) + " · " + duration(r.completed - r.started)]));
     tip.appendChild(el("div", { "class": "wd-muted", text: stamp(r.started) + " → " + stamp(r.completed).slice(11) }));
     if (r.message && r.object) tip.appendChild(el("div", { "class": "wd-tip-message", text: r.message }));

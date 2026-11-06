@@ -350,3 +350,29 @@ body { background: #f7f7f6; }
 .wd-mini td { padding: 4px; border-top: 1px solid var(--line); text-align: right; }
 .wd-mini th:first-child, .wd-mini td:first-child { text-align: left; }
 .wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
+
+/* The mirror toggle and the item scope sit in the toolbar. */
+.wd-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.wd-check input { margin: 0; }
+.wd-scope { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+
+/* --- estate ------------------------------------------------------------------ */
+
+.wd-estate { margin: 12px 0 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.wd-estate-scroll { overflow: auto; max-height: 720px; }
+.wd-estate-svg { display: block; }
+.wd-estate-edge { fill: none; stroke: var(--line-strong); stroke-width: 1.6; }
+.wd-estate-edge.wd-lit { stroke: var(--blue); stroke-width: 2.4; }
+.wd-estate-arrowhead { fill: var(--line-strong); }
+.wd-estate-count { fill: var(--muted); font: 600 11px var(--mono); }
+.wd-estate-card { cursor: pointer; }
+.wd-estate-card rect:first-of-type { fill: var(--surface); stroke: var(--line-strong); }
+.wd-estate-card.wd-current rect:first-of-type { stroke: var(--blue); stroke-width: 2; }
+.wd-estate-card .wd-estate-tone { fill: var(--faint); stroke: none; }
+.wd-estate-card.wd-ok .wd-estate-tone { fill: var(--green); }
+.wd-estate-card.wd-warn .wd-estate-tone { fill: var(--amber); }
+.wd-estate-card.wd-bad .wd-estate-tone { fill: var(--red); }
+.wd-estate-eyebrow { fill: var(--blue); font: 700 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.wd-estate-title { fill: var(--ink); font: 700 15px var(--sans); }
+.wd-estate-line { fill: var(--muted); font: 12px var(--sans); }
+.wd-dim { opacity: .35; }

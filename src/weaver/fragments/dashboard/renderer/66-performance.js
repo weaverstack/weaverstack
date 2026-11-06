@@ -16,11 +16,12 @@ function recordKind(node, task) { return node ? node.kind : task === "test" ? KI
 function targetItems(m) {
   if (m.targetItems) return m.targetItems;
   m.targetItems = new Map();
-  m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.type + "|" + it.target, it.label); });
+  m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.code + "|" + it.type + "|" + it.target, it.label); });
   return m.targetItems;
 }
 
-function targetItem(m, type, target) { return targetItems(m).get(type + "|" + target) || (type && target ? type + "/" + target : null); }
+/* The item a record's physical target belongs to, in the record's catalogue. */
+function targetItem(m, type, target, code) { return targetItems(m).get((code || "") + "|" + type + "|" + target) || (type && target ? owned(type + "/" + target, code) : null); }
 
 function perfRows(m, name) {
   return (m.tables[name] || []).filter(function (r) { return !isInternal(m, r.item, r.schema); }).map(function (r) {
@@ -34,7 +35,7 @@ function perfRows(m, name) {
 
 function testRows(m, name) {
   return (m.tables[name] || []).map(function (r) {
-    var item = targetItem(m, r.targettype, r.target);
+    var item = targetItem(m, r.targettype, r.target, r.catalogue);
     return { item: item, schema: r.schema, object: r.object, node: item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null,
       runs: num(r.runs) || 0, duration: num(r.duration), longest: num(r.longest), failed: num(r.failed) || 0, last: num(r.last) };
   }).filter(function (r) { return !(r.item && isInternal(m, r.item, r.schema)) && !(r.object && INTERNAL_SCHEMA.test(r.schema || "")); }).map(function (r) {
@@ -48,7 +49,7 @@ function testRows(m, name) {
 function runObjectRows(m) {
   if (m.runObjects) return m.runObjects;
   m.runObjects = (m.tables.runobjects || []).map(function (r) {
-    var item = targetItem(m, r.targettype, r.target), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
+    var item = targetItem(m, r.targettype, r.target, r.catalogue), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
     var started = num(r.started), completed = num(r.completed);
     return { workflow: r.workflow, task: r.task, item: item, schema: r.schema, object: r.object, node: node, result: r.result, message: r.message,
       started: started !== null ? started : completed, completed: completed !== null ? completed : started,
@@ -406,7 +407,7 @@ function performancePage(body, m) {
   function pick(choice) { s.card = choice; card(); saveState(); }
   var host = el("div", { "class": "wd-overview-main" });
   var allItems = Array.from(new Set(["perfmonth", "testmonth"].reduce(function (all, name) {
-    return all.concat((m.tables[name] || []).map(function (r) { return r.item || targetItem(m, r.targettype, r.target); }));
+    return all.concat((m.tables[name] || []).map(function (r) { return r.item || targetItem(m, r.targettype, r.target, r.catalogue); }));
   }, []).filter(Boolean))).filter(function (it) { return !isInternal(m, it); }).sort(compare);
   var deadlines = [el("option", { value: "", selected: s.deadline === "" ? "selected" : null, text: "No deadline" })];
   for (var h = 0; h < 24; h++) deadlines.push(el("option", { value: String(h), selected: s.deadline === String(h) ? "selected" : null, text: (h < 10 ? "0" : "") + h + ":00 " + zone }));

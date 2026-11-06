@@ -70,7 +70,7 @@ function weaveMark() { return el("span", { "class": "wd-mark", "aria-hidden": "t
 
 var PAGE_TITLES = {
   overview: "Overview", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
-  performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model"
+  performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model", estate: "Estate"
 };
 
 /* The header every page shares: the catalogue's own name, where it lives, and
@@ -78,9 +78,11 @@ var PAGE_TITLES = {
    last processed. */
 function shell(mount, m) {
   var s = state();
-  var title = m.catalogue.name || "Weaver catalogue";
-  var context = [m.catalogue.workspace ? "Workspace " + m.catalogue.workspace : null,
-    m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
+  var several = m.catalogues && m.catalogues.length > 1;
+  var title = several ? fmt(m.catalogues.length) + " catalogues" : m.catalogue.name || "Weaver catalogue";
+  var context = several ? m.catalogues.map(function (c) { return c.label; }).join(" · ") :
+    [m.catalogue.workspace ? "Workspace " + m.catalogue.workspace : null,
+      m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
   var processed = latestProcessed(m);
   var head = el("header", { "class": "wd-top" }, [
     el("div", { "class": "wd-brand" }, [weaveMark(), el("div", {}, [
@@ -92,6 +94,7 @@ function shell(mount, m) {
     zoneControl(m),
     el("dl", { "class": "wd-times" }, [
       el("dt", { text: "Queried" }), el("dd", { text: stamp(m.at) }),
+      m.imported ? el("dt", { text: "Imported" }) : null, m.imported ? el("dd", { text: stamp(m.imported) + " · " + ago(m.imported, m.at) }) : null,
       processed === undefined ? null : el("dt", { text: "Last processed" }),
       processed === undefined ? null : el("dd", { text: processed ? stamp(processed) + " · " + ago(processed, m.at) : "nothing has been processed" })
     ])
@@ -104,16 +107,31 @@ function shell(mount, m) {
     ]));
   }
   if (m.graphGaps && m.graphGaps.size) {
-    var gaps = Array.from(m.graphGaps.keys()).sort(compare);
+    var gaps = Array.from(m.graphGaps.keys()).sort(compare).map(shownItem);
     mount.appendChild(el("div", { "class": "wd-banner wd-banner-warn wd-banner-top" }, [
       el("b", { text: "Lineage may be out of date. " }),
       fmt(Array.from(m.graphGaps.values()).reduce(function (a, b) { return a + b; }, 0)) + " certified objects in " + gaps.join(", ") +
       " have no recorded lineage. Build " + (gaps.length === 1 ? "that item" : "those items") + " again to record it."
     ]));
   }
+  if (m.unlisted && m.scope && m.scope.length !== undefined && m.tables.scope) {
+    mount.appendChild(el("div", { "class": "wd-banner wd-banner-warn wd-banner-top" }, [
+      el("b", { text: fmt(m.unlisted) + (m.unlisted === 1 ? " installed item is" : " installed items are") + " not in the item list. " }),
+      "The list is written when the Dashboard deploys; deploy it again to choose them."
+    ]));
+  }
   var body = el("main", { "class": "wd-body" });
   mount.appendChild(body);
   return body;
+}
+
+/* A page whose data would exceed what one measure can return. */
+function tooLargePage(body, m) {
+  var t = m.tooLarge;
+  body.appendChild(section("Too much to show at once", [el("p", { text:
+    "This page's data is " + fmt(num(t.size)) + " characters, more than the " + fmt(num(t.budget)) +
+    " one Power BI measure can return. " + (m.page === "orchestration" || m.page === "entities" || m.page === "semantic" ?
+      "Choose fewer items in the Items list." : "Read fewer catalogues on this Dashboard, or open the detail pages, which show the items chosen.") })]));
 }
 
 /* The latest processed load, test or workflow, or undefined when the page
@@ -191,7 +209,7 @@ function searchNodes(m, query, limit) {
   if (!terms.length) return [];
   var found = [];
   m.nodes.forEach(function (n) {
-    var label = n.label.toLowerCase(), item = n.item.toLowerCase(), desc = n.desc.toLowerCase(),
+    var label = n.label.toLowerCase(), item = shownItem(n.item).toLowerCase(), desc = n.desc.toLowerCase(),
       full = (n.schema + "." + n.object).toLowerCase(), score = 0;
     for (var i = 0; i < terms.length; i++) {
       var t = terms[i], s = 0, w = wildcard(t);
@@ -257,7 +275,7 @@ function nodeSearch(m, onPick, onPattern) {
   return searchBox({
     placeholder: "Search " + fmt(m.nodes.size) + " objects · * matches any text · Shift adds",
     find: function (q) {
-      return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + n.item, desc: n.desc }; });
+      return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc }; });
     },
     onPick: function (r, adding) { onPick(r.key, adding); },
     onPattern: onPattern
@@ -283,8 +301,8 @@ function depthLabel(d) { return d < 0 ? "Max" : String(d); }
 
 function nodeLink(m, key, onOpen) {
   var n = m.nodes.get(key);
-  return el("button", { "class": "wd-link", type: "button", title: n.item + " · " + qualified(n), onclick: function () { onOpen(key); } },
-    [kindMark(n.kind), n.label, el("span", { "class": "wd-link-meta", text: itemName(n.item) })]);
+  return el("button", { "class": "wd-link", type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
+    [kindMark(n.kind), n.label, el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 
 function details(panel, m, key, options) {
@@ -295,7 +313,7 @@ function details(panel, m, key, options) {
   var open = options.onOpen || function () {};
   panel.appendChild(el("div", { "class": "wd-eyebrow" }, [kindMark(n.kind), " " + n.kind]));
   panel.appendChild(el("h2", { "class": "wd-detail-title", text: n.label }));
-  panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: n.item + " · " + qualified(n) }));
+  panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(n.item) + " · " + qualified(n) }));
   if (options.describe !== false) panel.appendChild(el("p", { "class": n.desc ? "wd-desc" : "wd-desc wd-muted", text: n.desc || "No description is declared." }));
 
   var s = isValidation(n) ? n.test : effectiveLoad(n), carries = !!m.tables.loads;

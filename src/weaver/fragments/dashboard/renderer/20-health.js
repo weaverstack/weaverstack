@@ -24,41 +24,82 @@ function establishedAt(n) {
   return s && ESTABLISHED.indexOf(s.result) >= 0 ? s.completed : null;
 }
 
-/* Nodes in an order where every upstream comes first. */
-function topological(m) {
-  var indegree = new Map(), order = [], queue = [];
-  m.nodes.forEach(function (n) { indegree.set(n.key, n.up.length); if (!n.up.length) queue.push(n.key); });
-  for (var i = 0; i < queue.length; i++) {
-    var n = m.nodes.get(queue[i]);
-    order.push(n);
-    n.down.forEach(function (d) { var k = indegree.get(d) - 1; indegree.set(d, k); if (k === 0) queue.push(d); });
+/* Strongly connected components: nodes that read one another share one. Each
+   node maps to its component's index; components come out with every upstream
+   component before them. */
+function components(m) {
+  if (m.components) return m.components;
+  var index = new Map(), low = new Map(), on = new Set(), stack = [], comp = new Map(), list = [], counter = 0;
+  function connect(start) {
+    var work = [[start, 0]];
+    index.set(start, counter); low.set(start, counter); counter += 1; stack.push(start); on.add(start);
+    while (work.length) {
+      var top = work[work.length - 1], key = top[0], ups = m.nodes.get(key).up;
+      if (top[1] < ups.length) {
+        var u = ups[top[1]++];
+        if (!index.has(u)) {
+          index.set(u, counter); low.set(u, counter); counter += 1; stack.push(u); on.add(u);
+          work.push([u, 0]);
+        } else if (on.has(u)) low.set(key, Math.min(low.get(key), index.get(u)));
+        continue;
+      }
+      work.pop();
+      if (work.length) { var parent = work[work.length - 1][0]; low.set(parent, Math.min(low.get(parent), low.get(key))); }
+      if (low.get(key) === index.get(key)) {
+        var members = [], w;
+        do { w = stack.pop(); on.delete(w); comp.set(w, list.length); members.push(w); } while (w !== key);
+        list.push(members);
+      }
+    }
   }
-  if (order.length < m.nodes.size) {
-    var placed = new Set(order.map(function (n) { return n.key; }));
-    m.nodes.forEach(function (n) { if (!placed.has(n.key)) order.push(n); });
-  }
-  return order;
+  Array.from(m.nodes.keys()).sort().forEach(function (k) { if (!index.has(k)) connect(k); });
+  m.components = { of: comp, list: list };
+  return m.components;
 }
 
+function sameCycle(m, a, b) { var c = components(m).of; return c.get(a) === c.get(b); }
+
 /* Over each node's lifecycle ancestors: whether one has not been processed,
-   the latest instant one was processed, and the latest it was processed or built. */
+   the latest instant one outside its cycle was processed, and the latest one
+   was processed or built. Members of a cycle count as each other's ancestors
+   for what has not been processed, never for what is newer. */
 function ancestry(m) {
-  var out = new Map();
-  topological(m).forEach(function (n) {
-    var a = { unprocessed: false, latest: null, changed: null };
-    n.up.forEach(function (key) {
-      var p = m.nodes.get(key), pa = out.get(key) || { unprocessed: false, latest: null, changed: null };
-      if (pa.unprocessed) a.unprocessed = true;
-      a.latest = later(a.latest, pa.latest);
-      a.changed = later(a.changed, pa.changed);
-      if (participates(p)) {
-        var at = establishedAt(p);
-        if (at === null) a.unprocessed = true;
-        a.latest = later(a.latest, at);
-        a.changed = later(a.changed, later(at, p.built));
-      }
+  var c = components(m), out = new Map(), within = [];
+  function empty() { return { unprocessed: false, latest: null, changed: null }; }
+  function merge(a, b) { if (b.unprocessed) a.unprocessed = true; a.latest = later(a.latest, b.latest); a.changed = later(a.changed, b.changed); }
+  function own(p) {
+    var r = empty();
+    if (participates(p)) {
+      var at = establishedAt(p);
+      if (at === null) r.unprocessed = true;
+      r.latest = at;
+      r.changed = later(at, p.built);
+    }
+    return r;
+  }
+  // Tarjan emits a component after every component it reads.
+  c.list.forEach(function (members, i) {
+    var upstream = empty(), seen = new Set();
+    members.forEach(function (key) {
+      m.nodes.get(key).up.forEach(function (u) {
+        var j = c.of.get(u);
+        if (j === i || seen.has(u)) return;
+        seen.add(u);
+        merge(upstream, within[j]);
+        merge(upstream, own(m.nodes.get(u)));
+      });
     });
-    out.set(n.key, a);
+    within[i] = upstream;
+    members.forEach(function (key) {
+      var a = { unprocessed: upstream.unprocessed, latest: upstream.latest, changed: upstream.changed };
+      if (members.length > 1) members.forEach(function (other) {
+        if (other === key) return;
+        var o = own(m.nodes.get(other));
+        if (o.unprocessed) a.unprocessed = true;
+        a.changed = later(a.changed, o.changed);
+      });
+      out.set(key, a);
+    });
   });
   return out;
 }
@@ -66,7 +107,7 @@ function ancestry(m) {
 function later(a, b) { return a === null ? b : b === null ? a : Math.max(a, b); }
 
 function ancestorsOf(m, key) {
-  var seen = new Set(), stack = [key], out = [];
+  var seen = new Set([key]), stack = [key], out = [];
   while (stack.length) {
     m.nodes.get(stack.pop()).up.forEach(function (u) { if (!seen.has(u)) { seen.add(u); out.push(m.nodes.get(u)); stack.push(u); } });
   }
@@ -160,7 +201,7 @@ function loadFindings(m, n, anc, asOf) {
   }
   var loaded = establishedAt(n);
   if (loaded !== null && a.latest !== null && a.latest > loaded) {
-    var newer = firstAncestor(m, n.key, function (p) { var at = establishedAt(p); return at !== null && at > loaded; });
+    var newer = firstAncestor(m, n.key, function (p) { var at = establishedAt(p); return !sameCycle(m, p.key, n.key) && at !== null && at > loaded; });
     out.push(finding("load", "load_stale_ancestor", AMBER, n, s.result,
       (newer ? newer.label : "an upstream object") + " has been established since this object was loaded", s));
   }

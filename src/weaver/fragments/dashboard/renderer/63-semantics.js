@@ -163,7 +163,7 @@ function semanticPage(body, m) {
   if (!s.model || !models.some(function (mo) { return mo.item === s.model; })) s.model = models[0].item;
   var mo = metadata(m).models.get(s.model);
   var picker = el("select", { "class": "wd-select wd-select-strong", "aria-label": "Semantic model", onchange: function () { s.model = this.value; s.table = null; saveState(); redraw(); } },
-    models.map(function (x) { return el("option", { value: x.item, selected: x.item === s.model ? "selected" : null, text: x.name }); }));
+    models.map(function (x) { return el("option", { value: x.item, selected: x.item === s.model ? "selected" : null, text: shownName(x.item) }); }));
   var input = el("input", { "class": "wd-search", type: "search", value: s.query, placeholder: "Search this model's tables, columns and measures", "aria-label": "Search the model", autocomplete: "off", spellcheck: "false" });
   body.appendChild(el("div", { "class": "wd-toolbar" }, [picker, el("div", { "class": "wd-searchbox" }, [input])]));
 
@@ -264,7 +264,7 @@ function sourceReuse(m, models, modelsAsRows, only) {
     .sort(function (a, b) { return compare(a.item, b.item) || compare(a.label, b.label); });
   if (!list.length) return empty("No table of this model records a managed source.");
   var rows = modelsAsRows ? models : list, cols = modelsAsRows ? list : models;
-  function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + itemName(x.item) })]; }
+  function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + shownName(x.item) })]; }
   function tables(row, col) { var src = modelsAsRows ? col : row, mo = modelsAsRows ? row : col; return src.by.get(mo.item); }
   return el("div", { "class": "wd-table-wrap wd-bus-wrap" }, [el("table", { "class": "wd-bus" }, [
     el("thead", {}, [el("tr", {}, [el("th", { "class": "wd-bus-corner", text: modelsAsRows ? "Model ↓   Source →" : "Source ↓   Model →" })].concat(cols.map(function (c) {

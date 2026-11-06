@@ -1,4 +1,4 @@
-"""The Catalogue Dashboard: a semantic model and Report over one catalogue.
+"""The Catalogue Dashboard: a semantic model and Report over Weaver catalogues.
 
 ``weaver catalogue-dashboard`` deploys the ``dashboard`` fragment as an ordinary
 Power BI project; see :mod:`weaver.operations.catalogue_dashboard`.
@@ -22,31 +22,32 @@ RENDERER = "renderer/"
 RENDERER_PLACEHOLDER = '"{renderer}"'
 
 
-def dashboard_files() -> dict[str, bytes]:
-    """The Dashboard's Power BI project, by project-relative path.
+def dashboard_files(sources, mode: str) -> dict[str, bytes]:
+    """The Dashboard's Power BI project over ``sources``, by project-relative path.
 
     The renderer is checked in as a stylesheet and scripts and reaches HTML
     Content as one DAX string literal, so the model carries it to every page.
     """
 
+    from .dashboard_model import model_text
     from .fragments import DASHBOARD as FRAGMENT
     from .fragments import fragment_files
 
     files = fragment_files(FRAGMENT)
-    sources = {
+    scripts = {
         path[len(RENDERER) :]: files.pop(path).decode("utf-8")
         for path in sorted(files)
         if path.startswith(RENDERER)
     }
     model = f"{DASHBOARD}.tmdl"
-    text = files[model].decode("utf-8")
+    text = model_text(sources, mode)
     if text.count(RENDERER_PLACEHOLDER) != 1:
         raise AssertionError(f"{model} must hold one Renderer placeholder")
     # The placeholder opens a fenced expression line; every line of the
     # literal keeps that line's indentation so TMDL reads it as one block.
     start = text.index(RENDERER_PLACEHOLDER)
     indent = text[text.rindex("\n", 0, start) + 1 : start]
-    literal = renderer_literal(*_renderer(sources)).replace("\n", "\n" + indent)
+    literal = renderer_literal(*_renderer(scripts)).replace("\n", "\n" + indent)
     files[model] = text.replace(RENDERER_PLACEHOLDER, literal).encode("utf-8")
     return files
 

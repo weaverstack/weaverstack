@@ -6,6 +6,8 @@
 // and column names; each row starts with ROW; FIELD separates fields. Every <
 // arrives as LESS so that no catalogue text can close the data element.
 var FIELD = "", ROW = "", TABLE = "", LESS = "";
+// An item, node key or record ID ends with OWNER and its catalogue's code.
+var OWNER = "";
 
 var KIND = {
   TABLE: "Table", VIEW: "View", FOLDER: "Folder", SHORTCUT: "Shortcut",
@@ -43,8 +45,22 @@ function identityKey(item, schema, object) { return item + "|" + (schema || "") 
 
 function isValidation(node) { return node.kind === KIND.TEST || node.kind === KIND.ASSUMPTION; }
 
-function itemType(label) { return String(label).split("/")[0]; }
-function itemName(label) { var s = String(label); return s.slice(s.indexOf("/") + 1); }
+function bare(value) { var s = String(value), at = s.indexOf(OWNER); return at < 0 ? s : s.slice(0, at); }
+function ownerCode(value) { var s = String(value), at = s.indexOf(OWNER); return at < 0 ? "" : s.slice(at + 1); }
+function owned(value, code) { return code ? value + OWNER + code : value; }
+function itemType(label) { return bare(label).split("/")[0]; }
+function itemName(label) { var s = bare(label); return s.slice(s.indexOf("/") + 1); }
+/* The catalogues the page reads, by code; set by buildModel. */
+var CATALOGUES = new Map();
+function catalogueLabel(value) { var c = CATALOGUES.get(ownerCode(value)); return c ? c.label : ""; }
+/* An item as shown: its kind and name, and its catalogue when several are read. */
+function shownItem(label) {
+  if (label === null || label === undefined) return "";
+  return CATALOGUES.size > 1 && catalogueLabel(label) ? bare(label) + " · " + catalogueLabel(label) : bare(label);
+}
+function shownName(label) {
+  return CATALOGUES.size > 1 && catalogueLabel(label) ? itemName(label) + " · " + catalogueLabel(label) : itemName(label);
+}
 
 function typeRank(type) { var i = ITEM_TYPES.indexOf(type); return i < 0 ? ITEM_TYPES.length : i; }
 
@@ -62,23 +78,33 @@ function addTo(map, key, value) { var list = map.get(key); if (!list) map.set(ke
 function buildModel(tables, problems) {
   var t = function (name) { return tables[name] || []; };
   var meta = t("meta")[0] || {}, page = t("page")[0] || {};
+  CATALOGUES = new Map();
+  t("catalogues").forEach(function (r) { CATALOGUES.set(r.code, { code: r.code, label: r.label, reference: r.reference }); });
   var m = {
     page: page.name || "overview", at: num(meta.at) || Date.now(), tables: tables,
+    catalogues: Array.from(CATALOGUES.values()), mode: meta.mode || null, unlisted: num(meta.unlisted) || 0, imported: num(meta.imported),
+    tooLarge: (t("toolarge")[0] || null),
     problems: (problems || []).slice(), items: new Map(), nodes: new Map(), byIdentity: new Map(),
     internalItems: new Set(), edgeCount: 0, hiddenEdges: 0, externalCount: 0
   };
   t("internal").forEach(function (r) { m.internalItems.add(r.item); });
   function item(label) {
     var it = m.items.get(label);
-    if (!it) m.items.set(label, it = { label: label, type: itemType(label), name: itemName(label), workspace: null, target: null, version: null, nodes: [], internal: m.internalItems.has(label) || label === CATALOGUE_ITEM });
+    if (!it) m.items.set(label, it = { label: label, type: itemType(label), name: itemName(label), code: ownerCode(label), catalogue: catalogueLabel(label),
+      workspace: null, workspaceId: null, target: null, targetId: null, version: null, nodes: [], internal: m.internalItems.has(label) || bare(label) === CATALOGUE_ITEM });
     return it;
   }
   t("items").forEach(function (r) {
     var it = item(r.item);
     it.workspace = r.workspace; it.target = r.target; it.version = r.version;
+    it.workspaceId = r.workspaceid || null; it.targetId = r.targetid || null;
   });
-  var catalogue = m.items.get(CATALOGUE_ITEM);
+  var first = m.catalogues.length ? m.catalogues[0].code : "";
+  var catalogue = m.items.get(owned(CATALOGUE_ITEM, first)) || m.items.get(CATALOGUE_ITEM);
   m.catalogue = { name: catalogue ? catalogue.target : null, workspace: catalogue ? catalogue.workspace : null, version: catalogue ? catalogue.version : null };
+  // The items a scoped page shows; empty on a page that shows the estate.
+  m.scope = t("scope").map(function (r) { return r.item; });
+  m.scopePicked = t("scope").some(function (r) { return r.picked === "1"; });
 
   t("nodes").forEach(function (r) {
     if (m.nodes.has(r.key)) { m.problems.push("Two lineage nodes share the key " + r.key + "; one of them is not shown."); return; }
@@ -112,6 +138,15 @@ function buildModel(tables, problems) {
     }
   });
 
+  m.crossings = joinCatalogues(m, t("shortcuts"));
+  m.crossings.forEach(function (c) {
+    if (!c.producer) return;
+    var u = m.nodes.get(c.producer), d = m.nodes.get(c.consumer), key = u.key + ">" + d.key;
+    if (seen.has(key)) return;
+    seen.add(key); u.down.push(d.key); d.up.push(u.key); m.edgeCount += 1;
+    if (!vseen.has(key)) { vseen.add(key); u.vdown.push(d.key); d.vup.push(u.key); d.kinds[u.key] = "Shortcut"; }
+  });
+
   t("loads").forEach(function (r) {
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     if (n) n.load = status(r);
@@ -140,6 +175,56 @@ function buildModel(tables, problems) {
   return m;
 }
 
+/* Where each physical shortcut lands among the catalogues read, as
+   weaver.catalogues.join decides it: the installation of the target item in
+   its workspace, then the object that item installs at the target path. A
+   shortcut nothing given installs, or that several items install, joins nothing. */
+function joinCatalogues(m, shortcuts) {
+  var installed = new Map();
+  m.items.forEach(function (it) {
+    if (!it.target) return;
+    var key = [String(it.workspace || "").toLowerCase(), it.type, String(it.target).toLowerCase()].join("|");
+    addTo(installed, key, it);
+  });
+  var out = [];
+  shortcuts.forEach(function (r) {
+    var code = ownerCode(r.item), consumerItem = m.items.get(r.item);
+    var workspace = r.workspace || (consumerItem ? consumerItem.workspace : "");
+    var target = workspace + "/" + r.targettype + "/" + r.target + "/" + r.targetschema + (r.targetobject ? "." + r.targetobject : "");
+    var consumer = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+    var crossing = { consumer: consumer ? consumer.key : null, item: r.item, target: target, workspace: workspace, producer: null, reason: null };
+    var candidates = installed.get([String(workspace).toLowerCase(), r.targettype, String(r.target).toLowerCase()].join("|")) || [];
+    var reached = candidates.map(function (it) { return { item: it, nodes: reachedNodes(m, it, r) }; }).filter(function (x) { return x.nodes.length; });
+    if (!consumer) crossing.reason = "Its shortcut object is not installed in " + shownItem(r.item) + ".";
+    else if (!candidates.length) crossing.reason = "No catalogue read installs " + workspace + "/" + r.targettype + "/" + r.target + ".";
+    else if (reached.length > 1) crossing.reason = target + " is installed by more than one item read.";
+    else if (!reached.length) crossing.reason = r.targetschema + (r.targetobject ? "." + r.targetobject : "") + " is not installed there.";
+    if (crossing.reason) { out.push(crossing); return; }
+    reached[0].nodes.forEach(function (n) {
+      var schemaDestination = r.type === "Schema" ? m.byIdentity.get(identityKey(r.item, r.schema, n.object)) : null;
+      out.push({ consumer: schemaDestination ? schemaDestination.key : consumer.key, item: r.item, target: target, workspace: workspace, producer: n.key, reason: null });
+    });
+    void code;
+  });
+  return out;
+}
+
+function relational(schema) { return String(schema || "").replace(/^Tables\//, ""); }
+
+function reachedNodes(m, it, r) {
+  var schema = relational(r.targetschema);
+  if (r.type === "Schema") {
+    return it.nodes.filter(function (n) { return relational(n.schema).toLowerCase() === schema.toLowerCase() && String(n.schema || "").indexOf("Files") !== 0; });
+  }
+  if (r.type === "Folder") {
+    var parts = String(r.targetschema).replace(/^\/+|\/+$/g, "").split("/");
+    if (parts.length !== 2) return [];
+    var folder = m.byIdentity.get(identityKey(it.label, "Files/" + parts[0], parts[1]));
+    return folder ? [folder] : [];
+  }
+  return it.nodes.filter(function (n) { return n.object === r.targetobject && relational(n.schema).toLowerCase() === schema.toLowerCase() && String(n.schema || "").indexOf("Files") !== 0; });
+}
+
 function status(r) {
   return { result: r.result, workflow: r.workflow, started: num(r.started), completed: num(r.completed), duration: num(r.duration) };
 }
@@ -150,7 +235,7 @@ var INTERNAL_SCHEMA = /^(?:Files\/|Tables\/)?_$/;
 
 function isInternal(m, item, schema) {
   var it = m.items.get(item);
-  return !!(it && it.internal) || item === CATALOGUE_ITEM || INTERNAL_SCHEMA.test(schema || "");
+  return !!(it && it.internal) || bare(item) === CATALOGUE_ITEM || INTERNAL_SCHEMA.test(schema || "");
 }
 
 function visibleItems(m) {
@@ -159,7 +244,7 @@ function visibleItems(m) {
 
 /* Shown names: a Lakehouse folder keeps its Files path. */
 function qualified(node) {
-  if (!node.schema && !node.object) return node.item;
+  if (!node.schema && !node.object) return shownItem(node.item);
   if (!node.object) return node.schema;
   return node.schema + (String(node.schema).indexOf("Files") === 0 ? "/" : ".") + node.object;
 }

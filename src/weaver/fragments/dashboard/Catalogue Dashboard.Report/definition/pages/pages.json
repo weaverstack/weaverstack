@@ -3,6 +3,7 @@
   "pageOrder": [
     "overview",
     "health",
+    "estate",
     "orchestration",
     "performance",
     "gantt",

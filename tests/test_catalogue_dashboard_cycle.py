@@ -1,9 +1,10 @@
-"""The Catalogue Dashboard deploys over one catalogue, outside its lifecycle."""
+"""The Catalogue Dashboard deploys over catalogues, outside their lifecycle."""
 
 import json
 import re
 
 import pytest
+from support.dashboard_sources import dashboard_source, dashboard_sources
 from support.weaver_test import weaver_test
 from test_semantic_model_build_cycle import DefinitionClient
 from test_semantic_source_build_cycle import SourceInventory
@@ -17,6 +18,15 @@ from weaver.catalogue_dashboard import (
     DASHBOARD_REPORT,
     renderer_html,
     renderer_literal,
+)
+from weaver.dashboard_model import (
+    DIRECT_LAKE,
+    DIRECTORY,
+    IMPORT,
+    declared_columns,
+    directory_rows,
+    model_text,
+    required_columns,
 )
 from weaver.declaration.repository import parse_item_repository
 from weaver.errors import CommandError
@@ -63,17 +73,26 @@ SOURCES = {
     "Semantic model column": "SemanticModelColumn",
     "Semantic model measure": "SemanticModelMeasure",
     "Semantic model relationship": "SemanticModelRelationship",
+    "Shortcut": "Shortcut",
 }
 
 #: The page measure each Report page shows, in page order.
 PAGES = {
     "overview": "Overview page",
     "health": "Health page",
+    "estate": "Estate page",
     "orchestration": "Orchestration page",
     "performance": "Performance page",
     "gantt": "Gantt page",
     "entities": "Entity dictionary page",
     "semantic": "Semantic model page",
+}
+
+#: The pages that show the items chosen in 'Dashboard item', by the kinds offered.
+DETAIL = {
+    "orchestration": ["Lakehouse", "Warehouse", "SQLDatabase"],
+    "entities": ["Lakehouse", "Warehouse", "SQLDatabase"],
+    "semantic": ["SemanticModel"],
 }
 
 #: The pages that refresh themselves, because they show settling work.
@@ -102,6 +121,7 @@ MEASURES = {
         "Statistic data",
         "Metadata data",
         "Semantic data",
+        "Estate data",
     },
     "Pages": {"Renderer", *PAGES.values()},
 }
@@ -117,14 +137,18 @@ def parse(root):
     return parse_item_repository(Location(root.as_posix()))
 
 
-def dashboard_repository(tmp_path):
+def dashboard_repository(tmp_path, sources=None, mode=DIRECT_LAKE):
     root = project(tmp_path)
-    write_dashboard_project(root)
+    write_dashboard_project(
+        root, dashboard_sources() if sources is None else sources, mode
+    )
     return parse(root)
 
 
-def dashboard_model(tmp_path):
-    return dashboard_repository(tmp_path).semantic_models[DASHBOARD_MODEL]
+def dashboard_model(tmp_path, sources=None, mode=DIRECT_LAKE):
+    return dashboard_repository(tmp_path, sources, mode).semantic_models[
+        DASHBOARD_MODEL
+    ]
 
 
 def measures(parts):
@@ -145,11 +169,98 @@ def test_the_dashboard_is_an_ordinary_power_bi_project(tmp_path):
 
     assert set(repository.powerbi_projects[DASHBOARD].items) == set(DASHBOARD_ITEMS)
     assert repository.reports[DASHBOARD_REPORT].model == DASHBOARD_MODEL
-    model = repository.semantic_models[DASHBOARD_MODEL]
-    assert dict(model.source_references) == {
-        table: f"Warehouse/_weaver/_.{relation}" for table, relation in SOURCES.items()
-    }
+    # Every catalogue table is generated with its source; none is bound by Build.
+    assert not repository.semantic_models[DASHBOARD_MODEL].source_references
     assert required_tables() == tuple(sorted(SOURCES.values()))
+
+
+@pytest.mark.parametrize("mode", [DIRECT_LAKE, IMPORT])
+@weaver_test()
+def test_both_modes_expose_one_set_of_measures_over_every_catalogue(tmp_path, mode):
+    sources = dashboard_sources(3)
+    parts = dashboard_model(tmp_path, sources, mode).parts
+    model = TmdlDefinition(parts).model
+    tables = {table.name: table for table in model.tables}
+    found = measures(parts)
+
+    assert set(found) == set().union(*MEASURES.values())
+    if mode == DIRECT_LAKE:
+        # One hidden table per catalogue and relation, over OneLake.
+        for source in sources:
+            for name, relation in SOURCES.items():
+                table = tables[f"{name} {source.alias}"]
+                assert table.isHidden
+                (partition,) = table.partitions
+                assert partition.mode == "directLake"
+        expressions = model.expressions
+        assert {e.name for e in expressions} == {
+            f"Catalogue {s.alias}" for s in sources
+        }
+    else:
+        # One table per relation, a partition per catalogue, tagged with it.
+        for name in SOURCES:
+            table = tables[name]
+            assert [p.name for p in table.partitions] == [
+                f"{name} {s.alias}" for s in sources
+            ]
+            assert {"Catalogue", "Catalogue code"} <= {c.name for c in table.columns}
+    assert DIRECTORY in tables
+    # The page measures bind the same names in both modes.
+    for page, measure in PAGES.items():
+        assert f'"{page}"' in found[measure][2]
+
+
+@weaver_test()
+def test_a_measure_reads_every_catalogue_and_reduces_across_them():
+    sources = dashboard_sources(2)
+    direct = model_text(sources, DIRECT_LAKE)
+    imported = model_text(sources, IMPORT)
+    a, b = (source.alias for source in sources)
+
+    workflows = direct[direct.index("measure 'Workflow data'") :]
+    workflows = workflows[: workflows.index("displayFolder")]
+    # One union of both catalogues' rows, then one GROUPBY and one TOPN over it.
+    assert f"'Log {a}'" in workflows and f"'Log {b}'" in workflows
+    assert workflows.count("UNION(") == 2
+    assert workflows.count("TOPN(40") == 1
+    assert '"@catalogue", "Team1"' in workflows and '"@code", "2"' in workflows
+    # Import reads the combined table and its catalogue column.
+    imported_workflows = imported[imported.index("measure 'Workflow data'") :]
+    assert "'Log'[Catalogue]" in imported_workflows
+    assert (
+        "UNION(" not in imported_workflows[: imported_workflows.index("displayFolder")]
+    )
+
+
+@weaver_test()
+def test_the_measures_read_only_columns_every_catalogue_declares():
+    for table, columns in required_columns().items():
+        assert set(columns) <= set(declared_columns(table)), table
+
+
+@weaver_test()
+def test_the_item_list_orders_catalogues_as_given_and_names_them_when_several():
+    one = directory_rows(
+        [
+            dashboard_source(
+                items=("Warehouse/Mart", "Lakehouse/Sales", "Warehouse/_weaver")
+            )
+        ]
+    )
+    assert [(row[0], row[3], row[6]) for row in one] == [
+        ("Sales", "Lakehouse/Sales", 1),
+        ("Mart", "Warehouse/Mart", 2),
+    ]
+    two = directory_rows(dashboard_sources(2))
+    assert [row[0] for row in two] == [
+        "Sales · Team1",
+        "Mart1 · Team1",
+        "Sales · Team2",
+        "Mart2 · Team2",
+    ]
+    # Each catalogue's tables keep their names whatever the order given.
+    first, second = dashboard_sources(2)
+    assert first.alias == dashboard_source("Team1", index=1).alias != second.alias
 
 
 @weaver_test()
@@ -248,7 +359,29 @@ def test_each_page_shows_one_html_content_visual_over_its_page_measure(tmp_path)
             for path, content in parts.items()
             if re.fullmatch(rf"definition/pages/{page}/visuals/\w+/visual\.json", path)
         ]
-        (visual,) = visuals
+        (visual,) = [v for v in visuals if v["visual"]["visualType"] == HTML_CONTENT]
+        slicers = [v for v in visuals if v["visual"]["visualType"] == "slicer"]
+        settings = json.loads(parts[f"definition/pages/{page}/page.json"])
+        if page in DETAIL:
+            # The page's items come from one slicer over 'Dashboard item', and a
+            # page filter offers the kinds it shows.
+            (slicer,) = slicers
+            (projection,) = slicer["visual"]["query"]["queryState"]["Values"][
+                "projections"
+            ]
+            column = projection["field"]["Column"]
+            assert (
+                column["Expression"]["SourceRef"]["Entity"],
+                column["Property"],
+            ) == (
+                DIRECTORY,
+                "Item",
+            )
+            (kind,) = settings["filterConfig"]["filters"]
+            values = kind["filter"]["Where"][0]["Condition"]["In"]["Values"]
+            assert [v[0]["Literal"]["Value"].strip("'") for v in values] == DETAIL[page]
+        else:
+            assert not slicers and "filterConfig" not in settings
         assert visual["visual"]["visualType"] == HTML_CONTENT
         (projection,) = visual["visual"]["query"]["queryState"]["content"][
             "projections"
@@ -262,9 +395,8 @@ def test_each_page_shows_one_html_content_visual_over_its_page_measure(tmp_path)
             f'"page" & UNICHAR(57345) & "name" & UNICHAR(57346) & "{page}"'
             in expression
         )
-        assert expression.index('id=""wd-data""') < expression.index("[Renderer]")
+        assert expression.index('id=""wd-data""') < expression.rindex("[Renderer]")
         assert "SUBSTITUTE(" in expression and '"<", UNICHAR(57344))' in expression
-        settings = json.loads(parts[f"definition/pages/{page}/page.json"])
         assert ("pageRefresh" in settings.get("objects", {})) is (page in LIVE)
 
 
@@ -274,13 +406,26 @@ def test_each_page_shows_one_html_content_visual_over_its_page_measure(tmp_path)
 class CatalogueSource(TestSession):
     """Answers the source catalogue's table list and each table's columns."""
 
-    def __init__(self, *, tables, **options):
+    def __init__(self, *, tables, missing=(), **options):
         super().__init__(**options)
         self.tables = tables
+        self.missing = set(missing)
+        self.read = []
 
     def query_tsql(self, statement, **options):
+        self.read.append(statement)
         if "sys.tables" in statement:
-            return [{"name": table} for table in sorted(self.tables)]
+            return [
+                {"table_name": table, "column_name": column, "type_name": kind}
+                for table in sorted(self.tables)
+                for column, kind in declared_columns(table).items()
+                if (table, column) not in self.missing
+            ]
+        if "from _.Installation" in statement:
+            return [
+                {"item_type": "Warehouse", "item_name": "Mart"},
+                {"item_type": "Warehouse", "item_name": "_weaver"},
+            ]
         named = re.search(r"TABLE_NAME = N?'(\w+)'", statement)
         if named and "INFORMATION_SCHEMA.COLUMNS" in statement:
             return [
@@ -312,7 +457,9 @@ class DashboardDefinition(DefinitionClient):
         )
 
 
-def dashboard_session(*, existing=True, tables=None, ours=True, workspace=None):
+def dashboard_session(
+    *, existing=True, tables=None, ours=True, workspace=None, missing=(), held=()
+):
     from test_report_build_cycle import ReportBoundary
 
     workspace = workspace or Workspace(
@@ -320,11 +467,12 @@ def dashboard_session(*, existing=True, tables=None, ours=True, workspace=None):
         catalogue="Warehouse/Catalogue",
         catalogue_dashboard="Estate Dashboard",
     )
-    held = [("Warehouse", "Catalogue")]
+    held = [("Warehouse", "Catalogue"), *held]
     if existing:
         held += [("SemanticModel", "Estate Dashboard"), ("Report", "Estate Dashboard")]
     session = CatalogueSource(
         tables=set(required_tables() if tables is None else tables),
+        missing=missing,
         workspace=workspace,
         store=FilesystemStore(),
         resolver=FabricResolver(workspace, client=SourceInventory("Demo", held)),
@@ -364,11 +512,13 @@ def test_the_dashboard_deploys_over_the_catalogue_and_only_reads_it():
     result = weaver.deploy_catalogue_dashboard(session=session)
 
     assert result.succeeded, result.errors
-    assert (result.workspace, result.catalogue, result.name) == (
+    assert (result.workspace, result.catalogue, result.name, result.mode) == (
         "Demo",
         "Demo/Warehouse/Catalogue",
         "Estate Dashboard",
+        DIRECT_LAKE,
     )
+    assert result.catalogues == ("Demo/Warehouse/Catalogue",)
     assert [(i.kind, i.status) for i in result.items] == [
         ("SemanticModel", "updated"),
         ("Report", "updated"),
@@ -380,17 +530,29 @@ def test_the_dashboard_deploys_over_the_catalogue_and_only_reads_it():
             "definition"
         ]
     )
-    node = submitted["definition/tables/Lineage%20node.tmdl"].decode()
-    assert "mode: directLake" in node
-    assert "entityName: LineageNode" in node and "schemaName: _" in node
+    catalogue = session.resolve_item("Catalogue", item_type="Warehouse")
+    expressions = submitted["definition/expressions.tmdl"].decode()
+    assert (
+        "https://onelake.dfs.fabric.microsoft.com/"
+        f"{catalogue.workspace_id}/{catalogue.id}" in expressions
+    )
     definition = TmdlDefinition(submitted).model
-    columns = definition.tables["Lineage node"].columns
-    assert columns["Signature"].isHidden and columns["Node ID"].isHidden
-    assert not columns["Label"].isHidden
+    (node,) = [t for t in definition.tables if t.name.startswith("Lineage node ")]
+    (partition,) = node.partitions
+    assert partition.mode == "directLake"
+    assert node.isHidden
+    (items,) = next(t for t in definition.tables if t.name == DIRECTORY).partitions
+    assert (
+        '{"Mart", "Demo", "1", "Warehouse/Mart", "Warehouse", "Demo", 1}'
+        in items.source
+    )
     assert set(measures(submitted)) == set().union(*MEASURES.values())
     assert report.calls == ["update", "read"]
     # The catalogue is read and never written: no table is built, no row changes.
     assert not session.tsql
+    assert all(
+        statement.lstrip().lower().startswith("select") for statement in session.read
+    )
     assert not session.spark_sql and not session.python
 
 
@@ -408,6 +570,11 @@ def test_a_dry_run_resolves_everything_and_changes_nothing():
     assert result.sources == tuple(f"_.{t}" for t in sorted(SOURCES.values()))
     assert not model.calls and not report.calls
     assert not session.tsql
+    mapping = result.to_mapping()
+    assert (mapping["mode"], mapping["catalogues"]) == (
+        DIRECT_LAKE,
+        ["Demo/Warehouse/Catalogue"],
+    )
 
 
 @weaver_test()
@@ -447,7 +614,6 @@ def test_a_first_deploy_builds_the_project_without_a_catalogue(monkeypatch):
         "targets": {
             str(DASHBOARD_MODEL): "Estate Dashboard",
             str(DASHBOARD_REPORT): "Estate Dashboard",
-            "Warehouse/_weaver": "Catalogue",
         },
     }
     assert [(i.kind, i.status) for i in result.items] == [
@@ -478,20 +644,51 @@ def _created_after_build(resolve, seen):
     ("options", "named"),
     [
         (
-            {"catalogue": ["Demo/Warehouse/A", "Demo/Warehouse/B"]},
-            "reads one catalogue",
+            {"catalogue": ["Demo/Warehouse/Catalogue", "demo/Warehouse/catalogue"]},
+            "given more than once",
         ),
-        ({"catalogue": "Prod/Warehouse/Catalogue"}, "Pass --workspace Prod"),
+        (
+            {"catalogue": [f"Team{i}/Warehouse/Weaver" for i in range(11)]},
+            "Pass --ImportMode",
+        ),
         ({"catalogue": "Lakehouse/Catalogue"}, "Workspace/Warehouse/Name"),
     ],
-    ids=["two catalogues", "another workspace", "not a Warehouse"],
+    ids=["the same catalogue twice", "eleven over Direct Lake", "not a Warehouse"],
 )
 @weaver_test()
-def test_the_source_must_be_one_warehouse_in_the_dashboards_workspace(options, named):
+def test_a_catalogue_set_the_dashboard_cannot_read_is_refused_first(options, named):
     session, model, _report = dashboard_session()
 
     with pytest.raises(CommandError, match=named):
         weaver.deploy_catalogue_dashboard(session=session, **options)
+    assert not model.calls and not session.read
+
+
+@weaver_test()
+def test_catalogues_in_other_workspaces_are_read_where_they_are():
+    session, _model, _report = dashboard_session(
+        existing=False, held=[("Warehouse", "Other")]
+    )
+
+    result = weaver.deploy_catalogue_dashboard(
+        catalogue=["Demo/Warehouse/Other", "Warehouse/Catalogue"],
+        dry_run=True,
+        session=session,
+    )
+
+    assert result.workspace == "Demo"
+    assert result.catalogues == ("Demo/Warehouse/Other", "Demo/Warehouse/Catalogue")
+    assert result.catalogue == "Demo/Warehouse/Other"
+
+
+@weaver_test()
+def test_a_catalogue_missing_a_column_the_dashboard_reads_is_named():
+    session, model, _report = dashboard_session(
+        missing={("LineageNode", "Is mirrored")}
+    )
+
+    with pytest.raises(CommandError, match=r"_\.LineageNode: Is mirrored"):
+        weaver.deploy_catalogue_dashboard(session=session)
     assert not model.calls
 
 

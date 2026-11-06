@@ -101,7 +101,10 @@ function erWindow(g, selection, up, down, expanded) {
 
 function unique(list) { return list.filter(function (x, i) { return list.indexOf(x) === i; }); }
 
-function erRows(n, edges) {
+/* A box's rows: its key and foreign key columns, the anchors its relationships
+   attach to. With columns, it also lists further columns up to ER.COLUMNS;
+   otherwise it counts them. */
+function erRows(n, edges, columns) {
   var keyCols = [], fkCols = [], rows = [];
   n.keys.forEach(function (k) { k.columns.forEach(function (c) { if (keyCols.indexOf(c) < 0) keyCols.push(c); }); });
   edges.forEach(function (e) {
@@ -111,14 +114,14 @@ function erRows(n, edges) {
   keyCols.forEach(function (c) { rows.push({ name: c, mark: "key" }); });
   fkCols.forEach(function (c) { if (keyCols.indexOf(c) < 0) rows.push({ name: c, mark: "fk" }); });
   var rest = n.columns.filter(function (c) { return keyCols.indexOf(c) < 0 && fkCols.indexOf(c) < 0; });
-  var room = Math.max(0, ER.COLUMNS - rows.length);
+  var room = columns ? Math.max(0, ER.COLUMNS - rows.length) : 0;
   rest.slice(0, room).forEach(function (c) { rows.push({ name: c, mark: "" }); });
   return { rows: rows, hidden: rest.length - Math.min(room, rest.length) };
 }
 
 /* Boxes for a window, one row per rank, each placed under the tables it relates
    to in the rows above. */
-function erLayout(g, win) {
+function erLayout(g, win, columns) {
   var levels = new Map();
   win.rank.forEach(function (d, id) { addTo(levels, d, id); });
   var order = Array.from(levels.keys()).sort(function (a, b) { return a - b; }), boxes = new Map(), placedX = new Map();
@@ -133,7 +136,7 @@ function erLayout(g, win) {
     // A rank wider than ER.WRAP tables wraps onto further rows.
     for (var start = 0; start < ids.length; start += ER.WRAP) {
       var line = ids.slice(start, start + ER.WRAP);
-      var rows = line.map(function (id) { return erRows(g.nodes.get(id), win.edges); });
+      var rows = line.map(function (id) { return erRows(g.nodes.get(id), win.edges, columns); });
       var heights = rows.map(function (r) { return ER.HEAD + Math.max(1, r.rows.length + (r.hidden ? 1 : 0)) * ER.ROW + 8; });
       var width = line.length * ER.BOX + (line.length - 1) * ER.GAP_X, x = -width / 2;
       line.forEach(function (id, i) {
@@ -242,7 +245,7 @@ function erWorkspace(body, m, s, options) {
     status(w);
     renderChips();
     if (!w) { drawing.appendChild(empty("Search for a table, or select one, to draw its relationships.")); zoom = null; return; }
-    var lay = erLayout(g, w), boxes = lay.boxes, current = focus();
+    var lay = erLayout(g, w, !!s.columns), boxes = lay.boxes, current = focus();
     Object.keys(s.moved).forEach(function (id) { var b = boxes.get(id); if (b) { b.x = s.moved[id].x; b.y = s.moved[id].y; } });
     var svg = sv("svg", { "class": "wd-er-svg", role: "img", "aria-label": "Relationship diagram" }), stage = sv("g"), lines = sv("g");
     svg.appendChild(stage);
@@ -271,12 +274,12 @@ function erWorkspace(body, m, s, options) {
       group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
       group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
       group.appendChild(sv("text", { "class": "wd-er-title", x: 12, y: 17 }, [clipText(n.label, 28)]));
-      group.appendChild(sv("text", { "class": "wd-er-item", x: 12, y: 29 }, [clipText(itemName(n.item), 34)]));
+      group.appendChild(sv("text", { "class": "wd-er-item", x: 12, y: 29 }, [clipText(shownName(n.item), 34)]));
       box.rows.forEach(function (r, i) {
         group.appendChild(sv("text", { "class": "wd-er-col" + (r.mark ? " wd-er-" + r.mark : ""), x: 12, y: ER.HEAD + i * ER.ROW + 13 },
           [(r.mark === "key" ? "⚿ " : r.mark === "fk" ? "↗ " : "   ") + clipText(r.name, 30)]));
       });
-      if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + " more described columns"]));
+      if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + (box.rows.length ? " more" : "") + (box.hidden === 1 ? " described column" : " described columns")]));
       // Parents left out above the box, children below; they move with it.
       var more = w.more.get(id);
       if (more && more.up.length) group.appendChild(marker(box, id, "up", more.up.length));
@@ -337,6 +340,8 @@ function erWorkspace(body, m, s, options) {
   f.mount(body, (options.tools || []).concat([
     segmented("Parents", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
     segmented("Children", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
+    segmented("Boxes", ["keys", "columns"], s.columns ? "columns" : "keys", function (v) { s.columns = v === "columns"; draw(); saveState(); },
+      function (v) { return v === "keys" ? "Keys" : "Columns"; }),
     el("span", { "class": "wd-grow" }),
     el("div", { "class": "wd-zoom" }, [
       el("button", { "class": "wd-icon", type: "button", title: "Zoom out", "aria-label": "Zoom out", onclick: function () { if (zoom) zoom.zoomBy(0.8); } }, ["−"]),

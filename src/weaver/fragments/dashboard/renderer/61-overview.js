@@ -120,7 +120,7 @@ function healthPage(body, m) {
       { key: "severity", title: "Severity", value: function (f) { return SEVERITY_RANK[f.severity] * 2 + (f.unobserved ? 0 : 1); }, render: function (f) { return severityChip(f.severity, f.unobserved); }, numeric: true },
       { key: "area", title: "Area", value: function (f) { return { load: "Load", tests: "Tests", build: "Build" }[f.area]; } },
       { key: "object", title: "Object", value: function (f) { return f.node ? f.node.label : f.label; }, render: function (f) { return f.node ? nodeLink(m, f.node.key, open) : el("span", { "class": "wd-mono", text: f.label }); } },
-      { key: "item", title: "Item", value: function (f) { return f.node ? f.node.item : ""; } },
+      { key: "item", title: "Item", value: function (f) { return f.node ? shownItem(f.node.item) : ""; } },
       { key: "result", title: "Status", value: function (f) { return f.result || ""; }, render: function (f) { return f.result ? chip(f.result) : "—"; } },
       { key: "message", title: "Finding", value: function (f) { return f.message; } },
       { key: "completed", title: "Processed", value: function (f) { return f.completed; }, render: function (f) { return f.completed ? stamp(f.completed) : "—"; }, numeric: true }

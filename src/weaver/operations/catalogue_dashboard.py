@@ -360,23 +360,12 @@ def _require_source(opened, base, label, owner, warehouse, reference, mode):
             f"{reference} lacks columns the Dashboard reads ({listed}). Build a "
             "project with this version of Weaver into that catalogue first."
         )
-    installed = opened.query_tsql(
-        "select [Item type] as item_type, [Item name] as item_name from _.Installation",
-        target=target,
-        workspace=place,
-    )
     server = None
     if mode == IMPORT:
         server = opened.resolver(place).sql_endpoint(target).server
     from dataclasses import replace
 
-    return replace(
-        source,
-        server=server,
-        items=tuple(
-            sorted(f"{row['item_type']}/{row['item_name']}" for row in installed)
-        ),
-    )
+    return replace(source, server=server)
 
 
 def _find(opened, base, name: str, kind: str):

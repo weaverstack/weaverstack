@@ -1,6 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
-  "name": "estate",
+  "name": "workspaces",
   "position": {
     "x": 0,
     "y": 0,
@@ -23,11 +23,11 @@
                       "Entity": "Dashboard measures"
                     }
                   },
-                  "Property": "Estate page"
+                  "Property": "Workspaces page"
                 }
               },
-              "queryRef": "Dashboard measures.Estate page",
-              "nativeQueryRef": "Estate page"
+              "queryRef": "Dashboard measures.Workspaces page",
+              "nativeQueryRef": "Workspaces page"
             }
           ]
         }

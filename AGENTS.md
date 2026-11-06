@@ -177,11 +177,10 @@ measure, payload and Report binding, and a reduction such as the latest
 workflows runs once over every catalogue's rows. The columns the measures read
 are the catalogue's required schema. A Direct Lake model cannot refresh a
 calculated table over its Direct Lake tables without a fixed-identity
-connection, so `Dashboard item`, the list the detail pages' slicers choose
-from, is a `DATATABLE` written at deployment; the page counts installed items
-it lacks. A detail page carries a page filter on the item kinds it shows, so
-its measures see a filter on `Dashboard item` and keep the items picked, or
-the first listed, before they serialise. The renderer qualifies every item,
+connection, so the model holds nothing derived from the catalogues. Every page
+carries all of its data, and the renderer chooses the items a detail page
+shows, the first it offers until others are chosen; a page whose data exceeds
+the measure budget says so instead. The renderer qualifies every item,
 node key and record ID with its catalogue's payload code, and joins physical
 `_.Shortcut` rows across catalogues as `weaver.catalogues.join` does. A
 catalogue holds `_.Mirror` only once it has been a mirror, so the model reads

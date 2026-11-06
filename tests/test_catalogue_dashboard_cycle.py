@@ -21,10 +21,8 @@ from weaver.catalogue_dashboard import (
 )
 from weaver.dashboard_model import (
     DIRECT_LAKE,
-    DIRECTORY,
     IMPORT,
     declared_columns,
-    directory_rows,
     model_text,
     required_columns,
 )
@@ -78,21 +76,14 @@ SOURCES = {
 
 #: The page measure each Report page shows, in page order.
 PAGES = {
+    "workspaces": "Workspaces page",
     "overview": "Overview page",
     "health": "Health page",
-    "estate": "Estate page",
     "orchestration": "Orchestration page",
     "performance": "Performance page",
     "gantt": "Gantt page",
     "entities": "Entity dictionary page",
     "semantic": "Semantic model page",
-}
-
-#: The pages that show the items chosen in 'Dashboard item', by the kinds offered.
-DETAIL = {
-    "orchestration": ["Lakehouse", "Warehouse", "SQLDatabase"],
-    "entities": ["Lakehouse", "Warehouse", "SQLDatabase"],
-    "semantic": ["SemanticModel"],
 }
 
 #: The pages that refresh themselves, because they show settling work.
@@ -204,7 +195,6 @@ def test_both_modes_expose_one_set_of_measures_over_every_catalogue(tmp_path, mo
                 f"{name} {s.alias}" for s in sources
             ]
             assert {"Catalogue", "Catalogue code"} <= {c.name for c in table.columns}
-    assert DIRECTORY in tables
     # The page measures bind the same names in both modes.
     for page, measure in PAGES.items():
         assert f'"{page}"' in found[measure][2]
@@ -239,26 +229,7 @@ def test_the_measures_read_only_columns_every_catalogue_declares():
 
 
 @weaver_test()
-def test_the_item_list_orders_catalogues_as_given_and_names_them_when_several():
-    one = directory_rows(
-        [
-            dashboard_source(
-                items=("Warehouse/Mart", "Lakehouse/Sales", "Warehouse/_weaver")
-            )
-        ]
-    )
-    assert [(row[0], row[3], row[6]) for row in one] == [
-        ("Sales", "Lakehouse/Sales", 1),
-        ("Mart", "Warehouse/Mart", 2),
-    ]
-    two = directory_rows(dashboard_sources(2))
-    assert [row[0] for row in two] == [
-        "Sales · Team1",
-        "Mart1 · Team1",
-        "Sales · Team2",
-        "Mart2 · Team2",
-    ]
-    # Each catalogue's tables keep their names whatever the order given.
+def test_each_catalogues_tables_keep_their_names_whatever_the_order_given():
     first, second = dashboard_sources(2)
     assert first.alias == dashboard_source("Team1", index=1).alias != second.alias
 
@@ -359,29 +330,10 @@ def test_each_page_shows_one_html_content_visual_over_its_page_measure(tmp_path)
             for path, content in parts.items()
             if re.fullmatch(rf"definition/pages/{page}/visuals/\w+/visual\.json", path)
         ]
-        (visual,) = [v for v in visuals if v["visual"]["visualType"] == HTML_CONTENT]
-        slicers = [v for v in visuals if v["visual"]["visualType"] == "slicer"]
+        # The page draws everything, its item choosers included, in one visual.
+        (visual,) = visuals
         settings = json.loads(parts[f"definition/pages/{page}/page.json"])
-        if page in DETAIL:
-            # The page's items come from one slicer over 'Dashboard item', and a
-            # page filter offers the kinds it shows.
-            (slicer,) = slicers
-            (projection,) = slicer["visual"]["query"]["queryState"]["Values"][
-                "projections"
-            ]
-            column = projection["field"]["Column"]
-            assert (
-                column["Expression"]["SourceRef"]["Entity"],
-                column["Property"],
-            ) == (
-                DIRECTORY,
-                "Item",
-            )
-            (kind,) = settings["filterConfig"]["filters"]
-            values = kind["filter"]["Where"][0]["Condition"]["In"]["Values"]
-            assert [v[0]["Literal"]["Value"].strip("'") for v in values] == DETAIL[page]
-        else:
-            assert not slicers and "filterConfig" not in settings
+        assert "filterConfig" not in settings
         assert visual["visual"]["visualType"] == HTML_CONTENT
         (projection,) = visual["visual"]["query"]["queryState"]["content"][
             "projections"
@@ -420,11 +372,6 @@ class CatalogueSource(TestSession):
                 for table in sorted(self.tables)
                 for column, kind in declared_columns(table).items()
                 if (table, column) not in self.missing
-            ]
-        if "from _.Installation" in statement:
-            return [
-                {"item_type": "Warehouse", "item_name": "Mart"},
-                {"item_type": "Warehouse", "item_name": "_weaver"},
             ]
         named = re.search(r"TABLE_NAME = N?'(\w+)'", statement)
         if named and "INFORMATION_SCHEMA.COLUMNS" in statement:
@@ -541,11 +488,6 @@ def test_the_dashboard_deploys_over_the_catalogue_and_only_reads_it():
     (partition,) = node.partitions
     assert partition.mode == "directLake"
     assert node.isHidden
-    (items,) = next(t for t in definition.tables if t.name == DIRECTORY).partitions
-    assert (
-        '{"Mart", "Demo", "1", "Warehouse/Mart", "Warehouse", "Demo", 1}'
-        in items.source
-    )
     assert set(measures(submitted)) == set().union(*MEASURES.values())
     assert report.calls == ["update", "read"]
     # The catalogue is read and never written: no table is built, no row changes.

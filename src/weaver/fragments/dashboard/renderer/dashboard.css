@@ -351,10 +351,9 @@ body { background: #f7f7f6; }
 .wd-mini th:first-child, .wd-mini td:first-child { text-align: left; }
 .wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
 
-/* The mirror toggle and the item scope sit in the toolbar. */
+/* The mirror toggle sits in the toolbar. */
 .wd-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .wd-check input { margin: 0; }
-.wd-scope { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
 
 /* --- estate ------------------------------------------------------------------ */
 
@@ -376,3 +375,23 @@ body { background: #f7f7f6; }
 .wd-estate-title { fill: var(--ink); font: 700 15px var(--sans); }
 .wd-estate-line { fill: var(--muted); font: 12px var(--sans); }
 .wd-dim { opacity: .35; }
+
+/* --- choosing items ---------------------------------------------------------- */
+
+.wd-chooser { position: relative; display: inline-block; }
+.wd-chooser-button { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; padding: 3px 10px 3px 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.wd-chooser-button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.wd-chooser-caret { color: var(--muted); font-size: 10px; }
+.wd-chooser-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(380px, calc(100vw - 32px)); max-height: 460px; display: flex; flex-direction: column;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.wd-chooser-tools { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
+.wd-chooser-tools .wd-search { flex: 1 1 auto; min-width: 0; }
+.wd-chooser-list { overflow: auto; padding: 4px 0; }
+.wd-chooser-group { padding: 8px 12px 2px; }
+.wd-chooser-entry { display: flex; align-items: center; gap: 8px; padding: 2px 12px; }
+.wd-chooser-entry.wd-current { background: var(--blue-soft); }
+.wd-chooser-name { flex: 1 1 auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.wd-chooser-hint { padding: 6px 12px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.wd-ws-group { margin-bottom: 18px; }
+.wd-ws-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; }
+.wd-ws-head h3 { margin: 0; font-size: 15px; }

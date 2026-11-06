@@ -82,7 +82,7 @@ function buildModel(tables, problems) {
   t("catalogues").forEach(function (r) { CATALOGUES.set(r.code, { code: r.code, label: r.label, reference: r.reference }); });
   var m = {
     page: page.name || "overview", at: num(meta.at) || Date.now(), tables: tables,
-    catalogues: Array.from(CATALOGUES.values()), mode: meta.mode || null, unlisted: num(meta.unlisted) || 0, imported: num(meta.imported),
+    catalogues: Array.from(CATALOGUES.values()), mode: meta.mode || null, imported: num(meta.imported),
     tooLarge: (t("toolarge")[0] || null),
     problems: (problems || []).slice(), items: new Map(), nodes: new Map(), byIdentity: new Map(),
     internalItems: new Set(), edgeCount: 0, hiddenEdges: 0, externalCount: 0
@@ -102,9 +102,6 @@ function buildModel(tables, problems) {
   var first = m.catalogues.length ? m.catalogues[0].code : "";
   var catalogue = m.items.get(owned(CATALOGUE_ITEM, first)) || m.items.get(CATALOGUE_ITEM);
   m.catalogue = { name: catalogue ? catalogue.target : null, workspace: catalogue ? catalogue.workspace : null, version: catalogue ? catalogue.version : null };
-  // The items a scoped page shows; empty on a page that shows the estate.
-  m.scope = t("scope").map(function (r) { return r.item; });
-  m.scopePicked = t("scope").some(function (r) { return r.picked === "1"; });
 
   t("nodes").forEach(function (r) {
     if (m.nodes.has(r.key)) { m.problems.push("Two lineage nodes share the key " + r.key + "; one of them is not shown."); return; }

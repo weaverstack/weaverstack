@@ -1,14 +1,14 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/pagesMetadata/1.1.0/schema.json",
   "pageOrder": [
+    "workspaces",
     "overview",
     "health",
-    "estate",
     "orchestration",
     "performance",
     "gantt",
     "entities",
     "semantic"
   ],
-  "activePageName": "overview"
+  "activePageName": "workspaces"
 }

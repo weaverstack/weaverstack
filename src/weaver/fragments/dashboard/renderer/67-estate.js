@@ -1,4 +1,4 @@
-// Estate: which workspaces and items the catalogues read supply and receive,
+// Workspaces: which workspaces and items the catalogues read supply and receive,
 // as direct object dependencies, and where they read one another in a loop.
 // It shows the estate the catalogues describe, not the whole tenant.
 
@@ -130,6 +130,9 @@ function loadNote(x) {
   return parts.length ? parts.join(" · ") : "last loads and validations succeeded";
 }
 
+/* An item kind as a reader names it. */
+function kindName(type) { return { SQLDatabase: "SQL database", SemanticModel: "Semantic model" }[type] || type; }
+
 var KIND_NAMES = { Lakehouse: "Lakehouses", Warehouse: "Warehouses", SQLDatabase: "SQL databases", SemanticModel: "semantic models", Report: "Reports" };
 
 function composition(kinds) {
@@ -138,16 +141,19 @@ function composition(kinds) {
   }).join(" · ") || "no items";
 }
 
-function estatePage(body, m) {
-  var topo = estateTopology(m), s = pageState("estate");
-  s.level = s.level || "workspace";
+function workspacesPage(body, m) {
+  var topo = estateTopology(m), s = pageState("workspaces");
+  // One workspace has no network of workspaces; its items still feed one another.
+  s.level = s.level || (topo.workspaces.size > 1 ? "workspace" : "item");
   if (s.selected && !(s.level === "workspace" ? topo.workspaces.has(s.selected) : topo.items.has(s.selected))) s.selected = null;
   var workspaceList = Array.from(topo.workspaces.values()), itemList = Array.from(topo.items.values());
   var crossing = topo.workspaceEdges.reduce(function (a, e) { return a + e.count; }, 0);
+  var between = topo.itemEdges.reduce(function (n, e) { return n + e.count; }, 0);
   body.appendChild(el("div", { "class": "wd-tiles" }, [
-    tile("Workspaces", workspaceList.length, "with an item a catalogue read installs", "none"),
+    workspaceList.length > 1 ? tile("Workspaces", workspaceList.length, "with an item a catalogue read installs", "none") : null,
     tile("Items", itemList.length, composition(itemList.reduce(function (k, p) { k[p.type] = (k[p.type] || 0) + 1; return k; }, {})), "none"),
-    tile("Dependencies between workspaces", crossing, "direct object dependencies", "none")
+    workspaceList.length > 1 ? tile("Dependencies between workspaces", crossing, "direct object dependencies", "none")
+      : tile("Dependencies between items", between, "direct object dependencies", "none")
   ]));
   body.appendChild(el("p", { "class": "wd-note", text: "The estate is what the catalogues read describe. A dependency is one object reading another directly; dependencies inside one item are left out. Load state is each item's last loads and validations, not a Health assessment." }));
   var bar = el("div", { "class": "wd-toolbar" }, [segmented("Show", ["workspace", "item"], s.level, function (v) { s.level = v; s.selected = null; saveState(); redraw(); },
@@ -163,7 +169,7 @@ function estatePage(body, m) {
   } else {
     var incoming = new Map(), outgoing = new Map();
     topo.itemEdges.forEach(function (e) { incoming.set(e.down, (incoming.get(e.down) || 0) + e.count); outgoing.set(e.up, (outgoing.get(e.up) || 0) + e.count); });
-    nodes = itemList.map(function (p) { return { key: p.key, title: p.name, eyebrow: p.type + " · " + p.workspace, lines: [
+    nodes = itemList.map(function (p) { return { key: p.key, title: p.name, eyebrow: kindName(p.type) + " · " + p.workspace, lines: [
       fmt(p.objects) + (p.objects === 1 ? " object" : " objects"),
       fmt(incoming.get(p.key) || 0) + " in · " + fmt(outgoing.get(p.key) || 0) + " out"], tone: loadTone(p), note: loadNote(p) }; });
     edges = topo.itemEdges; loops = topo.itemLoops;

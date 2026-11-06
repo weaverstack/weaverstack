@@ -150,25 +150,16 @@ var SEMANTIC_TYPES = ["SemanticModel", "Report"];
    model page is its counterpart for models. */
 function entitiesPage(body, m) {
   var s = pageState("entities"), md = metadata(m);
-  s.item = s.item || "all"; s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
-  var scope = new Set(m.scope || []);
-  var items = visibleItems(m).filter(function (it) { return SEMANTIC_TYPES.indexOf(it.type) < 0 && (it.nodes.length || it.target) && (!scope.size || scope.has(it.label)); })
-    .sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
-  if (scope.size) s.item = scope.size === 1 ? Array.from(scope)[0] : "all";
-  if (s.item !== "all" && !items.some(function (it) { return it.label === s.item; })) s.item = "all";
+  s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
+  var eligible = eligibleItems(m, DETAIL_KINDS), chosen = new Set(chosenItems(s, eligible));
   var entries = dictionaryEntries(m).filter(function (e) {
-    return ENTITY_KINDS.indexOf(e.kind) > 0 && SEMANTIC_TYPES.indexOf(itemType(e.item)) < 0 && (!scope.size || scope.has(e.item)) && (s.item === "all" || e.item === s.item);
+    return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
   });
   var counts = {};
   entries.forEach(function (e) { counts[e.kind] = (counts[e.kind] || 0) + 1; });
   // Columns are listed when asked for; the default list is of items and objects.
   var browsed = entries.filter(function (e) { return e.kind !== "Column"; });
-  var picker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-    s.item = this.value; s.selected = null; s.er = { up: s.er.up, down: s.er.down, maximised: s.er.maximised }; saveState(); redraw();
-  } }, [el("option", { value: "all", text: "Every Lakehouse and Warehouse" })].concat(items.map(function (it) {
-    return el("option", { value: it.label, selected: it.label === s.item ? "selected" : null, text: it.type + " · " + shownName(it.label) });
-  })));
-  if (scope.size) picker = scopeLabel(m);
+  var picker = itemChooser(m, s, eligible);
   var search = searchBox({
     placeholder: "Search " + fmt(entries.length) + " tables, views, folders and columns · * matches any text · Shift adds",
     find: function (q) {
@@ -178,7 +169,7 @@ function entitiesPage(body, m) {
     onPattern: function (q) { er.addPattern(q); }
   });
 
-  var er = erWorkspace(body, m, s.er, { item: s.item, tools: [search, picker], describe: renderSide,
+  var er = erWorkspace(body, m, s.er, { item: chosen, tools: [search, picker], describe: renderSide,
     // A wildcard term selects the objects it names; a column's table joins only by name.
     matches: function (q) { return searchEntries(entries, q, "All").filter(function (e) { return e.ref && e.ref.key; }).map(function (e) { return e.ref.id; }); },
     onPick: function (id) {
@@ -228,7 +219,7 @@ function entitiesPage(body, m) {
     s.selected = entryId(e);
     var id = tableOf(e);
     if (id && er.has(id)) er.select(id, adding);
-    else if (id) er.say(e.label + " is not a declared table" + (s.item !== "all" ? " in " + shownName(s.item) : ""));
+    else if (id) er.say(e.label + " is not a declared table in the items shown");
     renderSide(); renderList(); renderDetail();
     saveState();
   }

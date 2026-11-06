@@ -906,12 +906,16 @@ test("view state is kept apart for each set of catalogues", () => {
   assert.notEqual(D.storeKey(m), D.storeKey({ catalogues: [{ reference: "HUB/Warehouse/Weaver" }] }));
 });
 
-test("a scoped page shows the items chosen, with their catalogue, and says whether they were picked", () => {
-  const p = D.parsePayload(federated({ extra: table("scope", ["item", "picked"], [[O("Warehouse/Mart", 2), ""]]) }));
-  const m = D.buildModel(p.tables, p.problems);
-  assert.deepEqual(m.scope, [O("Warehouse/Mart", 2)]);
-  assert.equal(m.scopePicked, false);
-  assert.deepEqual(D.scopedKeys(m).sort(), [O("m", 2), O("s", 2)]);
+test("a detail page shows the first item it offers until others are chosen, kept by catalogue reference", () => {
+  const m = federatedModel();
+  const eligible = D.eligibleItems(m, ["Lakehouse", "Warehouse", "SQLDatabase"]);
+  // Catalogues in the order given, then kind, then name.
+  assert.deepEqual(eligible.map((it) => it.label), [O("Warehouse/Hub", 1), O("Warehouse/Mart", 1), O("Lakehouse/Bridge", 2), O("Warehouse/Mart", 2)]);
+  assert.deepEqual(D.chosenItems({}, eligible), [O("Warehouse/Hub", 1)]);
+  const kept = { items: [D.stableItem(O("Warehouse/Mart", 2)), "GONE/Warehouse/Weaver|Warehouse/Old"] };
+  assert.equal(kept.items[0], "SPOKE/Warehouse/Weaver|Warehouse/Mart");
+  assert.deepEqual(D.chosenItems(kept, eligible), [O("Warehouse/Mart", 2)]);
+  assert.deepEqual(D.keysOf(m, [O("Warehouse/Mart", 2)]).sort(), [O("m", 2), O("s", 2)]);
 });
 
 test("a page whose data is too large says so instead of drawing part of it", () => {

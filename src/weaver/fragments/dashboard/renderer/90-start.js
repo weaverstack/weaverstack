@@ -3,8 +3,8 @@
 // refresh keeps the focus, the depths and the viewport.
 
 var PAGES = {
-  overview: overviewPage, health: healthPage, orchestration: orchestrationPage, gantt: ganttPage,
-  performance: performancePage, entities: entitiesPage, semantic: semanticPage, estate: estatePage
+  workspaces: workspacesPage, overview: overviewPage, health: healthPage, orchestration: orchestrationPage, gantt: ganttPage,
+  performance: performancePage, entities: entitiesPage, semantic: semanticPage
 };
 var STORE = "weaver-dashboard-state";
 /* View state is kept per set of catalogues, so one Dashboard's focus never
@@ -63,7 +63,7 @@ var api = {
   searchEntries: searchEntries, metadata: metadata, modelTables: modelTables, busMatrix: busMatrix, erGraph: erGraph,
   erWindow: erWindow, erLayout: erLayout, ER: ER, ganttSummary: ganttSummary, clockTicks: clockTicks, clockLabel: clockLabel, canvasRatio: canvasRatio, duration: duration, stamp: stamp, wallOf: wallOf, instantOf: instantOf, zoneLabel: zoneLabel, logRows: logRows, perfRows: perfRows, performanceCard: performanceCard, largestRows: largestRows, runStatRows: runStatRows, sortRows: sortRows, taskRank: taskRank, runsOf: runsOf, runObjectRows: runObjectRows, runView: runView, dayStartHour: dayStartHour, testRows: testRows, recordKind: recordKind, tone: tone, BUDGET: BUDGET,
   estateTopology: estateTopology, loopsOf: loopsOf, topologyColumns: topologyColumns, withoutMirrors: withoutMirrors,
-  joinCatalogues: joinCatalogues, components: components, scopedKeys: scopedKeys, shownItem: shownItem, storeKey: storeKey,
+  joinCatalogues: joinCatalogues, components: components, keysOf: keysOf, eligibleItems: eligibleItems, chosenItems: chosenItems, stableItem: stableItem, shownItem: shownItem, storeKey: storeKey,
   FIELD: FIELD, ROW: ROW, TABLE: TABLE, LESS: LESS, OWNER: OWNER
 };
 if (typeof module === "object" && module && module.exports) module.exports = api;

@@ -69,9 +69,11 @@ function pageState(name) { var s = state(); s[name] = s[name] || {}; return s[na
 function weaveMark() { return el("span", { "class": "wd-mark", "aria-hidden": "true" }, [el("i"), el("i"), el("i"), el("i")]); }
 
 var PAGE_TITLES = {
-  overview: "Overview", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
-  performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model", estate: "Estate"
+  workspaces: "Workspaces", overview: "Summary", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
+  performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model"
 };
+/* The catalogues the header names before it counts the rest. */
+var HEADER_CATALOGUES = 3;
 
 /* The header every page shares: the catalogue's own name, where it lives, and
    the two times a reader needs apart, when this was queried and when work
@@ -79,16 +81,18 @@ var PAGE_TITLES = {
 function shell(mount, m) {
   var s = state();
   var several = m.catalogues && m.catalogues.length > 1;
-  var title = several ? fmt(m.catalogues.length) + " catalogues" : m.catalogue.name || "Weaver catalogue";
-  var context = several ? m.catalogues.map(function (c) { return c.label; }).join(" · ") :
-    [m.catalogue.workspace ? "Workspace " + m.catalogue.workspace : null,
+  // One catalogue is known by its workspace; several by how many they are.
+  var title = several ? fmt(m.catalogues.length) + " catalogues" : m.catalogue.workspace || m.catalogue.name || "Weaver catalogue";
+  var labels = several ? m.catalogues.map(function (c) { return c.label; }) : [];
+  var context = several ? labels.slice(0, HEADER_CATALOGUES).join(" · ") + (labels.length > HEADER_CATALOGUES ? " +" + fmt(labels.length - HEADER_CATALOGUES) + " more" : "") :
+    [m.catalogue.name ? "Catalogue " + m.catalogue.name : null,
       m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
   var processed = latestProcessed(m);
   var head = el("header", { "class": "wd-top" }, [
     el("div", { "class": "wd-brand" }, [weaveMark(), el("div", {}, [
-      el("div", { "class": "wd-eyebrow", text: "Catalogue · " + (PAGE_TITLES[m.page] || m.page) }),
+      el("div", { "class": "wd-eyebrow", text: (several ? "Catalogues · " : "Catalogue · ") + (PAGE_TITLES[m.page] || m.page) }),
       el("h1", { text: title }),
-      context ? el("div", { "class": "wd-context", text: context }) : null
+      context ? el("div", { "class": "wd-context", text: context, title: several ? labels.join("\n") : null }) : null
     ])]),
     el("span", { "class": "wd-grow" }),
     zoneControl(m),
@@ -114,12 +118,6 @@ function shell(mount, m) {
       " have no recorded lineage. Build " + (gaps.length === 1 ? "that item" : "those items") + " again to record it."
     ]));
   }
-  if (m.unlisted && m.scope && m.scope.length !== undefined && m.tables.scope) {
-    mount.appendChild(el("div", { "class": "wd-banner wd-banner-warn wd-banner-top" }, [
-      el("b", { text: fmt(m.unlisted) + (m.unlisted === 1 ? " installed item is" : " installed items are") + " not in the item list. " }),
-      "The list is written when the Dashboard deploys; deploy it again to choose them."
-    ]));
-  }
   var body = el("main", { "class": "wd-body" });
   mount.appendChild(body);
   return body;
@@ -130,8 +128,91 @@ function tooLargePage(body, m) {
   var t = m.tooLarge;
   body.appendChild(section("Too much to show at once", [el("p", { text:
     "This page's data is " + fmt(num(t.size)) + " characters, more than the " + fmt(num(t.budget)) +
-    " one Power BI measure can return. " + (m.page === "orchestration" || m.page === "entities" || m.page === "semantic" ?
-      "Choose fewer items in the Items list." : "Read fewer catalogues on this Dashboard, or open the detail pages, which show the items chosen.") })]));
+    " one Power BI measure can return. Deploy a Dashboard over fewer catalogues, or with --ImportMode over the catalogues this page needs." })]));
+}
+
+/* ---- choosing items --------------------------------------------------------- */
+
+function catalogueRank(code) { var n = Number(code); return isNaN(n) ? 0 : n; }
+
+/* The items of the given kinds, in the order a page offers them: catalogues in
+   the order given, then kind, then name. */
+function eligibleItems(m, kinds) {
+  return visibleItems(m).filter(function (it) { return kinds.indexOf(it.type) >= 0 && (it.nodes.length || it.target); })
+    .sort(function (a, b) {
+      return catalogueRank(a.code) - catalogueRank(b.code) || typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name) || compare(a.label, b.label);
+    });
+}
+
+/* An item as view state keeps it: by its catalogue's reference, which stays
+   with the catalogue whatever the order given. */
+function stableItem(label) { var c = CATALOGUES.get(ownerCode(label)); return (c ? c.reference : "") + "|" + bare(label); }
+
+/* The items a page shows: those chosen, or else the first it offers. */
+function chosenItems(s, eligible) {
+  var byStable = new Map(eligible.map(function (it) { return [stableItem(it.label), it.label]; }));
+  var chosen = (s.items || []).map(function (k) { return byStable.get(k); }).filter(Boolean);
+  return chosen.length ? chosen : eligible.length ? [eligible[0].label] : [];
+}
+
+function chooseItems(s, labels) { s.items = labels.map(stableItem); saveState(); redraw(); }
+
+/* A compact chooser. A plain click on an entry chooses it alone; its box, or
+   Ctrl or ⌘ with the click, adds or removes it. Entries are grouped and
+   searchable. With options.all, choosing nothing means every entry. */
+function chooser(options) {
+  var chosen = new Set(options.chosen), wrap = el("div", { "class": "wd-chooser" }), panel = el("div", { "class": "wd-chooser-panel", hidden: "hidden" });
+  var names = options.entries.filter(function (e) { return chosen.has(e.key); }).map(function (e) { return e.label; });
+  var summary = !names.length ? options.allLabel : names.length === 1 ? names[0] : fmt(names.length) + " " + options.plural;
+  var button = el("button", { type: "button", "class": "wd-chooser-button", "aria-haspopup": "listbox", "aria-expanded": "false", title: names.join("\n") || options.allLabel }, [
+    el("span", { "class": "wd-seg-label", text: options.title }), el("b", { text: summary }), el("span", { "class": "wd-chooser-caret", text: "▾" })]);
+  var search = el("input", { "class": "wd-search", type: "search", placeholder: "Filter " + fmt(options.entries.length) + " " + options.plural, "aria-label": "Filter " + options.plural, autocomplete: "off", spellcheck: "false" });
+  var list = el("div", { "class": "wd-chooser-list", role: "listbox", "aria-multiselectable": "true" });
+  function commit(keys) { options.onChange(keys); }
+  function render() {
+    var q = search.value.trim().toLowerCase(), group = null;
+    list.textContent = "";
+    options.entries.forEach(function (e) {
+      if (q && (e.label + " " + (e.group || "") + " " + (e.meta || "")).toLowerCase().indexOf(q) < 0) return;
+      if (e.group && e.group !== group) { group = e.group; list.appendChild(el("div", { "class": "wd-eyebrow wd-chooser-group", text: group })); }
+      var box = el("input", { type: "checkbox", checked: chosen.has(e.key) ? "checked" : null, "aria-label": (chosen.has(e.key) ? "Remove " : "Add ") + e.label,
+        onchange: function () { if (this.checked) chosen.add(e.key); else chosen.delete(e.key); commit(Array.from(chosen)); } });
+      list.appendChild(el("div", { "class": "wd-chooser-entry" + (chosen.has(e.key) ? " wd-current" : ""), role: "option", "aria-selected": String(chosen.has(e.key)) }, [
+        box,
+        el("button", { type: "button", "class": "wd-chooser-name", onclick: function (ev) {
+          if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { if (chosen.has(e.key)) chosen.delete(e.key); else chosen.add(e.key); commit(Array.from(chosen)); }
+          else commit([e.key]);
+        } }, [e.kind ? kindMark(e.kind) : null, e.label, e.meta ? el("span", { "class": "wd-muted", text: " " + e.meta }) : null])
+      ]));
+    });
+    if (!list.firstChild) list.appendChild(empty("Nothing matches."));
+  }
+  function open(on) {
+    panel.hidden = !on; button.setAttribute("aria-expanded", String(on));
+    if (on) { render(); search.focus(); }
+  }
+  button.addEventListener("click", function () { open(panel.hidden); });
+  search.addEventListener("input", render);
+  document.addEventListener("click", function (ev) { if (!panel.hidden && !wrap.contains(ev.target)) open(false); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !panel.hidden) open(false); });
+  panel.appendChild(el("div", { "class": "wd-chooser-tools" }, [search,
+    el("button", { type: "button", "class": "wd-text-btn", onclick: function () { commit([]); } }, [options.all ? "All" : "First"])]));
+  panel.appendChild(list);
+  panel.appendChild(el("div", { "class": "wd-chooser-hint", text: "Click to show one · tick, Ctrl or ⌘ to add" }));
+  wrap.appendChild(button); wrap.appendChild(panel);
+  return wrap;
+}
+
+/* The chooser over a page's items, defaulting to the first it offers. */
+function itemChooser(m, s, eligible) {
+  var several = CATALOGUES.size > 1;
+  return chooser({
+    title: "Items", plural: "items", allLabel: "No items", chosen: chosenItems(s, eligible),
+    entries: eligible.map(function (it) {
+      return { key: it.label, label: it.name, kind: null, group: several ? (it.workspace || it.catalogue) + " · " + kindName(it.type) : kindName(it.type), meta: it.target && it.target !== it.name ? it.target : "" };
+    }),
+    onChange: function (labels) { chooseItems(s, labels); }
+  });
 }
 
 /* The latest processed load, test or workflow, or undefined when the page

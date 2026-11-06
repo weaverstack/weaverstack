@@ -3,8 +3,7 @@
 The fragment's measures read catalogue tables through table macros, so one set
 of measures serves both storage modes. Direct Lake reads one table per
 catalogue and relation over OneLake; Import reads one table per relation with
-a partition per catalogue. ``Dashboard item`` is the item list the detail pages
-select from, written when the Dashboard deploys.
+a partition per catalogue.
 """
 
 from __future__ import annotations
@@ -55,21 +54,6 @@ RELATIONS = {
 #: catalogue that has never been a mirror has no ``_.Mirror``.
 OPTIONAL = frozenset({"Mirror"})
 
-DIRECTORY = "Dashboard item"
-#: Its columns, in order. ``Item`` is what a slicer shows.
-DIRECTORY_COLUMNS = (
-    ("Item", "STRING", "string"),
-    ("Catalogue", "STRING", "string"),
-    ("Catalogue code", "STRING", "string"),
-    ("Item key", "STRING", "string"),
-    ("Kind", "STRING", "string"),
-    ("Workspace", "STRING", "string"),
-    ("Order", "INTEGER", "int64"),
-)
-#: Item kinds in the order a catalogue lists them.
-ITEM_KINDS = ("Lakehouse", "Warehouse", "SQLDatabase", "SemanticModel", "Report")
-CATALOGUE_ITEM = "Warehouse/_weaver"
-
 
 @dataclass(frozen=True)
 class DashboardSource:
@@ -88,8 +72,6 @@ class DashboardSource:
     server: str | None = None
     #: Each catalogue table's columns and their SQL types.
     columns: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
-    #: The installed items, as ``Kind/Name``.
-    items: tuple[str, ...] = ()
 
     @property
     def alias(self) -> str:
@@ -353,16 +335,6 @@ def _load_summary(arguments: list[str]) -> str:
     )
 
 
-#: The items a scoped page shows: those picked in 'Dashboard item', or the
-#: first it lists under the page's filters.
-SCOPE = """VAR _scoped = ISFILTERED('Dashboard item')
-VAR _picked = ISFILTERED('Dashboard item'[Item])
-VAR _eligible = SUMMARIZE('Dashboard item', 'Dashboard item'[Catalogue], 'Dashboard item'[Catalogue code], 'Dashboard item'[Item key], 'Dashboard item'[Order])
-VAR _first = MINX(_eligible, 'Dashboard item'[Order])
-VAR _chosen = SELECTCOLUMNS(FILTER(_eligible, _picked || 'Dashboard item'[Order] = _first), "@sc", 'Dashboard item'[Catalogue], "@scode", 'Dashboard item'[Catalogue code], "@si", 'Dashboard item'[Item key])
-VAR _chosenkeys = SELECTCOLUMNS(_chosen, "@sc", [@sc], "@si", [@si])"""
-
-
 def page_expression(name: str, data: str) -> str:
     """A page measure: its data, or a small page saying it is too large."""
 
@@ -407,11 +379,6 @@ def expand_measures(text: str, sources: Sequence[DashboardSource], mode: str) ->
             out.append(f"{indent}measure '{page.group(2)}' = ```")
             out.extend(indent * 2 + each for each in body.split("\n"))
             out.append(indent * 2 + "```")
-            i += 1
-            continue
-        if line.strip() == "__SCOPE__":
-            indent = line[: len(line) - len(line.lstrip())]
-            out.extend(indent + each for each in SCOPE.split("\n"))
             i += 1
             continue
         out.append(line)
@@ -618,83 +585,6 @@ def catalogue_tables(
     return expressions, tables
 
 
-def directory_rows(sources: Sequence[DashboardSource]) -> list[tuple]:
-    """Each catalogue's installed items, in the order a detail page offers them."""
-
-    rows, order = [], 0
-    labelled = len(sources) > 1
-    for code, source in enumerate(sources, start=1):
-        items = sorted(
-            (i for i in source.items if i != CATALOGUE_ITEM),
-            key=lambda i: (
-                ITEM_KINDS.index(i.split("/")[0])
-                if i.split("/")[0] in ITEM_KINDS
-                else len(ITEM_KINDS),
-                i.split("/", 1)[1].casefold(),
-                i,
-            ),
-        )
-        for item in items:
-            order += 1
-            kind, name = item.split("/", 1)
-            shown = f"{name} · {source.label}" if labelled else name
-            rows.append(
-                (shown, source.label, str(code), item, kind, source.workspace, order)
-            )
-    return rows
-
-
-def directory_table(sources: Sequence[DashboardSource]) -> dict:
-    rows = directory_rows(sources)
-    header = ", ".join(f'"{name}", {kind}' for name, kind, _ in DIRECTORY_COLUMNS)
-
-    def value(v):
-        return str(v) if isinstance(v, int) else _dax_string(v)
-
-    if rows:
-        body = ", ".join("{" + ", ".join(value(v) for v in row) + "}" for row in rows)
-        expression = f"DATATABLE({header}, {{{body}}})"
-    else:
-        placeholder = (
-            "{"
-            + ", ".join(
-                "0" if t == "INTEGER" else '""' for _, t, _ in DIRECTORY_COLUMNS
-            )
-            + "}"
-        )
-        expression = f"FILTER(DATATABLE({header}, {{{placeholder}}}), FALSE())"
-    return {
-        "name": DIRECTORY,
-        "description": (
-            "The items the detail pages select from, as installed when the "
-            "Dashboard was deployed. Deploy it again to list items installed since."
-        ),
-        "columns": [
-            {
-                "name": name,
-                "dataType": native,
-                "type": "calculatedTableColumn",
-                "isNameInferred": True,
-                "sourceColumn": f"[{name}]",
-                **({"sortByColumn": "Order"} if name == "Item" else {}),
-                **(
-                    {"isHidden": True}
-                    if name not in {"Item", "Catalogue", "Kind"}
-                    else {}
-                ),
-            }
-            for name, _, native in DIRECTORY_COLUMNS
-        ],
-        "partitions": [
-            {
-                "name": DIRECTORY,
-                "mode": "import",
-                "source": {"type": "calculated", "expression": expression},
-            }
-        ],
-    }
-
-
 def model_text(sources: Sequence[DashboardSource], mode: str) -> str:
     """The Dashboard model's TMDL over ``sources``."""
 
@@ -712,7 +602,7 @@ def model_text(sources: Sequence[DashboardSource], mode: str) -> str:
     rendered = [head.rstrip("\n")]
     for expression in expressions:
         rendered.append(render_object("expression", expression, unit=unit).rstrip("\n"))
-    for table in [*tables, directory_table(sources)]:
+    for table in tables:
         rendered.append(render_object("table", table, unit=unit).rstrip("\n"))
     rendered.append(expand_measures(measures, sources, mode).rstrip("\n"))
     return "\n\n".join(rendered) + "\n"
@@ -721,7 +611,6 @@ def model_text(sources: Sequence[DashboardSource], mode: str) -> str:
 __all__ = [
     "DIRECT_LAKE",
     "DIRECT_LAKE_CATALOGUES",
-    "DIRECTORY",
     "DashboardSource",
     "IMPORT",
     "MODES",
@@ -729,7 +618,6 @@ __all__ = [
     "PAGE_BUDGET",
     "RELATIONS",
     "declared_columns",
-    "directory_rows",
     "model_text",
     "required_columns",
 ]

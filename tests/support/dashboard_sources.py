@@ -10,12 +10,6 @@ def dashboard_source(
     warehouse: str = "Catalogue",
     *,
     label: str | None = None,
-    items=(
-        "Lakehouse/Sales",
-        "Warehouse/Mart",
-        "SemanticModel/Model",
-        "Warehouse/_weaver",
-    ),
     index: int = 1,
 ) -> DashboardSource:
     """A catalogue of this Weaver version, holding every table it declares."""
@@ -29,14 +23,8 @@ def dashboard_source(
         item_id=f"{index:08d}-1111-4000-8000-000000000000",
         server=f"{workspace.lower()}.datawarehouse.fabric.microsoft.com",
         columns={table: declared_columns(table) for table in RELATIONS.values()},
-        items=tuple(items),
     )
 
 
 def dashboard_sources(count: int = 2) -> tuple[DashboardSource, ...]:
-    return tuple(
-        dashboard_source(
-            f"Team{i}", index=i, items=(f"Warehouse/Mart{i}", "Lakehouse/Sales")
-        )
-        for i in range(1, count + 1)
-    )
+    return tuple(dashboard_source(f"Team{i}", index=i) for i in range(1, count + 1))

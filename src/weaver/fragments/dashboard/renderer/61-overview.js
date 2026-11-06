@@ -1,29 +1,62 @@
-// Overview and Health.
+// Summary and Health.
 
 var KIND_ORDER = [KIND.FOLDER, KIND.SHORTCUT, KIND.TABLE, KIND.VIEW, KIND.MODEL, KIND.REPORT, KIND.TEST, KIND.ASSUMPTION];
 
+/* Each item's workspace, as the Summary groups it. */
+function workspaceOf(it) { return it.workspace || it.catalogue || ""; }
+
+/* Workspaces in the order the catalogues were given. */
+function workspaceList(m) {
+  var seen = [];
+  eligibleItems(m, ITEM_TYPES).forEach(function (it) { var w = workspaceOf(it); if (seen.indexOf(w) < 0) seen.push(w); });
+  return seen;
+}
+
 function overviewPage(body, m) {
-  var health = assessHealth(m), s = pageState("overview");
+  var all = assessHealth(m), s = pageState("overview");
+  var workspaces = workspaceList(m), several = workspaces.length > 1;
+  var shown = new Set((s.workspaces || []).filter(function (w) { return workspaces.indexOf(w) >= 0; }));
+  if (!shown.size) shown = new Set(workspaces);
+  function inScope(n) { var it = n && m.items.get(n.item); return !it || shown.has(workspaceOf(it)); }
+  var health = {
+    load: all.load.filter(function (f) { return inScope(f.node); }), tests: all.tests.filter(function (f) { return inScope(f.node); }),
+    build: all.build.filter(function (f) { return f.node ? inScope(f.node) : !m.items.has(f.item) || shown.has(workspaceOf(m.items.get(f.item))); }),
+    counts: { load: { subjects: 0 }, tests: { subjects: 0 } }
+  };
+  health.all = health.load.concat(health.tests, health.build).sort(byFinding);
+  m.nodes.forEach(function (n) {
+    if (!inScope(n)) return;
+    if (isLoadSubject(n)) health.counts.load.subjects += 1;
+    if (isValidation(n)) health.counts.tests.subjects += 1;
+  });
   var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
   function open(key) {
     s.open = key;
     side.hidden = !key;
-    details(side, m, key, { onOpen: open, health: health });
+    details(side, m, key, { onOpen: open, health: all });
     if (key) side.insertBefore(el("button", { "class": "wd-icon wd-close", type: "button", "aria-label": "Close", onclick: function () { open(null); } }, ["×"]), side.firstChild);
   }
+  var items = visibleItems(m).filter(function (it) { return (it.nodes.length || it.target) && shown.has(workspaceOf(it)); });
+  if (several) body.appendChild(el("div", { "class": "wd-toolbar" }, [chooser({
+    title: "Workspaces", plural: "workspaces", allLabel: "All workspaces", all: true,
+    chosen: s.workspaces && s.workspaces.length ? Array.from(shown) : [],
+    entries: workspaces.map(function (w) { return { key: w, label: w }; }),
+    onChange: function (keys) { s.workspaces = keys; saveState(); redraw(); }
+  })]));
   var loadRed = health.load.filter(function (f) { return f.severity === RED; }).length;
   var loadAmber = health.load.filter(function (f) { return f.severity === AMBER && !f.unobserved; }).length;
   var testRed = health.tests.filter(function (f) { return f.severity === RED; }).length;
   var testAmber = health.tests.filter(function (f) { return f.severity === AMBER; }).length;
   body.appendChild(el("div", { "class": "wd-tiles" }, [
-    tile("Items", visibleItems(m).filter(function (it) { return it.nodes.length; }).length, fmt(m.nodes.size) + " installed objects", "none"),
+    tile("Items", items.filter(function (it) { return it.nodes.length; }).length,
+      fmt(items.reduce(function (a, it) { return a + it.nodes.length; }, 0)) + " installed objects" + (several ? " in " + fmt(shown.size) + (shown.size === 1 ? " workspace" : " workspaces") : ""), "none"),
     tile("Load", loadRed ? loadRed + " red" : loadAmber ? loadAmber + " amber" : "Green", health.counts.load.subjects + " subjects · " + loadAmber + " amber", loadRed ? "bad" : loadAmber ? "wait" : "ok"),
     tile("Tests", testRed ? testRed + " red" : testAmber ? testAmber + " amber" : "Green", health.counts.tests.subjects + " Tests and Assumptions", testRed ? "bad" : testAmber ? "wait" : "ok"),
     tile("Build", health.build.length ? health.build.length + " red" : "Consistent", "catalogue consistency only", health.build.length ? "bad" : "ok"),
     tile("Workflows, 7 days", m.workflowCount || 0, m.workflows.length ? "latest " + ago(m.workflows[0].completed, m.at) : "none in the last 7 days", "none")
   ]));
 
-  var inventory = section("Installed items", [itemInventory(m, open)]);
+  var inventory = section("Installed items", [several ? workspaceInventory(m, open, items) : itemInventory(m, open, items)]);
   var findings = health.all.filter(function (f) { return !f.unobserved; });
   var significant = section("Significant findings", [findings.length ? el("ul", { "class": "wd-findings wd-findings-wide" }, findings.slice(0, 12).map(function (f) {
     return el("li", {}, [severityChip(f.severity), f.node ? nodeLink(m, f.node.key, open) : el("span", { "class": "wd-mono", text: f.label }),
@@ -35,9 +68,28 @@ function overviewPage(body, m) {
   if (s.open && m.nodes.has(s.open)) open(s.open);
 }
 
+/* Items grouped by workspace, each workspace in the order its catalogue was given. */
+function workspaceInventory(m, open, items) {
+  if (!items.length) return empty("Nothing is installed yet. Build a project to fill the catalogue.");
+  var groups = new Map();
+  workspaceList(m).forEach(function (w) { groups.set(w, []); });
+  items.forEach(function (it) { var g = groups.get(workspaceOf(it)); if (g) g.push(it); });
+  var out = [];
+  groups.forEach(function (list, w) {
+    if (!list.length) return;
+    var kinds = {};
+    list.forEach(function (it) { kinds[it.type] = (kinds[it.type] || 0) + 1; });
+    out.push(el("div", { "class": "wd-ws-group" }, [
+      el("div", { "class": "wd-ws-head" }, [el("h3", { text: w }), el("span", { "class": "wd-muted", text: composition(kinds) })]),
+      itemCards(m, open, list, true)
+    ]));
+  });
+  return el("div", {}, out);
+}
+
 /* Each item with its objects by kind and the state of what it loads. */
-function itemInventory(m, open) {
-  var items = visibleItems(m).filter(function (it) { return it.nodes.length || it.target; });
+function itemInventory(m, open, items) {
+  items = items.slice();
   items.sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
   if (!items.length) return empty("Nothing is installed yet. Build a project to fill the catalogue.");
   var groups = [];
@@ -49,7 +101,16 @@ function itemInventory(m, open) {
   return el("div", { "class": "wd-inventory" }, groups.map(function (g) {
     return el("div", { "class": "wd-inv-group" }, [
       el("div", { "class": "wd-eyebrow", text: g.type + " · " + g.items.length }),
-      el("div", { "class": "wd-inv-items" }, g.items.map(function (it) {
+      itemCards(m, open, g.items, false)
+    ]);
+  }));
+}
+
+/* An item's card: its objects by kind, the state of what it loads and when it
+   last processed. With kind, the card names its kind, for a list that mixes them. */
+function itemCards(m, open, items, kind) {
+  items = items.slice().sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
+  return el("div", { "class": "wd-inv-items" }, items.map(function (it) {
         var byKind = {}, tones = { ok: 0, bad: 0, warn: 0, wait: 0, none: 0 }, latest = null;
         it.nodes.forEach(function (n) {
           byKind[n.kind] = (byKind[n.kind] || 0) + 1;
@@ -60,6 +121,7 @@ function itemInventory(m, open) {
         var total = tones.ok + tones.bad + tones.warn + tones.wait + tones.none;
         var first = it.nodes[0];
         return el("button", { "class": "wd-inv-item", type: "button", onclick: function () { if (first) open(first.key); } }, [
+          kind ? el("div", { "class": "wd-eyebrow", text: kindName(it.type) }) : null,
           el("div", { "class": "wd-inv-head" }, [el("b", { text: it.name }), it.target && it.target !== it.name ? el("span", { "class": "wd-muted", text: " → " + it.target }) : null]),
           el("div", { "class": "wd-inv-kinds" }, KIND_ORDER.filter(function (k) { return byKind[k]; }).map(function (k) {
             return el("span", { "class": "wd-inv-kind" }, [kindMark(k), fmt(byKind[k]) + " " + k.toLowerCase() + (byKind[k] === 1 ? "" : "s")]);
@@ -68,8 +130,6 @@ function itemInventory(m, open) {
             ["ok", "warn", "wait", "bad", "none"].map(function (t) { return tones[t] ? el("i", { "class": "wd-" + t, style: "flex:" + tones[t] }) : null; })) : null,
           el("div", { "class": "wd-inv-meta", text: total ? "Last processed " + ago(latest, m.at) : it.nodes.length ? "Nothing to load" : "No objects" })
         ]);
-      }))
-    ]);
   }));
 }
 

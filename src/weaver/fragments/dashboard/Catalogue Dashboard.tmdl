@@ -8,9 +8,7 @@ model Model
 /// table, optional WHERE filters joined by &&, and named columns: it returns
 /// every catalogue's rows with "@catalogue", the catalogue's label, and
 /// "@code", its position in this payload, before the named columns. The
-/// SUM_CATALOGUES macro adds one scalar expression per catalogue. __SCOPE__ declares the items the page shows:
-/// _scoped is false on a page that shows the whole estate; otherwise
-/// _chosenkeys holds the items picked in 'Dashboard item', or its first item.
+/// SUM_CATALOGUES macro adds one scalar expression per catalogue.
 ///
 /// The Data measures return delimited text for the renderer: each table starts
 /// with U+E003 and its name and column names, each row with U+E002, and
@@ -78,15 +76,13 @@ table 'Dashboard measures'
         formatString: #,##0
         displayFolder: Estate
 
-    /// The query instant, the catalogues read, their installations, the items
-    /// the page shows and how many installed items 'Dashboard item' lacks.
+    /// The query instant, the catalogues read and their installations.
     measure 'Catalogue data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
         VAR _t = UNICHAR(57347)
         VAR _q = UNICHAR(57348)
         VAR _now = UTCNOW()
-        __SCOPE__
         VAR _items = CATALOGUES(
             'Installation',
             "@item", 'Installation'[Item type] & "/" & 'Installation'[Item name],
@@ -96,15 +92,9 @@ table 'Dashboard measures'
             "@targetid", 'Installation'[Target item GUID],
             "@version", 'Installation'[Weaver version]
         )
-        VAR _listed = SELECTCOLUMNS(ALL('Dashboard item'), "@catalogue", 'Dashboard item'[Catalogue], "@item", 'Dashboard item'[Item key])
-        VAR _unlisted = EXCEPT(
-            SELECTCOLUMNS(FILTER(_items, [@item] <> "Warehouse/_weaver" && LEFT([@item], 7) <> "Report/"), "@catalogue", [@catalogue], "@item", [@item]),
-            _listed
-        )
         RETURN
-            _t & "meta" & _f & "at" & _f & "format" & _f & "mode" & _f & "scoped" & _f & "unlisted" & _f & "imported"
-            & _r & FORMAT((_now - DATE(1970, 1, 1)) * 86400000, "0") & _f & "2" & _f & "{mode}" & _f & IF(_scoped, "1") & _f & COUNTROWS(_unlisted)
-            & _f & "{imported}"
+            _t & "meta" & _f & "at" & _f & "format" & _f & "mode" & _f & "imported"
+            & _r & FORMAT((_now - DATE(1970, 1, 1)) * 86400000, "0") & _f & "2" & _f & "{mode}" & _f & "{imported}"
             & _t & "catalogues" & _f & "code" & _f & "label" & _f & "reference"
             & "{catalogues}"
             & _t & "items" & _f & "item" & _f & "workspace" & _f & "target" & _f & "version" & _f & "workspaceid" & _f & "targetid"
@@ -118,21 +108,18 @@ table 'Dashboard measures'
                     & _f & [@targetid],
                 ""
             )
-            & _t & "scope" & _f & "item" & _f & "picked"
-            & IF(_scoped, CONCATENATEX(_chosen, _r & [@si] & _q & [@scode] & _f & IF(_picked, "1"), ""))
         ```
         displayFolder: Data
 
     /// Installed nodes and edges, the catalogues and the Dashboard aside, and
     /// the physical shortcuts that may land in another catalogue. An edge names
     /// its upstream when it reads outside Weaver, or when no lineage node is
-    /// that upstream. Descriptions are kept for the items the page shows.
+    /// that upstream.
     measure 'Lineage data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
         VAR _t = UNICHAR(57347)
         VAR _q = UNICHAR(57348)
-        __SCOPE__
         VAR _all = CATALOGUES(
             'Lineage node',
             "@key", 'Lineage node'[Node key],
@@ -186,7 +173,7 @@ table 'Dashboard measures'
                     & _f & [@kind]
                     & _f & [@label]
                     & _f & [@flags]
-                    & _f & IF(NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys, [@description]),
+                    & _f & [@description],
                 ""
             )
             & _t & "edges" & _f & "down" & _f & "up" & _f & "kind" & _f & "through" & _f & "reference"
@@ -711,98 +698,75 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// Declared schemas, tables, views, folders, columns, keys, relationships and
-    /// validations of the items the page shows.
+    /// Declared schemas, tables, views, folders, columns, keys, relationships and validations.
     measure 'Metadata data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
         VAR _t = UNICHAR(57347)
         VAR _q = UNICHAR(57348)
-        __SCOPE__
-        VAR _schemas = FILTER(
-            CATALOGUES('Schema dictionary', "@item", 'Schema dictionary'[Item type] & "/" & 'Schema dictionary'[Item name], "@schema", 'Schema dictionary'[Schema name], "@description", LEFT('Schema dictionary'[Description], 1000)),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _schemas = CATALOGUES('Schema dictionary', "@item", 'Schema dictionary'[Item type] & "/" & 'Schema dictionary'[Item name], "@schema", 'Schema dictionary'[Schema name], "@description", LEFT('Schema dictionary'[Description], 1000))
+        VAR _tables = CATALOGUES(
+            'Table dictionary',
+            "@item", 'Table dictionary'[Item type] & "/" & 'Table dictionary'[Item name],
+            "@schema", 'Table dictionary'[Schema name],
+            "@object", 'Table dictionary'[Object name],
+            "@type", 'Table dictionary'[Object type],
+            "@description", LEFT('Table dictionary'[Description], 1000),
+            "@lineage", LEFT('Table dictionary'[Lineage], 1000),
+            "@primarykey", 'Table dictionary'[Primary key],
+            "@notnull", 'Table dictionary'[Not null columns],
+            "@identity", 'Table dictionary'[Identity column],
+            "@incremental", IF('Table dictionary'[Is incremental], "1"),
+            "@static", IF('Table dictionary'[Is static], "1"),
+            "@prohibit", IF('Table dictionary'[Prohibit rebuild], "1")
         )
-        VAR _tables = FILTER(
-            CATALOGUES(
-                'Table dictionary',
-                "@item", 'Table dictionary'[Item type] & "/" & 'Table dictionary'[Item name],
-                "@schema", 'Table dictionary'[Schema name],
-                "@object", 'Table dictionary'[Object name],
-                "@type", 'Table dictionary'[Object type],
-                "@description", LEFT('Table dictionary'[Description], 1000),
-                "@lineage", LEFT('Table dictionary'[Lineage], 1000),
-                "@primarykey", 'Table dictionary'[Primary key],
-                "@notnull", 'Table dictionary'[Not null columns],
-                "@identity", 'Table dictionary'[Identity column],
-                "@incremental", IF('Table dictionary'[Is incremental], "1"),
-                "@static", IF('Table dictionary'[Is static], "1"),
-                "@prohibit", IF('Table dictionary'[Prohibit rebuild], "1")
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _folders = CATALOGUES(
+            'Folder dictionary',
+            "@item", 'Folder dictionary'[Item type] & "/" & 'Folder dictionary'[Item name],
+            "@schema", 'Folder dictionary'[Schema name],
+            "@object", 'Folder dictionary'[Object name],
+            "@description", LEFT('Folder dictionary'[Description], 1000),
+            "@lineage", LEFT('Folder dictionary'[Lineage], 1000),
+            "@filekey", 'Folder dictionary'[File key],
+            "@incremental", IF('Folder dictionary'[Is incremental], "1"),
+            "@static", IF('Folder dictionary'[Is static], "1")
         )
-        VAR _folders = FILTER(
-            CATALOGUES(
-                'Folder dictionary',
-                "@item", 'Folder dictionary'[Item type] & "/" & 'Folder dictionary'[Item name],
-                "@schema", 'Folder dictionary'[Schema name],
-                "@object", 'Folder dictionary'[Object name],
-                "@description", LEFT('Folder dictionary'[Description], 1000),
-                "@lineage", LEFT('Folder dictionary'[Lineage], 1000),
-                "@filekey", 'Folder dictionary'[File key],
-                "@incremental", IF('Folder dictionary'[Is incremental], "1"),
-                "@static", IF('Folder dictionary'[Is static], "1")
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _columns = CATALOGUES(
+            'Column dictionary',
+            "@item", 'Column dictionary'[Item type] & "/" & 'Column dictionary'[Item name],
+            "@schema", 'Column dictionary'[Schema name],
+            "@object", 'Column dictionary'[Object name],
+            "@column", 'Column dictionary'[Column name],
+            "@description", LEFT('Column dictionary'[Description], 400),
+            "@identity", IF('Column dictionary'[Is identity], "1")
         )
-        VAR _columns = FILTER(
-            CATALOGUES(
-                'Column dictionary',
-                "@item", 'Column dictionary'[Item type] & "/" & 'Column dictionary'[Item name],
-                "@schema", 'Column dictionary'[Schema name],
-                "@object", 'Column dictionary'[Object name],
-                "@column", 'Column dictionary'[Column name],
-                "@description", LEFT('Column dictionary'[Description], 400),
-                "@identity", IF('Column dictionary'[Is identity], "1")
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _keys = CATALOGUES(
+            'Key dictionary' WHERE 'Key dictionary'[Key type] <> "Primary key",
+            "@item", 'Key dictionary'[Item type] & "/" & 'Key dictionary'[Item name],
+            "@schema", 'Key dictionary'[Schema name],
+            "@object", 'Key dictionary'[Object name],
+            "@type", 'Key dictionary'[Key type],
+            "@columns", 'Key dictionary'[Column set]
         )
-        VAR _keys = FILTER(
-            CATALOGUES(
-                'Key dictionary' WHERE 'Key dictionary'[Key type] <> "Primary key",
-                "@item", 'Key dictionary'[Item type] & "/" & 'Key dictionary'[Item name],
-                "@schema", 'Key dictionary'[Schema name],
-                "@object", 'Key dictionary'[Object name],
-                "@type", 'Key dictionary'[Key type],
-                "@columns", 'Key dictionary'[Column set]
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _foreign = CATALOGUES(
+            'Foreign key dictionary',
+            "@item", 'Foreign key dictionary'[Item type] & "/" & 'Foreign key dictionary'[Item name],
+            "@schema", 'Foreign key dictionary'[Foreign schema name],
+            "@object", 'Foreign key dictionary'[Foreign object name],
+            "@columns", 'Foreign key dictionary'[Foreign column set],
+            "@primaryitem", 'Foreign key dictionary'[Primary item type] & "/" & 'Foreign key dictionary'[Primary item name],
+            "@primaryschema", 'Foreign key dictionary'[Primary schema name],
+            "@primaryobject", 'Foreign key dictionary'[Primary object name],
+            "@primarycolumns", 'Foreign key dictionary'[Primary column set]
         )
-        VAR _foreign = FILTER(
-            CATALOGUES(
-                'Foreign key dictionary',
-                "@item", 'Foreign key dictionary'[Item type] & "/" & 'Foreign key dictionary'[Item name],
-                "@schema", 'Foreign key dictionary'[Foreign schema name],
-                "@object", 'Foreign key dictionary'[Foreign object name],
-                "@columns", 'Foreign key dictionary'[Foreign column set],
-                "@primaryitem", 'Foreign key dictionary'[Primary item type] & "/" & 'Foreign key dictionary'[Primary item name],
-                "@primaryschema", 'Foreign key dictionary'[Primary schema name],
-                "@primaryobject", 'Foreign key dictionary'[Primary object name],
-                "@primarycolumns", 'Foreign key dictionary'[Primary column set]
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
-        )
-        VAR _validations = FILTER(
-            CATALOGUES(
-                'Test dictionary',
-                "@item", 'Test dictionary'[Item type] & "/" & 'Test dictionary'[Item name],
-                "@schema", 'Test dictionary'[Schema name],
-                "@object", 'Test dictionary'[Object name],
-                "@type", 'Test dictionary'[Test type],
-                "@description", LEFT('Test dictionary'[Description], 1000),
-                "@primarykey", 'Test dictionary'[Primary key]
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _validations = CATALOGUES(
+            'Test dictionary',
+            "@item", 'Test dictionary'[Item type] & "/" & 'Test dictionary'[Item name],
+            "@schema", 'Test dictionary'[Schema name],
+            "@object", 'Test dictionary'[Object name],
+            "@type", 'Test dictionary'[Test type],
+            "@description", LEFT('Test dictionary'[Description], 1000),
+            "@primarykey", 'Test dictionary'[Primary key]
         )
         RETURN
             _t & "schemas" & _f & "item" & _f & "schema" & _f & "description"
@@ -848,83 +812,64 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// The semantic models the page shows: tables in authored order, columns,
-    /// measures, relationships and the managed sources each table reads.
+    /// Semantic models: tables in authored order, columns, measures,
+    /// relationships and the managed sources each table reads.
     measure 'Semantic data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
         VAR _t = UNICHAR(57347)
         VAR _q = UNICHAR(57348)
-        __SCOPE__
-        VAR _models = FILTER(
-            CATALOGUES('Semantic model', "@item", 'Semantic model'[Item type] & "/" & 'Semantic model'[Item name], "@description", LEFT('Semantic model'[Description], 1000)),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _models = CATALOGUES('Semantic model', "@item", 'Semantic model'[Item type] & "/" & 'Semantic model'[Item name], "@description", LEFT('Semantic model'[Description], 1000))
+        VAR _tables = CATALOGUES(
+            'Semantic model table',
+            "@item", 'Semantic model table'[Item type] & "/" & 'Semantic model table'[Item name],
+            "@table", 'Semantic model table'[Table name],
+            "@ordinal", 'Semantic model table'[Table ordinal],
+            "@description", LEFT('Semantic model table'[Description], 1000),
+            "@mode", 'Semantic model table'[Source mode],
+            "@access", 'Semantic model table'[Source access]
         )
-        VAR _tables = FILTER(
-            CATALOGUES(
-                'Semantic model table',
-                "@item", 'Semantic model table'[Item type] & "/" & 'Semantic model table'[Item name],
-                "@table", 'Semantic model table'[Table name],
-                "@ordinal", 'Semantic model table'[Table ordinal],
-                "@description", LEFT('Semantic model table'[Description], 1000),
-                "@mode", 'Semantic model table'[Source mode],
-                "@access", 'Semantic model table'[Source access]
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _columns = CATALOGUES(
+            'Semantic model column',
+            "@item", 'Semantic model column'[Item type] & "/" & 'Semantic model column'[Item name],
+            "@table", 'Semantic model column'[Table name],
+            "@column", 'Semantic model column'[Column name],
+            "@description", LEFT('Semantic model column'[Description], 400),
+            "@datatype", 'Semantic model column'[Data type],
+            "@columntype", 'Semantic model column'[Column type],
+            "@sourcecolumn", 'Semantic model column'[Source column],
+            "@expression", LEFT('Semantic model column'[Expression], 400)
         )
-        VAR _columns = FILTER(
-            CATALOGUES(
-                'Semantic model column',
-                "@item", 'Semantic model column'[Item type] & "/" & 'Semantic model column'[Item name],
-                "@table", 'Semantic model column'[Table name],
-                "@column", 'Semantic model column'[Column name],
-                "@description", LEFT('Semantic model column'[Description], 400),
-                "@datatype", 'Semantic model column'[Data type],
-                "@columntype", 'Semantic model column'[Column type],
-                "@sourcecolumn", 'Semantic model column'[Source column],
-                "@expression", LEFT('Semantic model column'[Expression], 400)
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _measures = CATALOGUES(
+            'Semantic model measure',
+            "@item", 'Semantic model measure'[Item type] & "/" & 'Semantic model measure'[Item name],
+            "@table", 'Semantic model measure'[Table name],
+            "@measure", 'Semantic model measure'[Measure name],
+            "@description", LEFT('Semantic model measure'[Description], 400),
+            "@expression", LEFT('Semantic model measure'[Expression], 1000),
+            "@format", LEFT('Semantic model measure'[Format string], 200)
         )
-        VAR _measures = FILTER(
-            CATALOGUES(
-                'Semantic model measure',
-                "@item", 'Semantic model measure'[Item type] & "/" & 'Semantic model measure'[Item name],
-                "@table", 'Semantic model measure'[Table name],
-                "@measure", 'Semantic model measure'[Measure name],
-                "@description", LEFT('Semantic model measure'[Description], 400),
-                "@expression", LEFT('Semantic model measure'[Expression], 1000),
-                "@format", LEFT('Semantic model measure'[Format string], 200)
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _relationships = CATALOGUES(
+            'Semantic model relationship',
+            "@item", 'Semantic model relationship'[Item type] & "/" & 'Semantic model relationship'[Item name],
+            "@name", 'Semantic model relationship'[Relationship name],
+            "@fromtable", 'Semantic model relationship'[From table],
+            "@fromcolumn", 'Semantic model relationship'[From column],
+            "@totable", 'Semantic model relationship'[To table],
+            "@tocolumn", 'Semantic model relationship'[To column],
+            "@fromcardinality", 'Semantic model relationship'[From cardinality],
+            "@tocardinality", 'Semantic model relationship'[To cardinality],
+            "@crossfilter", 'Semantic model relationship'[Cross filtering behavior],
+            "@active", IF(ISBLANK('Semantic model relationship'[Is active]), "", IF('Semantic model relationship'[Is active], "1", "0"))
         )
-        VAR _relationships = FILTER(
-            CATALOGUES(
-                'Semantic model relationship',
-                "@item", 'Semantic model relationship'[Item type] & "/" & 'Semantic model relationship'[Item name],
-                "@name", 'Semantic model relationship'[Relationship name],
-                "@fromtable", 'Semantic model relationship'[From table],
-                "@fromcolumn", 'Semantic model relationship'[From column],
-                "@totable", 'Semantic model relationship'[To table],
-                "@tocolumn", 'Semantic model relationship'[To column],
-                "@fromcardinality", 'Semantic model relationship'[From cardinality],
-                "@tocardinality", 'Semantic model relationship'[To cardinality],
-                "@crossfilter", 'Semantic model relationship'[Cross filtering behavior],
-                "@active", IF(ISBLANK('Semantic model relationship'[Is active]), "", IF('Semantic model relationship'[Is active], "1", "0"))
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
-        )
-        VAR _sources = FILTER(
-            CATALOGUES(
-                'Dependency' WHERE 'Dependency'[Item type] = "SemanticModel",
-                "@item", 'Dependency'[Item type] & "/" & 'Dependency'[Item name],
-                "@table", 'Dependency'[Referencing object name],
-                "@reference", 'Dependency'[Dependency reference],
-                "@sourceitem", IF(NOT ISBLANK('Dependency'[Referenced item type]), 'Dependency'[Referenced item type] & "/" & 'Dependency'[Referenced item name]),
-                "@sourceschema", 'Dependency'[Referenced schema name],
-                "@sourceobject", 'Dependency'[Referenced object name]
-            ),
-            NOT _scoped || ([@catalogue], [@item]) IN _chosenkeys
+        VAR _sources = CATALOGUES(
+            'Dependency' WHERE 'Dependency'[Item type] = "SemanticModel",
+            "@item", 'Dependency'[Item type] & "/" & 'Dependency'[Item name],
+            "@table", 'Dependency'[Referencing object name],
+            "@reference", 'Dependency'[Dependency reference],
+            "@sourceitem", IF(NOT ISBLANK('Dependency'[Referenced item type]), 'Dependency'[Referenced item type] & "/" & 'Dependency'[Referenced item name]),
+            "@sourceschema", 'Dependency'[Referenced schema name],
+            "@sourceobject", 'Dependency'[Referenced object name]
         )
         RETURN
             _t & "models" & _f & "item" & _f & "description"
@@ -1062,7 +1007,7 @@ table 'Dashboard measures'
         displayFolder: Pages
         isHidden
 
-    /// The Overview page for HTML Content.
+    /// The Summary page for HTML Content.
     measure 'Overview page' = PAGE("overview", [Catalogue data] & [Lineage data] & [Status data] & [Workflow data] & [Build data])
         displayFolder: Pages
 
@@ -1090,6 +1035,6 @@ table 'Dashboard measures'
     measure 'Semantic model page' = PAGE("semantic", [Catalogue data] & [Lineage data] & [Status data] & [Semantic data])
         displayFolder: Pages
 
-    /// The Estate page for HTML Content.
-    measure 'Estate page' = PAGE("estate", [Catalogue data] & [Estate data])
+    /// The Workspaces page for HTML Content.
+    measure 'Workspaces page' = PAGE("workspaces", [Catalogue data] & [Estate data])
         displayFolder: Pages

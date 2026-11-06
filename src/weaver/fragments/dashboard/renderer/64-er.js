@@ -11,6 +11,8 @@ var ER = { NODES: 80, EXPANDED: 120, WRAP: 8, BOX: 220, HEAD: 34, ROW: 18, GAP_X
    relationship keep their foreign and primary columns. */
 function erGraph(m, item) {
   var md = metadata(m), nodes = new Map(), edges = [];
+  // A set of items, one item, or every item.
+  var only = item instanceof Set ? item : item && item !== "all" ? new Set([item]) : null;
   function node(id) {
     if (nodes.has(id)) return;
     var parts = id.split("|"), owner = m.byIdentity.get(id) || null, declared = md.tables.get(id);
@@ -22,11 +24,11 @@ function erGraph(m, item) {
       owner: owner, refs: [], back: [] });
   }
   md.foreignKeys.forEach(function (fk) {
-    if (item && item !== "all" && fk.from.split("|")[0] !== item && fk.to.split("|")[0] !== item) return;
+    if (only && !only.has(fk.from.split("|")[0]) && !only.has(fk.to.split("|")[0])) return;
     node(fk.from); node(fk.to);
     edges.push({ from: fk.from, to: fk.to, fromColumns: fk.fromColumns, toColumns: fk.toColumns, label: "", active: true, many: true });
   });
-  md.tables.forEach(function (_, id) { if (!item || item === "all" || id.split("|")[0] === item) node(id); });
+  md.tables.forEach(function (_, id) { if (!only || only.has(id.split("|")[0])) node(id); });
   edges.forEach(function (e, i) { e.id = i; nodes.get(e.from).refs.push(e); nodes.get(e.to).back.push(e); });
   return { nodes: nodes, edges: edges };
 }
@@ -152,8 +154,8 @@ function erLayout(g, win, columns) {
 }
 
 /* The ER page's workspace, framed as the Orchestration graph is: s holds
-   the selection, depths, expansions and viewport. options.item limits it to one
-   item's relationships; options.tools come first in its toolbar; options.onPick
+   the selection, depths, expansions and viewport. options.item limits it to the
+   relationships of a set of items; options.tools come first in its toolbar; options.onPick
    hears a table chosen in the diagram, options.describe fills the details, and
    options.matches(term) lists the tables a wildcard term selects. */
 function erWorkspace(body, m, s, options) {
@@ -359,7 +361,7 @@ function erWorkspace(body, m, s, options) {
   ]));
   if (options.describe) options.describe(f.side);
   if (!g.nodes.size) {
-    drawing.appendChild(empty("No declared table is recorded" + (options.item && options.item !== "all" ? " for " + itemName(options.item) : "") + "."));
+    drawing.appendChild(empty("No declared table is recorded for the items shown."));
     return { has: function () { return false; }, select: function () {}, addPattern: function () {}, say: function () {}, side: f.side };
   }
   draw();

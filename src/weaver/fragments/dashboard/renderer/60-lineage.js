@@ -13,7 +13,7 @@ function graphWorkspace(body, m, options) {
   if (s.mirrors === undefined) s.mirrors = true;
   // Hiding mirrors changes what is drawn, never what is assessed.
   m = s.mirrors ? whole : withoutMirrors(whole);
-  var estate = layoutEstate(m), scoped = scopedKeys(m);
+  var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
   s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
   if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
   if (s.up === undefined) s.up = 1;
@@ -116,7 +116,7 @@ function graphWorkspace(body, m, options) {
   ]);
   f.mount(body, [
     nodeSearch(m, select, addPattern),
-    m.scope && m.scope.length ? scopeLabel(m) : itemPicker,
+    options.chooser || itemPicker,
     mirrorToggle,
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
@@ -143,21 +143,11 @@ function graphWorkspace(body, m, options) {
   return { select: select };
 }
 
-/* The objects of the items a scoped page shows. */
-function scopedKeys(m) {
+/* The objects of the given items. */
+function keysOf(m, labels) {
   var out = [];
-  (m.scope || []).forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
+  labels.forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
   return out;
-}
-
-/* What the page shows, and how the reader changes it. */
-function scopeLabel(m) {
-  var names = m.scope.map(shownItem);
-  var text = names.length === 1 ? names[0] : names.length + " items";
-  return el("span", { "class": "wd-scope", title: names.join(", ") }, [
-    el("b", { text: text }),
-    m.scopePicked ? null : el("span", { "class": "wd-muted", text: " · the first item; choose others in the Items list" })
-  ]);
 }
 
 /* The graph without mirrored objects. An edge that passed through one is
@@ -263,6 +253,9 @@ function legend(mode) {
   }).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
 }
 
+/* The kinds of item the Orchestration and Entity dictionary pages offer. */
+var DETAIL_KINDS = ["Lakehouse", "Warehouse", "SQLDatabase"];
+
 function orchestrationPage(body, m) {
   var counts = {}, failed = [], ready = [], waiting = [];
   m.nodes.forEach(function (n) {
@@ -283,7 +276,9 @@ function orchestrationPage(body, m) {
     latest ? tile("Latest workflow", duration((latest.completed || 0) - (latest.started || 0)), fmt(latest.records) + " processed records · " + ago(latest.completed, m.at), latest.failed ? "bad" : "none") : null
   ]);
   var note = el("p", { "class": "wd-note", text: "Readiness is derived from the recorded state of each object's nearest loadable dependencies. It is not a queue: the catalogue records processed work only, so nothing here is shown as running." });
+  var s = pageState("orchestration"), eligible = eligibleItems(m, DETAIL_KINDS);
   graphWorkspace(body, m, { page: "orchestration", mode: "load", health: true, label: "Orchestration graph", above: el("div", { "class": "wd-summary" }, [tiles, note]),
+    items: chosenItems(s, eligible), chooser: itemChooser(m, s, eligible),
     empty: "Search for an object, or select one in the graph, to follow its lineage, last outcome and readiness." });
   var lists = el("div", { "class": "wd-columns-2" }, [
     section("Ready · " + ready.length, [dataTable([

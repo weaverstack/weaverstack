@@ -5,6 +5,9 @@ stays absent there for minutes after OneLake creates it, although a mount made
 afterwards sees it at once. The Folder here looks up its destination through
 the mount before publishing, as authored code that skips files it already has
 does, and the Table then opens what was published with ordinary ``pathlib``.
+
+The second load also deletes a file created over ``abfss://`` after the mount
+looked it up, which the mount still reports absent.
 """
 
 from __future__ import annotations
@@ -33,6 +36,8 @@ Incremental: true
 
 import json
 
+import notebookutils
+
 from weaver import Folder
 
 
@@ -55,12 +60,21 @@ class Raw__Documents(Folder):
         for name in files:
             (destination / name).exists()
 
+        deletes = []
+        if first:
+            stale = destination / "docs/stale.txt"
+            stale.exists()
+            notebookutils.fs.put(self.spark_path() + "/docs/stale.txt", "stale", True)
+            if stale.exists():
+                raise RuntimeError("the mount sees docs/stale.txt; nothing is stale")
+            deletes.append("docs/stale.txt")
+
         staging = self.staging_folder()
         for name, data in files.items():
             target = staging.path / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-        return staging, []
+        return staging, deletes
 '''
 
 TABLE = '''\
@@ -83,6 +97,7 @@ Schema:
 
 import hashlib
 
+import notebookutils
 from Files.Raw__Documents import Raw__Documents
 
 from weaver import Table
@@ -105,6 +120,8 @@ class Raw__DocumentIndex(Table):
         omitted = sorted({row[0] for row in rows} - globbed)
         if omitted:
             raise RuntimeError(f"glob omits {len(omitted)} published files: {omitted[:5]}")
+        if notebookutils.fs.exists(folder.spark_path() + "/docs/stale.txt"):
+            raise RuntimeError("OneLake still has the deleted docs/stale.txt")
         return self.spark.createDataFrame(rows, "Name string, Bytes long, Sha256 string")
 '''
 
@@ -142,12 +159,17 @@ def test_a_dependent_table_opens_every_file_a_folder_published_in_its_load(
     folder = f"load:Lakehouse/{target}/Files/Raw.Documents"
     table = f"load:Lakehouse/{target}/Tables/Raw.DocumentIndex"
     # The first load publishes into a destination that did not exist; the second
-    # adds to one that does and revises one sidecar.
-    for inserted, updated in ((2 * BATCH + 1, 0), (2 * BATCH, 2)):
+    # adds to one that does, revises one sidecar and deletes a file the mount
+    # reports absent.
+    for inserted, updated, deleted in ((2 * BATCH + 1, 0, 0), (2 * BATCH, 2, 1)):
         loaded = weaver.load([ITEM], session=weaver_session)
         assert loaded.succeeded, loaded.to_mapping()
         nodes = loaded.by_node
         published = nodes[folder].result
         indexed = nodes[table].result
-        assert (published.rows_inserted, published.rows_updated) == (inserted, updated)
+        assert (
+            published.rows_inserted,
+            published.rows_updated,
+            published.rows_deleted,
+        ) == (inserted, updated, deleted)
         assert (indexed.rows_inserted, indexed.rows_updated) == (inserted, updated)

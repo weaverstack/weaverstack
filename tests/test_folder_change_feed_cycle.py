@@ -136,6 +136,76 @@ def test_a_mixed_load_writes_one_document_with_actual_changes(landing):
 
 
 @weaver_test()
+def test_publication_changes_destination_files_through_the_mount(landing, monkeypatch):
+    # A mount keeps reporting a path absent once it looked it up while absent,
+    # until the file is created through that mount.
+    store = landing.lakehouse.store
+    changed = []
+    for name in ("write", "delete", "make_directory", "copy", "move"):
+        original = getattr(store, name)
+
+        def record(*locations, _original=original, **options):
+            changed.extend(
+                location.value for location in locations if hasattr(location, "value")
+            )
+            return _original(*locations, **options)
+
+        monkeypatch.setattr(store, name, record)
+
+    landing.files = {"June.csv": "old", "remove.csv": "old"}
+    landing.load()
+    landing.files = {"June.csv": "new", "nested/July.csv": "new"}
+    landing.deletes = ("remove.csv",)
+    result = landing.load()
+
+    assert (result.rows_inserted, result.rows_updated, result.rows_deleted) == (1, 1, 1)
+    destination = landing.spark_path()
+    through_store = [
+        value
+        for value in changed
+        if value.startswith(f"{destination}/")
+        and not value.startswith(f"{destination}/{CHANGES_DIRECTORY}/")
+    ]
+    assert through_store == []
+    assert (landing.path() / "June.csv").read_text(encoding="utf-8") == "new"
+    assert not (landing.path() / "remove.csv").exists()
+
+
+@weaver_test()
+def test_a_delete_reaches_a_file_the_mount_reports_absent(tmp_path):
+    # A file created outside the mount after the mount looked it up stays
+    # absent there, while OneLake lists it.
+    from support.workspaces import OneLakeDirectory
+
+    from weaver.lakehouse import _MOUNTS, Lakehouse, _Mount
+
+    onelake, mount = tmp_path / "onelake", tmp_path / "mount"
+    for directory in (onelake, mount):
+        (directory / "Files" / "Sales" / "Landing").mkdir(parents=True)
+    (onelake / "Files" / "Sales" / "Landing" / "remove.csv").write_text("old")
+    root = "abfss://ws@onelake.dfs.fabric.microsoft.com/Hidden"
+    _MOUNTS[root] = _Mount(point="/weaver/Hidden/test", local=str(mount))
+    Sales__Landing.files = {}
+    Sales__Landing.deletes = ("remove.csv",)
+    Sales__Landing.incremental = True
+    Sales__Landing.static = False
+    landing = Sales__Landing(
+        object(),
+        lakehouse=Lakehouse(
+            name="Hidden", spark_root=root, store=OneLakeDirectory(root, onelake)
+        ),
+    ).with_catalogue(never("Sales.Landing", target="Hidden", files=True))
+
+    try:
+        result = landing.load()
+    finally:
+        del _MOUNTS[root]
+
+    assert result.rows_deleted == 1
+    assert not (onelake / "Files" / "Sales" / "Landing" / "remove.csv").exists()
+
+
+@weaver_test()
 def test_wholesale_omission_records_a_delete(landing):
     landing.incremental = False
     landing.files = {"keep.csv": "same", "remove.csv": "old"}

@@ -141,8 +141,13 @@ def _working_workspace(
         return resolve(first)
 
 
-def home_places(places: Sequence[Place], home: Workspace) -> tuple[Place, ...]:
-    """The catalogues given in the working workspace, its own catalogue first."""
+def home_place(operation: str, places: Sequence[Place], home: Workspace) -> Place:
+    """The working workspace's catalogue among those given.
+
+    Its configured catalogue when given, otherwise the one given in the working
+    workspace. Several there, none of them configured, is ambiguous: catalogue
+    order never decides what runs.
+    """
 
     local = [
         place
@@ -150,29 +155,66 @@ def home_places(places: Sequence[Place], home: Workspace) -> tuple[Place, ...]:
         if place.workspace.workspace.casefold() == home.workspace.casefold()
     ]
     own = (home.catalogue or "").rpartition("/")[2].casefold()
-    return tuple(
-        sorted(local, key=lambda place: place.catalogue_name.casefold() != own)
+    configured = [place for place in local if place.catalogue_name.casefold() == own]
+    if configured:
+        return configured[0]
+    if len(local) == 1:
+        return local[0]
+    if not local:
+        raise CommandError(
+            f"None of the catalogues given to {operation} is in {home.workspace}. "
+            "Name the items to run with the workspace whose catalogue they are in."
+        )
+    names = ", ".join(place.reference for place in local)
+    raise CommandError(
+        f"{operation} was given several catalogues in {home.workspace} ({names}) "
+        "and none is its configured catalogue. Name the items with the catalogue "
+        "they are in, as Workspace/Warehouse/Name/Kind/Name, or configure one."
     )
 
 
 def requested_by_label(
-    operation: str, items, places: Sequence[Place], home: Workspace
+    operation: str,
+    items,
+    places: Sequence[Place],
+    home: Workspace,
+    *,
+    project=None,
 ) -> dict[str, tuple[WeaverItemId, ...]]:
     """Each catalogue's requested items. An empty tuple means all of them.
 
     ``Kind/Name`` is an item of the working workspace's catalogue,
-    ``Workspace/Kind/Name`` one in another's, and a bare label or workspace name
-    every item of that catalogue. The result keeps the order the catalogues were
-    given.
+    ``Workspace/Kind/Name`` one in another workspace's, and a bare label or
+    workspace name every item of that catalogue. A label is the workspace, or
+    ``Workspace/Warehouse/Name`` where one workspace holds two catalogues given.
+    ``PowerBI`` and ``PowerBI/<project>`` are the working workspace's, read from
+    ``project``. The result keeps the order the catalogues were given.
     """
 
-    def matching(owner: str) -> list[Place]:
+    from .items import is_powerbi_selector
+
+    def exact(owner: str) -> list[Place]:
         return [
             place
             for place in places
-            if place.label.casefold() == owner.casefold()
-            or place.workspace.workspace.casefold() == owner.casefold()
+            if owner.casefold() in (place.label.casefold(), place.reference.casefold())
         ]
+
+    def one(value, owner: str) -> Place:
+        named = exact(owner) or [
+            place
+            for place in places
+            if place.workspace.workspace.casefold() == owner.casefold()
+        ]
+        if len(named) == 1:
+            return named[0]
+        if owner.casefold() == home.workspace.casefold():
+            return home_place(operation, places, home)
+        raise CommandError(
+            f"{value} names {owner}, which is "
+            f"{'none' if not named else 'more than one'} of the catalogues "
+            f"given to {operation}"
+        )
 
     values = (items,) if isinstance(items, str) else tuple(items)
     found: dict[str, list[WeaverItemId]] = {}
@@ -180,29 +222,24 @@ def requested_by_label(
     for value in values:
         text = str(value).strip().strip("/")
         parts = text.split("/")
-        if len(parts) == 1 or (len(parts) == 2 and matching(text)):
+        if is_powerbi_selector(text):
+            owner, local = home.workspace, text
+        elif len(parts) == 1 or (len(parts) == 2 and exact(text)):
             owner, local = text, None
+        elif len(parts) == 5:
+            owner, local = "/".join(parts[:3]), "/".join(parts[3:])
         elif len(parts) == 3:
             owner, local = parts[0], "/".join(parts[1:])
         else:
             owner, local = home.workspace, text
-        candidates = (
-            list(home_places(places, home))[:1]
-            if local is not None and owner == home.workspace
-            else matching(owner)
-        )
-        if len(candidates) != 1:
-            raise CommandError(
-                f"{value} names {owner}, which is "
-                f"{'none' if not candidates else 'more than one'} of the catalogues "
-                f"given to {operation}"
-            )
-        label = candidates[0].label
+        label = one(value, owner).label
         if local is None:
             whole.add(label)
             found.setdefault(label, [])
         else:
-            found.setdefault(label, []).extend(requested_items(local, what=operation))
+            found.setdefault(label, []).extend(
+                requested_items(local, what=operation, project=project)
+            )
     return {
         place.label: (
             () if place.label in whole else tuple(dict.fromkeys(found[place.label]))
@@ -308,13 +345,7 @@ def owned_items(state, requested, *, what: str) -> tuple:
 def default_request(operation: str, places, home) -> dict:
     """What an operation given no items runs: the working workspace's catalogue."""
 
-    local = home_places(places, home)
-    if not local:
-        raise CommandError(
-            f"None of the catalogues given to {operation} is in {home.workspace}. "
-            "Name the items to run, or the workspace whose catalogue they are in."
-        )
-    return {local[0].label: ()}
+    return {home_place(operation, places, home).label: ()}
 
 
 def context_lines(state, items) -> tuple[str, ...]:
@@ -401,13 +432,13 @@ __all__ = [
     "Place",
     "context_lines",
     "default_request",
+    "home_place",
     "offer_spark_homes",
     "owned_items",
     "places_from_mapping",
     "places_mapping",
     "read_run_places",
     "concurrently",
-    "home_places",
     "is_joined",
     "place_workspace",
     "requested_by_label",

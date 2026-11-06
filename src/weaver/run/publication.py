@@ -92,6 +92,107 @@ def _by_place(paths, roots):
     return grouped
 
 
+#: Allowance for the Warehouse's clock running behind the one that stamped a
+#: load's start.
+CLOCK_SKEW_SECONDS = 5.0
+
+#: Commit files read for their instants, newest first. An older commit is
+#: taken as before the load.
+COMMITS_READ = 50
+
+
+def last_load(node, session, workspace):
+    """When the table's last successful load started, if it wrote rows.
+
+    Read from the catalogue that owns the table. ``None`` when no load has
+    succeeded or the last one moved nothing, so there is nothing to wait for.
+    """
+
+    from ..catalogue.claims import catalogue_columns
+    from ..catalogue.tables import LOAD_STATISTIC, LOAD_STATUS
+    from ..targets import WarehouseTarget
+
+    status, statistic = LOAD_STATUS.public_name_of, LOAD_STATISTIC.public_name_of
+    keys = ("item_type", "item_name", "schema_name", "object_name")
+    joined = " and ".join(f"t.[{statistic(k)}] = s.[{status(k)}]" for k in keys)
+    where = " and ".join(f"s.[{status(k)}] = ?" for k in keys)
+    moved = " + ".join(
+        f"isnull(t.[{statistic(name)}], 0)"
+        for name in ("rows_inserted", "rows_updated", "rows_deleted")
+    )
+    identity = node.publication_of
+    schema, name = catalogue_columns(identity)
+    rows = session.query_tsql(
+        f"select top 1 s.[{status('result')}] as result, "
+        f"s.[{status('started_datetime')}] as started, {moved} as moved "
+        f"from [_].[{LOAD_STATUS.name}] as s "
+        f"left join [_].[{LOAD_STATISTIC.name}] as t "
+        f"on t.[{statistic('workflow_id')}] = s.[{status('workflow_id')}] and {joined} "
+        f"where {where} "
+        f"order by t.[{statistic('completed_datetime')}] desc",
+        target=WarehouseTarget(warehouse=workspace.catalogue_item),
+        workspace=workspace,
+        parameters=[identity.item.item_type, identity.item.item_name, schema, name],
+    )
+    if not rows:
+        return None
+    row = rows[0]
+    if str(row["result"]).casefold() not in ("succeeded", "rejected"):
+        return None
+    if not row["moved"]:
+        return None
+    return row["started"]
+
+
+def commits_before(node, session, workspace, started) -> frozenset[str]:
+    """The table's commits made before ``started``, by their own instants."""
+
+    from datetime import timezone
+
+    store = session.transport_store(workspace)
+    log = _commit_log(
+        node.physical_target.name, node.publication_of.object_id, session, workspace
+    )
+    if not store.exists(log):
+        return frozenset()
+    names = sorted(
+        entry.name
+        for entry in store.list(log)
+        if not entry.is_directory and entry.name.endswith(".json")
+    )
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    cutoff = (started.timestamp() - CLOCK_SKEW_SECONDS) * 1000
+    recent = names[-COMMITS_READ:]
+    before = set(names[: len(names) - len(recent)])
+    for name in recent:
+        if _committed_at(store.read(log / name)) < cutoff:
+            before.add(name)
+    return frozenset(before)
+
+
+def _committed_at(data: bytes) -> float:
+    """A commit's instant in milliseconds.
+
+    Its commitInfo where it has one; a Fabric Warehouse writes none, so
+    otherwise the newest file it added. A commit that adds no file, such as a
+    table's first, holds nothing a reader waits for, so it counts as before.
+    """
+
+    added = []
+    for line in data.decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        action = json.loads(line)
+        info = action.get("commitInfo")
+        if info and info.get("timestamp") is not None:
+            return float(info["timestamp"])
+        stamp = (action.get("add") or {}).get("modificationTime")
+        if stamp is not None:
+            added.append(float(stamp))
+    return max(added) if added else float("-inf")
+
+
 def _commit_log(target_name, object_id, session, workspace):
 
     from ..fabric.resources import WAREHOUSE

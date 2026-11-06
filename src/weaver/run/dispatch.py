@@ -225,10 +225,32 @@ def _onelake_publication(node, session, workspace, publication, state=None):
     """
 
     from ..runtime.load_result import LoadResult
-    from .publication import await_publication
+    from .publication import await_publication, commits_before, last_load
 
+    where = (
+        None
+        if state is None
+        else lambda readiness: state.workspace_for(
+            getattr(readiness, "owner", None), workspace
+        )
+    )
     producer = node.produced_by
-    if publication is None or producer is None:
+    if producer is None:
+        # The table's last load ran before this run: its catalogue says when,
+        # and whether it wrote anything to publish.
+        started = last_load(node, session, workspace)
+        if started is None:
+            return LoadResult(succeeded=True)
+        await_publication(
+            node,
+            session,
+            workspace,
+            before=commits_before(node, session, workspace, started),
+            readiness=tuple(node.publication_targets),
+            where=where,
+        )
+        return LoadResult(succeeded=True)
+    if publication is None:
         raise RunError(
             f"{node.node_id} waits on a publication and this run recorded none"
         )
@@ -241,11 +263,7 @@ def _onelake_publication(node, session, workspace, publication, state=None):
         workspace,
         before=publication.baseline(producer),
         readiness=tuple(node.publication_targets),
-        where=None
-        if state is None
-        else lambda readiness: state.workspace_for(
-            getattr(readiness, "owner", None), workspace
-        ),
+        where=where,
     )
     return LoadResult(succeeded=True)
 

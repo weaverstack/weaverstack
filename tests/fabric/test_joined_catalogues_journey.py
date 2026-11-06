@@ -14,8 +14,9 @@ Each team builds alone. Then:
                     behind a failed load in the hub
     repair          the hub's source returns with more rows; one joined --stale
                     load runs only what the failure reached, barriers included
-    spoke recovery  the hub reloads alone; the spoke's --stale load runs only
-                    its own stale Mart, recorded in its own catalogue
+    spoke recovery  the hub reloads alone; the spoke's --stale load syncs its
+                    own Bridge endpoint and runs only its stale Mart, which reads
+                    what the hub published, recorded in its own catalogue
 """
 
 from __future__ import annotations
@@ -157,6 +158,27 @@ class Estate:
             )
         self.session.execute_tsql(script, target=target, workspace=workspace)
 
+    def await_published(self, timeout: float = 300.0) -> None:
+        """Wait until OneLake holds the hub table a shortcut is created onto.
+
+        A rebuilt Warehouse table reaches OneLake after its transaction, and the
+        spoke's build checks its shortcut's source exists.
+        """
+
+        import time
+
+        from weaver.declaration.metadata import ObjectId
+        from weaver.run.publication import published_commits
+
+        _target, workspace = self._warehouse(self.joined.hub_workspace, "hub_warehouse")
+        name = self.joined.names["hub_warehouse"]
+        deadline = time.monotonic() + timeout
+        while not published_commits(
+            name, ObjectId("HUB", "Customer"), self.session, workspace
+        ):
+            assert time.monotonic() < deadline, "the hub table never reached OneLake"
+            time.sleep(10)
+
     def customers(self) -> int:
         target, workspace = self._warehouse(
             self.joined.spoke_workspace, "spoke_warehouse"
@@ -229,6 +251,7 @@ def journey(tmp_path_factory, weaver_session, joined_estate, environment_name):
         str(estate.hub), workspace_config=estate.hub_config, session=weaver_session
     )
     assert built.succeeded, built
+    estate.await_published()
     built = weaver.build(
         str(estate.spoke), workspace_config=estate.spoke_config, session=weaver_session
     )
@@ -281,7 +304,7 @@ def journey(tmp_path_factory, weaver_session, joined_estate, environment_name):
         workspace_config=estate.spoke_config,
         session=weaver_session,
     )
-    steps["recovery"] = (behind, recovered, estate.statuses())
+    steps["recovery"] = (behind, recovered, estate.statuses(), estate.customers())
     return steps
 
 
@@ -377,7 +400,7 @@ def test_a_joined_stale_load_repairs_only_what_the_failure_reached(
 def test_the_spoke_recovers_its_own_stale_objects_and_nothing_else(
     journey, joined_estate
 ):
-    behind, recovered, statuses = journey["recovery"]
+    behind, recovered, statuses, customers = journey["recovery"]
     spoke = joined_estate.spoke_workspace
 
     spoke_report = next(
@@ -390,4 +413,11 @@ def test_the_spoke_recovers_its_own_stale_objects_and_nothing_else(
     }
     assert recovered.succeeded, recovered
     assert _loads(recovered) == {(spoke, "Warehouse/Mart/MART.Summary"): "succeeded"}
+    # The hub's load is not part of this run, so the run waits for its last
+    # commit to be published, then syncs the spoke's own Bridge endpoint.
+    assert _barriers(recovered) == [
+        (joined_estate.hub_workspace, "onelake_publication", "succeeded"),
+        (spoke, "endpoint_refresh", "succeeded"),
+    ]
+    assert customers == 6
     assert statuses[spoke]["MART.Summary"] == ("succeeded", recovered.workflow_id)

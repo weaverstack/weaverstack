@@ -109,7 +109,7 @@ def load_folder(
 
     inserted, updated = _publish(staged_entries, staging, destination, current)
     deleted = _reconcile_deletes(
-        destination.mounted(), current, deletes, staged, contract=contract
+        destination, current, deletes, staged, contract=contract
     )
     _write_change_document(
         destination,
@@ -325,9 +325,23 @@ def _reconcile_deletes(
     for relative in sorted(targets):
         if _is_changes_path(relative) or relative not in current.files:
             continue
-        destination.store.delete(destination.at(relative))
+        _delete(destination, relative)
         deleted.append(relative)
     return tuple(deleted)
+
+
+def _delete(destination: FolderFiles, relative: str) -> None:
+    """Delete through the mount, or through the store where the mount misses it.
+
+    The mount reports absent a file created outside it after it looked the path
+    up, and deleting a path the mount reports absent changes nothing.
+    """
+
+    mounted = destination.mounted()
+    if mounted.store.exists(mounted.at(relative)):
+        mounted.store.delete(mounted.at(relative))
+    else:
+        destination.store.delete(destination.at(relative))
 
 
 # --- evidence and changes ------------------------------------------------------

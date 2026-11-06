@@ -151,6 +151,7 @@ function buildModel(tables, problems) {
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     if (n) n.load = status(r);
   });
+  mirrorSources(m, t("mirrors"));
   t("tests").forEach(function (r) {
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     if (n) { n.test = status(r); n.test.failures = num(r.failures); }
@@ -207,6 +208,23 @@ function joinCatalogues(m, shortcuts) {
     void code;
   });
   return out;
+}
+
+/* Where each mirrored object's rows come from. When the catalogue holding its
+   source is read, the object's state is the source's, and none when the source
+   no longer holds it; otherwise its state is not observed here. */
+function mirrorSources(m, rows) {
+  var byTarget = new Map();
+  m.items.forEach(function (it) {
+    if (it.target) byTarget.set(String(it.workspace || "").toLowerCase() + "|" + String(it.target).toLowerCase(), it);
+  });
+  rows.forEach(function (r) {
+    var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+    if (!n) return;
+    var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
+    if (!source) return;
+    n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+  });
 }
 
 function relational(schema) { return String(schema || "").replace(/^Tables\//, ""); }

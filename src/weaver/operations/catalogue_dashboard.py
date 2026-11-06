@@ -255,9 +255,9 @@ def _refuse_configured_targets(base: Workspace, name: str) -> None:
 def required_tables() -> tuple[str, ...]:
     """The catalogue tables the Dashboard model reads."""
 
-    from ..dashboard_model import RELATIONS
+    from ..dashboard_model import OPTIONAL, RELATIONS
 
-    return tuple(sorted(RELATIONS.values()))
+    return tuple(sorted(set(RELATIONS.values()) - OPTIONAL))
 
 
 def _require_sources(opened, base, places, mode):

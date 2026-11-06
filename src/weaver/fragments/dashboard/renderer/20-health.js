@@ -15,9 +15,13 @@ function isView(n) { return n.kind === KIND.VIEW; }
 function participates(n) { return n.canLoad || n.isMirrored || isView(n); }
 function isLoadSubject(n) { return (n.canLoad || n.isMirrored) && !isView(n); }
 
-/* A mirrored object's state is recorded in the catalogue it mirrors, which
-   this Dashboard does not read. */
-function effectiveLoad(n) { return n.isMirrored ? null : n.load; }
+/* A mirrored object's state is recorded in the catalogue it mirrors: the
+   source object's, where the Dashboard reads that catalogue. */
+function effectiveLoad(n) {
+  if (!n.isMirrored) return n.load;
+  return n.mirror && n.mirror.source ? n.mirror.source.load : null;
+}
+function mirrorObserved(n) { return !!(n.mirror && n.mirror.read); }
 
 function establishedAt(n) {
   var s = effectiveLoad(n);
@@ -195,10 +199,12 @@ function byFinding(a, b) {
 function loadFindings(m, n, anc, asOf) {
   var s = effectiveLoad(n), out = [];
   if (!s || s.result === "Pending") {
-    var f = finding("load", "load_pending", AMBER, n, "Pending", n.isMirrored ?
+    var unseen = n.isMirrored && !mirrorObserved(n);
+    var f = finding("load", "load_pending", AMBER, n, "Pending", unseen ?
       "loaded in the catalogue this one mirrors, which the Dashboard does not read" :
+      n.isMirrored ? "the catalogue this one mirrors has not loaded it" :
       "no load has processed this object since it was built", s);
-    f.unobserved = n.isMirrored;
+    f.unobserved = unseen;
     return [f];
   }
   if (LOAD_RED.indexOf(s.result) >= 0) return [finding("load", "load_failed", RED, n, s.result, "the last load " + s.result, s)];

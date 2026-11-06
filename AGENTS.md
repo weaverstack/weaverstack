@@ -183,7 +183,10 @@ it lacks. A detail page carries a page filter on the item kinds it shows, so
 its measures see a filter on `Dashboard item` and keep the items picked, or
 the first listed, before they serialise. The renderer qualifies every item,
 node key and record ID with its catalogue's payload code, and joins physical
-`_.Shortcut` rows across catalogues as `weaver.catalogues.join` does.
+`_.Shortcut` rows across catalogues as `weaver.catalogues.join` does. A
+catalogue holds `_.Mirror` only once it has been a mirror, so the model reads
+it where it exists; a mirrored object takes its source's state when the
+source's catalogue is among those read, and is unobserved otherwise.
 
 ## The core abstraction
 

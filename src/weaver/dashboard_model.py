@@ -49,7 +49,11 @@ RELATIONS = {
     "Semantic model measure": "SemanticModelMeasure",
     "Semantic model relationship": "SemanticModelRelationship",
     "Shortcut": "Shortcut",
+    "Mirror": "Mirror",
 }
+#: Relations a catalogue holds only once something has happened to it: a
+#: catalogue that has never been a mirror has no ``_.Mirror``.
+OPTIONAL = frozenset({"Mirror"})
 
 DIRECTORY = "Dashboard item"
 #: Its columns, in order. ``Item`` is what a slicer shows.
@@ -133,6 +137,8 @@ def missing_columns(source: DashboardSource) -> dict[str, tuple[str, ...]]:
 
     missing = {}
     for table, columns in required_columns().items():
+        if table in OPTIONAL and table not in source.columns:
+            continue
         held = {name.casefold() for name in source.columns.get(table, {})}
         absent = tuple(c for c in columns if c.casefold() not in held)
         if absent:
@@ -209,6 +215,16 @@ class _Expander:
         self.sources = tuple(sources)
         self.mode = mode
 
+    def holders(self, table: str) -> list[tuple[int, DashboardSource]]:
+        """Each catalogue holding a relation, with its code."""
+
+        relation = RELATIONS[table]
+        return [
+            (code, source)
+            for code, source in enumerate(self.sources, start=1)
+            if relation not in OPTIONAL or relation in source.columns
+        ]
+
     def table_name(self, table: str, source: DashboardSource) -> str:
         return table if self.mode == IMPORT else f"{table} {source.alias}"
 
@@ -225,6 +241,11 @@ class _Expander:
             raise AssertionError(f"CATALOGUES reads {table!r}, not a catalogue table")
         filters = _split_top(where, "&&") if where else []
         projected = ", ".join(columns)
+        holders = self.holders(table)
+        if not holders:
+            # No catalogue holds it: the same columns, and no rows.
+            blank = ", ".join(f'{name}, ""' for name in columns[0::2])
+            return f'FILTER(ROW("@catalogue", "", "@code", "", {blank}), FALSE())'
         if self.mode == IMPORT:
             quoted = "'" + table.replace("'", "''") + "'"
             body = (
@@ -233,7 +254,7 @@ class _Expander:
             )
             return f"CALCULATETABLE({body}, {', '.join(filters)})" if filters else body
         branches = []
-        for code, source in enumerate(self.sources, start=1):
+        for code, source in holders:
             named = "'" + self.table_name(table, source).replace("'", "''") + "'"
             body = (
                 f'SELECTCOLUMNS({named}, "@catalogue", {_dax_string(source.label)}, '
@@ -248,12 +269,15 @@ class _Expander:
     def sum_catalogues(self, arguments: list[str]) -> str:
         table = arguments[0].strip().strip("'").replace("''", "'")
         expression = arguments[1]
+        holders = self.holders(table)
+        if not holders:
+            return "0"
         if self.mode == IMPORT:
             return f"({expression})"
         return (
             "("
             + " + ".join(
-                f"({self.rename(expression, table, source)})" for source in self.sources
+                f"({self.rename(expression, table, source)})" for _, source in holders
             )
             + ")"
         )
@@ -491,6 +515,8 @@ def catalogue_tables(
             )
         for model_table, relation in RELATIONS.items():
             for source in sources:
+                if relation in OPTIONAL and relation not in source.columns:
+                    continue
                 name = f"{model_table} {source.alias}"
                 tables.append(
                     {
@@ -519,6 +545,8 @@ def catalogue_tables(
         columns = None
         partitions = []
         for code, source in enumerate(sources, start=1):
+            if relation in OPTIONAL and relation not in source.columns:
+                continue
             found = _source_columns(source, relation, wanted)
             columns = columns or found
             if not source.server:
@@ -554,6 +582,8 @@ def catalogue_tables(
                     },
                 }
             )
+        if not partitions:
+            continue
         tables.append(
             {
                 "name": model_table,
@@ -695,6 +725,7 @@ __all__ = [
     "DashboardSource",
     "IMPORT",
     "MODES",
+    "OPTIONAL",
     "PAGE_BUDGET",
     "RELATIONS",
     "declared_columns",

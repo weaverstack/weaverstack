@@ -919,3 +919,22 @@ test("a page whose data is too large says so instead of drawing part of it", () 
   const m = D.buildModel(p.tables, p.problems);
   assert.deepEqual(m.tooLarge, { size: "2500000", budget: "2000000" });
 });
+
+test("a mirrored object takes its state from its source when that catalogue is read, and is unobserved otherwise", () => {
+  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
+  // Spoke's Mart Summary is mirrored from Hub's Mart Summary.
+  const nodes = (flags) => table("nodes", NODE, [
+    [O("hm", 1), O("Warehouse/Mart", 1), "MART", "Summary", "Table", "MART.Summary", 9, ""],
+    [O("m", 2), O("Warehouse/Mart", 2), "MART", "Summary", "Table", "MART.Summary", flags, ""]]);
+  const items = table("items", INSTALL, [
+    [O("Warehouse/Mart", 1), "HUB", "HubMart_WH", "1", "w-hub", "i-hubmart"], [O("Warehouse/Mart", 2), "SPOKE", "Mart_WH", "1", "w-spoke", "i-mart"]]);
+  const loads = table("loads", LOAD, [[O("Warehouse/Mart", 1), "MART", "Summary", "Failed", "w", AT - H, AT - H, 1]]);
+  const mirrors = (target) => table("mirrors", MIRROR, [[O("Warehouse/Mart", 2), "MART", "Summary", "HUB", target, "MART", "Summary"]]);
+  const assess = (extra) => {
+    const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes(13) + loads + extra);
+    return D.assessHealth(D.buildModel(p.tables, p.problems), { asOf: AT - 24 * H }).load.filter((f) => f.node.key === O("m", 2));
+  };
+  assert.deepEqual(assess(mirrors("HubMart_WH")).map((f) => [f.code, f.unobserved]), [["load_failed", false]]);
+  assert.deepEqual(assess(mirrors("Elsewhere_WH")).map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
+  assert.deepEqual(assess("").map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
+});

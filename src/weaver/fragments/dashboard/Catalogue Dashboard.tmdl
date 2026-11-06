@@ -254,7 +254,8 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// Current load and test outcomes, and when each data object was last built.
+    /// Current load and test outcomes, when each data object was last built,
+    /// and where each mirrored object's rows come from.
     measure 'Status data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
@@ -284,6 +285,16 @@ table 'Dashboard measures'
             "@schema", 'Registry'[Schema name],
             "@object", 'Registry'[Object name],
             "@built", 'Registry'[Build datetime]
+        )
+        VAR _mirrors = CATALOGUES(
+            'Mirror',
+            "@item", 'Mirror'[Item type] & "/" & 'Mirror'[Item name],
+            "@schema", 'Mirror'[Schema name],
+            "@object", 'Mirror'[Object name],
+            "@workspace", 'Mirror'[Source workspace name],
+            "@target", 'Mirror'[Source target name],
+            "@sourceschema", 'Mirror'[Source schema name],
+            "@sourceobject", 'Mirror'[Source object name]
         )
         RETURN
             _t & "loads" & _f & "item" & _f & "schema" & _f & "object" & _f & "result" & _f & "completed" & _f & "duration"
@@ -315,6 +326,15 @@ table 'Dashboard measures'
                     & _f & [@schema]
                     & _f & [@object]
                     & _f & IF(ISBLANK([@built]), "", FORMAT(([@built] - DATE(1970, 1, 1)) * 86400000, "0")),
+                ""
+            )
+            & _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject"
+            & CONCATENATEX(
+                _mirrors,
+                _r & [@item] & _q & [@code]
+                    & _f & [@schema] & _f & [@object]
+                    & _f & [@workspace] & _f & [@target]
+                    & _f & [@sourceschema] & _f & [@sourceobject],
                 ""
             )
         ```

@@ -761,3 +761,23 @@ def test_a_configured_target_of_that_name_is_refused():
     with pytest.raises(CommandError, match="targets: deploys SemanticModel/Sales"):
         weaver.deploy_catalogue_dashboard(session=session)
     assert not model.calls
+
+
+@weaver_test()
+def test_a_catalogue_that_was_never_a_mirror_is_read_without_one():
+    from dataclasses import replace
+
+    held, never = dashboard_sources(2)
+    never = replace(
+        never, columns={t: c for t, c in never.columns.items() if t != "Mirror"}
+    )
+    both = model_text([held, never], DIRECT_LAKE)
+    assert f"table 'Mirror {held.alias}'" in both
+    assert f"table 'Mirror {never.alias}'" not in both
+    status = both[both.index("measure 'Status data'") :]
+    assert f"'Mirror {held.alias}'" in status[: status.index("displayFolder")]
+
+    neither = model_text([never], IMPORT)
+    assert "table 'Mirror'" not in neither
+    status = neither[neither.index("measure 'Status data'") :]
+    assert 'FILTER(ROW("@catalogue", "", "@code", ""' in status

@@ -76,10 +76,11 @@ class Lakehouse:
         return _join(_mounted(self.name, self.spark_root), FILES_AREA)
 
     def files_store(self):
-        """The store Weaver lists and changes this Lakehouse's Files through.
+        """The store Weaver lists this Lakehouse's Files through.
 
         A mount's listing can still show a file deleted through OneLake, so
-        Weaver's own file work goes through ``notebookutils.fs`` instead.
+        Weaver lists through ``notebookutils.fs``. Folder publication writes
+        through the mount, which authored code reads.
         """
 
         if self.store is not None:

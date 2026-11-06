@@ -4,9 +4,11 @@ Object code fills a Weaver-issued staging folder and returns files to delete.
 Validation confirms staged and deleted paths are within the declared file key
 before publishing changes.
 
-Weaver lists, compares, copies and deletes through the Lakehouse's store, never
-through the mount: a mount's listing can still show a file deleted through
-OneLake. Mounted paths are only handed to authored code.
+Weaver lists and compares through the Lakehouse's store, because a mount's
+listing can still show a file deleted through OneLake. It publishes into the
+destination through the mount, because a mount that looked up a path while it
+was absent keeps reporting it absent until the file is created through that
+mount.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from typing import Any
 
 from ..errors import LoadError
 from ..locations import Location
-from ..store import StoreError, StoreNotFoundError
+from ..store import FilesystemStore, StoreError, StoreNotFoundError
 from .load_contract import FolderLoadContract
 from .load_result import LoadResult
 
@@ -54,8 +56,8 @@ TOLERATED_MESSAGE = "staged files were rejected and excluded from the load"
 class FolderFiles:
     """One Files folder, as its store reaches it and as authored code opens it.
 
-    ``store`` must also copy and move a file within itself and copy one to the
-    driver. ``path`` is the mounted address of ``location``.
+    ``store`` must also copy a file to the driver. ``path`` is the mounted
+    address of ``location``.
     """
 
     store: Any
@@ -69,6 +71,11 @@ class FolderFiles:
 
     def at(self, relative: str) -> Location:
         return self.location.join(*relative.split("/"))
+
+    def mounted(self) -> "FolderFiles":
+        """The same folder, changed through its mount."""
+
+        return FolderFiles(FilesystemStore(), Location(str(self.path)), self.path)
 
 
 def load_folder(
@@ -279,7 +286,9 @@ def _publish(
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Do not rewrite byte-identical files or report them as updated."""
 
-    destination.store.make_directory(destination.location)
+    source = staging.mounted()
+    target = destination.mounted()
+    target.store.make_directory(target.location)
     inserted: list[str] = []
     updated: list[str] = []
     for relative, entry in staged.items():
@@ -290,7 +299,7 @@ def _publish(
             updated.append(relative)
         else:
             continue
-        _safe_replace(destination.store, staging.at(relative), destination.at(relative))
+        _safe_replace(target.store, source.at(relative), target.at(relative))
     return tuple(inserted), tuple(updated)
 
 
@@ -316,9 +325,23 @@ def _reconcile_deletes(
     for relative in sorted(targets):
         if _is_changes_path(relative) or relative not in current.files:
             continue
-        destination.store.delete(destination.at(relative))
+        _delete(destination, relative)
         deleted.append(relative)
     return tuple(deleted)
+
+
+def _delete(destination: FolderFiles, relative: str) -> None:
+    """Delete through the mount, or through the store where the mount misses it.
+
+    The mount reports absent a file created outside it after it looked the path
+    up, and deleting a path the mount reports absent changes nothing.
+    """
+
+    mounted = destination.mounted()
+    if mounted.store.exists(mounted.at(relative)):
+        mounted.store.delete(mounted.at(relative))
+    else:
+        destination.store.delete(destination.at(relative))
 
 
 # --- evidence and changes ------------------------------------------------------

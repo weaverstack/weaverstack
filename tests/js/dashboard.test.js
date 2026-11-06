@@ -932,7 +932,7 @@ test("a mirrored object takes its state from its source when that catalogue is r
   assert.deepEqual(assess("").map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
 });
 
-test("a mirror leaves unchanged what it mirrors and what keeps its source signature, on both sides", () => {
+test("a mirror borrows, rebuilds, changes or adds each object, and the source copy shares borrowed and changed", () => {
   const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
   // Spoke mirrors Hub's Mart: Summary is mirrored; Customer is rebuilt the
   // same; Revenue is changed; Report is new.
@@ -953,10 +953,12 @@ test("a mirror leaves unchanged what it mirrors and what keeps its source signat
     [O("Warehouse/Mart", 2), "MART", "Report", "data", "n1"]]);
   const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes + mirrors + signatures);
   const m = D.buildModel(p.tables, p.problems);
-  const unchanged = Array.from(m.nodes.values()).filter((n) => n.unchanged).map((n) => n.key).sort();
-  assert.deepEqual(unchanged, [O("hs", 1), O("hc", 1), O("s", 2), O("c", 2)].sort());
+  const state = (key) => m.nodes.get(key).change || "rebuilt";
+  assert.deepEqual([O("s", 2), O("c", 2), O("r", 2), O("n", 2)].map(state), ["borrowed", "rebuilt", "changed", "added"]);
+  assert.deepEqual([O("hs", 1), O("hc", 1), O("hr", 1)].map(state), ["borrowed", "rebuilt", "changed"]);
   assert.equal(m.nodes.get(O("c", 2)).original.key, O("hc", 1));
   assert.deepEqual(m.nodes.get(O("hs", 1)).copies.map((n) => n.key), [O("s", 2)]);
+  assert.ok(m.changes);
 });
 
 test("a run knows the items it touched, so choosing items narrows the runs", () => {

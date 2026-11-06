@@ -1056,7 +1056,7 @@ table 'Dashboard measures'
         displayFolder: Pages
         isHidden
 
-    /// The Summary page for HTML Content.
+    /// The Items page for HTML Content.
     measure 'Overview page' = PAGE("overview", [Catalogue data] & [Lineage data] & [Status data] & [Mirror data] & [Workflow data] & [Build data])
         displayFolder: Pages
 

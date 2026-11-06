@@ -272,11 +272,13 @@ function erWorkspace(body, m, s, options) {
     }
     boxes.forEach(function (box, id) {
       var n = g.nodes.get(id), seed = w.seeds.has(id);
-      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + (n.owner && n.owner.unchanged ? " wd-unchanged" : "") + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
+      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + changeClass(n.owner) + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
       group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
       group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
       group.appendChild(sv("text", { "class": "wd-er-title", x: 12, y: 17 }, [clipText(n.label, 28)]));
       group.appendChild(sv("text", { "class": "wd-er-item", x: 12, y: 29 }, [clipText(shownName(n.item), 34)]));
+      if (CHANGE_TEXT[n.owner && n.owner.change]) group.appendChild(sv("text", { "class": "wd-er-change", x: ER.BOX - 12, y: 17, "text-anchor": "end" },
+        [n.owner.change === CHANGE.CHANGED ? "Δ" : "+", sv("title", {}, [CHANGE_TEXT[n.owner.change]])]));
       box.rows.forEach(function (r, i) {
         group.appendChild(sv("text", { "class": "wd-er-col" + (r.mark ? " wd-er-" + r.mark : ""), x: 12, y: ER.HEAD + i * ER.ROW + 13 },
           [(r.mark === "key" ? "⚿ " : r.mark === "fk" ? "↗ " : "   ") + clipText(r.name, 30)]));

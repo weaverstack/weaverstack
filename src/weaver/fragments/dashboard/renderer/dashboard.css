@@ -352,10 +352,15 @@ body { background: #f7f7f6; }
 .wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
 
 /* The mirror toggle sits in the toolbar. */
-/* An object a mirror left unchanged, and the object it mirrors. */
-.wd-unchanged { opacity: 0.4; }
-.wd-unchanged:hover, .wd-unchanged:focus-visible { opacity: 0.8; }
-.wd-key-swatch.wd-unchanged { background: var(--ink); opacity: 0.3; }
+/* As a mirror left an object: borrowed objects muted, changed and added ones marked. */
+.wd-borrowed { opacity: 0.6; }
+.wd-borrowed:hover, .wd-borrowed:focus-visible { opacity: 0.9; }
+tr.wd-changed > td:first-child, .wd-entry.wd-changed { box-shadow: inset 3px 0 0 var(--violet); }
+.wd-change-mark { display: inline-block; min-width: 13px; margin-left: 5px; padding: 0 2px; border-radius: 3px; background: var(--violet); color: var(--surface); font: 700 10px/13px var(--sans); text-align: center; }
+.wd-er-change { fill: var(--violet); font: 700 13px var(--sans); }
+.wd-key-swatch.wd-borrowed { background: var(--ink); opacity: 0.45; }
+.wd-key-change { width: 13px; height: 13px; border-radius: 3px; background: var(--violet); }
+.wd-key-change::before { content: "Δ"; display: block; color: var(--surface); font: 700 9px/13px var(--sans); text-align: center; }
 
 /* --- estate ------------------------------------------------------------------ */
 

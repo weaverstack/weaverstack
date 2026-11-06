@@ -158,7 +158,8 @@ function ganttChart(rows, sum, s, m, select) {
       var r = rows[i], y = GANTT.AXIS + i * GANTT.ROW, mid = y + GANTT.ROW / 2;
       if (i % 2) { ctx.fillStyle = P["paper-deep"]; ctx.globalAlpha = 0.45; ctx.fillRect(0, y, width, GANTT.ROW); ctx.globalAlpha = 1; }
       if (r.id === s.pick) { ctx.fillStyle = P["blue-soft"]; ctx.fillRect(0, y, width, GANTT.ROW); }
-      var light = r.node && r.node.unchanged ? UNCHANGED_ALPHA : 1;
+      var change = r.node && r.node.change, light = change === CHANGE.BORROWED ? BORROWED_ALPHA : 1;
+      if (CHANGE_TEXT[change]) { ctx.fillStyle = P.violet; ctx.fillRect(0, y + 2, 3, GANTT.ROW - 4); }
       ctx.globalAlpha = light;
       var kind = r.envelope ? null : recordKind(r.node, r.task);
       if (kind) glyph(ctx, kind, 17, mid, kindColour(kind, P), P);

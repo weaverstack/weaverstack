@@ -69,7 +69,7 @@ function pageState(name) { var s = state(); s[name] = s[name] || {}; return s[na
 function weaveMark() { return el("span", { "class": "wd-mark", "aria-hidden": "true" }, [el("i"), el("i"), el("i"), el("i")]); }
 
 var PAGE_TITLES = {
-  workspaces: "Workspaces", overview: "Summary", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
+  workspaces: "Workspaces", overview: "Items", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
   performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model"
 };
 /* The catalogues the header names before it counts the rest. */
@@ -423,11 +423,22 @@ function depthLabel(d) { return d < 0 ? "Max" : String(d); }
 
 /* ---- object details ----------------------------------------------------------- */
 
+/* The class that draws an object as a mirror left it: muted when borrowed,
+   marked when changed or added. */
+function changeClass(n) {
+  return !n || !n.change ? "" : n.change === CHANGE.BORROWED ? " wd-borrowed" : " wd-changed";
+}
+var CHANGE_TEXT = { changed: "Changed from its source", added: "Added; not in the catalogue mirrored" };
+function changeMark(n) {
+  if (!n || !CHANGE_TEXT[n.change]) return null;
+  return el("span", { "class": "wd-change-mark", title: CHANGE_TEXT[n.change], text: n.change === CHANGE.CHANGED ? "Δ" : "+" });
+}
+
 /* plain leaves the item out, for a table that shows it in a column of its own. */
 function nodeLink(m, key, onOpen, plain) {
   var n = m.nodes.get(key);
-  return el("button", { "class": "wd-link" + (n.unchanged ? " wd-unchanged" : ""), type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
-    [kindMark(n.kind), n.label, plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
+  return el("button", { "class": "wd-link" + changeClass(n), type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
+    [kindMark(n.kind), n.label, changeMark(n), plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 
 function details(panel, m, key, options) {
@@ -457,9 +468,12 @@ function details(panel, m, key, options) {
     fact("Readiness", el("span", {}, [el("span", { "class": "wd-chip wd-" + readinessTone(ready.state), text: ready.state }),
       ready.waitingOn.length ? " waiting on " + ready.waitingOn.slice(0, 3).map(function (w) { return w.label; }).join(", ") + (ready.waitingOn.length > 3 ? " and " + (ready.waitingOn.length - 3) + " more" : "") : ""]));
   }
-  if (n.original) fact("Unchanged from", nodeLink(m, n.original.key, open));
-  else if (n.isMirrored) fact("Mirrors", el("span", { "class": "wd-muted", text: "Its source's catalogue is not read" }));
-  if (n.copies) fact("Unchanged in", el("span", {}, n.copies.reduce(function (out, c, i) { return out.concat(i ? [" · "] : [], [nodeLink(m, c.key, open)]); }, [])));
+  // The other side of a mirror: the source this copy came from, or the copies of this source.
+  var FROM = { borrowed: "Borrowed from", changed: "Changed from" }, IN = { borrowed: "Borrowed by", changed: "Changed in" };
+  if (n.original) fact(FROM[n.change] || "Same code as", nodeLink(m, n.original.key, open));
+  else if (n.change === CHANGE.BORROWED) fact("Borrowed from", el("span", { "class": "wd-muted", text: "Its source's catalogue is not read" }));
+  else if (n.change === CHANGE.ADDED) fact("Added", el("span", { "class": "wd-muted", text: "Not in the catalogue mirrored" }));
+  (n.copies || []).forEach(function (c) { fact(IN[c.change] || "Rebuilt in", nodeLink(m, c.key, open)); });
   if (n.built) fact("Built", stamp(n.built));
   if (n.isStatic) fact("Static", "Loaded once");
   panel.appendChild(facts);
@@ -528,7 +542,7 @@ function sortRows(columns, rows, sortBy, desc, group) {
 }
 
 /* A table for a list of records, with optional sorting, grouping and a row
-   limit. A row about an object a mirror left unchanged is drawn lighter. */
+   limit. A row about an object is drawn as a mirror left it. */
 function dataTable(columns, rows, options) {
   options = options || {};
   var limit = options.limit || 200, sortBy = options.sort || null, desc = options.desc !== false;
@@ -546,7 +560,7 @@ function dataTable(columns, rows, options) {
       }))]),
       el("tbody", {}, sorted.slice(0, limit).map(function (row) {
         var n = row && (row.node || row.n);
-        return el("tr", { "class": [options.onRow ? "wd-clickable" : "", n && n.unchanged ? "wd-unchanged" : ""].join(" ").trim() || null, onclick: options.onRow ? function () { options.onRow(row); } : null },
+        return el("tr", { "class": ((options.onRow ? "wd-clickable" : "") + changeClass(n)).trim() || null, onclick: options.onRow ? function () { options.onRow(row); } : null },
           columns.map(function (c) {
             var v = c.render ? c.render(row) : c.value(row);
             return el("td", { "class": c.numeric ? "wd-num" : c.mono ? "wd-mono" : null }, [v === null || v === undefined ? "—" : typeof v === "object" ? v : String(v)]);

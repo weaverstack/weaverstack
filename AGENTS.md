@@ -186,10 +186,11 @@ node key and record ID with its catalogue's payload code, and joins physical
 catalogue holds `_.Mirror` only once it has been a mirror, so the model reads
 it where it exists; a mirrored object takes its source's state when the
 source's catalogue is among those read, and is unobserved otherwise. Beside a
-mirror, the model also carries each object's source signature: the renderer
-pairs a mirror's catalogue with the one it mirrors and draws an object lighter on
-both sides when it is mirrored or keeps its signature, so what changed in the
-mirror stands out.
+mirror, the model also carries each object's source signature. The renderer
+pairs a mirror's catalogue with the one it mirrors, through an object still
+mirrored, and classes each object there as borrowed (drawn muted), changed or
+added (marked) by its signature, or rebuilt with the same code (drawn as
+usual); the source's copy of a borrowed or changed object takes that state.
 
 ## The core abstraction
 

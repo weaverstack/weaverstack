@@ -205,9 +205,9 @@ function entitiesPage(body, m) {
     note.textContent = found.length > 100 ? "Showing the first 100 of " + fmt(found.length) + " matches. Refine the filter to narrow them." : fmt(found.length) + (found.length === 1 ? " match" : " matches");
     shown.forEach(function (e) {
       var n = e.ref && e.ref.key ? e.ref : e.owner;
-      list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry" + (n && n.unchanged ? " wd-unchanged" : ""), "aria-selected": String(s.selected === entryId(e)),
+      list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry" + changeClass(n), "aria-selected": String(s.selected === entryId(e)),
         onclick: function () { choose(e, false); } }, [
-        el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label]),
+        el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label, e.ref && e.ref.key ? changeMark(e.ref) : null]),
         el("span", { "class": "wd-entry-meta", text: e.meta }),
         e.desc ? el("span", { "class": "wd-entry-desc", text: e.desc }) : null
       ]));

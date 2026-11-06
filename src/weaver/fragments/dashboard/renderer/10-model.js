@@ -160,7 +160,7 @@ function buildModel(tables, problems) {
     if (n) n.load = status(r);
   });
   mirrorSources(m, t("mirrors"));
-  markUnchanged(m, t("signatures"));
+  markChanges(m, t("signatures"));
   t("tests").forEach(function (r) {
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     if (n) { n.test = status(r); n.test.failures = num(r.failures); }
@@ -237,25 +237,31 @@ function mirrorSources(m, rows) {
 
 }
 
-/* What a mirror left unchanged. A mirror's catalogue is paired with the
-   catalogue it mirrors, where both are read; an object is unchanged when it is
-   mirrored, or when its source signature equals that of the same object there.
-   Both sides are marked, and pages draw them lighter. */
-function markUnchanged(m, signatures) {
+/* How each object differs between a mirror and the catalogue it mirrors,
+   where both are read. On the mirror's side an object is borrowed when it is
+   mirrored, changed when its source signature differs from the same object's
+   there, added when that catalogue holds no such object, and otherwise rebuilt
+   with the same code. The source's copy of a borrowed or changed object takes
+   that state. A mirror whose source is not read marks only what it borrows. */
+var CHANGE = { BORROWED: "borrowed", CHANGED: "changed", ADDED: "added" };
+function markChanges(m, signatures) {
   var sources = new Map(), signed = new Map();
   m.nodes.forEach(function (n) { if (n.mirror) sources.set(ownerCode(n.item), n.mirror.item.code); });
   signatures.forEach(function (r) { signed.set(identityKey(r.item, r.schema, r.object) + "|" + r.kind, r.signature); });
   function signature(n) { return signed.get(identityKey(n.item, n.schema, n.object) + "|" + (isValidation(n) ? "test" : "data")) || null; }
   m.nodes.forEach(function (n) {
     var code = sources.get(ownerCode(n.item));
+    if (!n.isMirrored && !code) return;
     var original = n.mirror && n.mirror.source ? n.mirror.source
       : code ? m.byIdentity.get(identityKey(owned(bare(n.item), code), n.schema, n.object)) || null : null;
-    if (!n.isMirrored && !(original && signature(n) && signature(n) === signature(original))) return;
-    n.unchanged = m.unchanged = true;
+    if (n.isMirrored) n.change = CHANGE.BORROWED;
+    else if (!original) n.change = CHANGE.ADDED;
+    else if (signature(n) && signature(original) && signature(n) !== signature(original)) n.change = CHANGE.CHANGED;
+    if (n.change) m.changes = true;
     if (!original) return;
     n.original = original;
-    original.unchanged = true;
     (original.copies = original.copies || []).push(n);
+    if (n.change && !original.change) original.change = n.change;
   });
 }
 

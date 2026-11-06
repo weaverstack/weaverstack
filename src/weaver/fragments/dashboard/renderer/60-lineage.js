@@ -191,7 +191,7 @@ function legend(mode, m) {
     ["kind wd-kind wd-kind-test", "Test"], ["kind wd-kind wd-kind-assumption", "Assumption"], ["kind wd-kind wd-kind-semantic-model", "Semantic model"], ["kind wd-kind wd-kind-report", "Report"],
     ["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]
   ];
-  if (m && m.unchanged) entries.push(["swatch wd-unchanged", "Lighter: the same in a mirror and its source"]);
+  if (m && m.changes) entries.push(["swatch wd-borrowed", "Borrowed from the catalogue mirrored"], ["change", "Changed (Δ) or added (+) in a mirror"]);
   return el("div", { "class": "wd-legend" }, entries.map(function (e) {
     return el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-" + e[0] }), e[1]]);
   }).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));

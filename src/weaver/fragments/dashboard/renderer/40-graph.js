@@ -4,8 +4,8 @@
 // starts on a node moves the node instead.
 
 var CELL = 64, LABEL_DROP = 20;
-/* The opacity of an object a mirror left unchanged, and of edges between two. */
-var UNCHANGED_ALPHA = 0.3;
+/* The opacity of an object a mirror borrows, and of edges between two. */
+var BORROWED_ALPHA = 0.55;
 
 function GraphView(host, m, lay, options) {
   var self = this;
@@ -176,15 +176,16 @@ GraphView.prototype.paint = function () {
   var shown = win ? win.shown : null;
   // Edges: everything faintly without a focus; with one, the window's edges.
   ctx.lineWidth = 1 / Math.max(k, 0.5);
-  function unchanged(u, d) { return !!(m.nodes.get(u).unchanged && m.nodes.get(d).unchanged); }
+  function borrowed(key) { return m.nodes.get(key).change === CHANGE.BORROWED; }
+  function lent(u, d) { return borrowed(u) && borrowed(d); }
   if (!win) {
     [false, true].forEach(function (light) {
-      ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = (k < 0.3 ? 0.35 : 0.6) * (light ? UNCHANGED_ALPHA : 1); ctx.beginPath();
+      ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = (k < 0.3 ? 0.35 : 0.6) * (light ? BORROWED_ALPHA : 1); ctx.beginPath();
       m.nodes.forEach(function (n) {
         var b = lay.pos.get(n.key);
         n.vup.forEach(function (u) {
           var a = lay.pos.get(u);
-          if (a && unchanged(u, n.key) === light && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
+          if (a && lent(u, n.key) === light && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
         });
       });
       ctx.stroke();
@@ -197,14 +198,14 @@ GraphView.prototype.paint = function () {
         ctx.beginPath();
         var heads = [];
         win.edges.forEach(function (e) {
-          if (e.side !== side || unchanged(e.u, e.d) !== light) return;
+          if (e.side !== side || lent(e.u, e.d) !== light) return;
           var a = lay.pos.get(e.u), b = lay.pos.get(e.d);
           curve(ctx, a, b); heads.push(b);
         });
         if (!heads.length) return;
         if (side === null) { ctx.strokeStyle = P["line-strong"]; ctx.lineWidth = 1 / Math.max(k, 0.6); ctx.globalAlpha = 0.75; }
         else { ctx.strokeStyle = side === "up" ? P.up : P.down; ctx.lineWidth = 1.8 / Math.max(k, 0.7); ctx.globalAlpha = 1; }
-        if (light) ctx.globalAlpha *= UNCHANGED_ALPHA;
+        if (light) ctx.globalAlpha *= BORROWED_ALPHA;
         ctx.stroke();
         if (side !== null && k > 0.4) { ctx.beginPath(); heads.forEach(function (b) { arrow(ctx, b); }); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); }
         ctx.globalAlpha = 1;
@@ -228,9 +229,12 @@ GraphView.prototype.paint = function () {
       ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fillStyle = P["blue-soft"]; ctx.fill();
       ctx.lineWidth = 2 / Math.max(k, 0.8); ctx.strokeStyle = P.ink; ctx.stroke();
     }
-    ctx.globalAlpha = n.unchanged ? UNCHANGED_ALPHA : 1;
+    var muted = n.change === CHANGE.BORROWED;
+    ctx.globalAlpha = muted ? BORROWED_ALPHA : 1;
     glyph(ctx, n.kind, p.x, p.y, colour, P);
     self.marks(ctx, n, p, P);
+    ctx.globalAlpha = 1;
+    changeBadge(ctx, n, p.x - 9, p.y - 9, P);
     if (labels || (win && k > 0.3)) {
       var seed = win && win.seeds.has(n.key);
       var text = clip(ctx, n.label, lay.geometry.LABEL, seed ? fontStrong : font);
@@ -239,11 +243,10 @@ GraphView.prototype.paint = function () {
       // background colour keeps it legible over edges passing beneath.
       var half = ctx.measureText(text).width / 2;
       ctx.lineJoin = "round"; ctx.lineWidth = 3; ctx.strokeStyle = P.band; ctx.strokeText(text, p.x - half, p.y + LABEL_DROP);
-      ctx.fillStyle = P.ink;
+      ctx.fillStyle = muted ? P.muted : P.ink;
       ctx.fillText(text, p.x - half, p.y + LABEL_DROP);
       self.labels.set(n.key, { x0: p.x - half, x1: p.x + half });
     }
-    ctx.globalAlpha = 1;
   });
 
   // Expansion markers: neighbours outside the window, upstream on the left.
@@ -266,6 +269,16 @@ GraphView.prototype.nodeColour = function (n, P) {
   var s = isValidation(n) ? n.test : effectiveLoad(n);
   return s ? toneColour(tone(s.result), P) : participates(n) ? P.faint : kindColour(n.kind, P);
 };
+
+/* A changed object's Δ, or an added one's +, centred at x, y. */
+function changeBadge(ctx, n, x, y, P) {
+  if (n.change !== CHANGE.CHANGED && n.change !== CHANGE.ADDED) return;
+  ctx.beginPath(); roundRect(ctx, x - 5.5, y - 5.5, 11, 11, 3);
+  ctx.fillStyle = P.violet; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = P.surface; ctx.stroke();
+  ctx.fillStyle = P.surface; ctx.font = "700 9px " + (P.sans || "sans-serif");
+  var mark = n.change === CHANGE.CHANGED ? "Δ" : "+";
+  ctx.fillText(mark, x - ctx.measureText(mark).width / 2, y + 3.2);
+}
 
 /* Small status marks: a dot for a load or test that needs attention, and on
    the Load page a ring for derived readiness. */

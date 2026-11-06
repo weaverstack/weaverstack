@@ -1,8 +1,8 @@
-// Summary and Health.
+// Items and Health.
 
 var KIND_ORDER = [KIND.FOLDER, KIND.SHORTCUT, KIND.TABLE, KIND.VIEW, KIND.MODEL, KIND.REPORT, KIND.TEST, KIND.ASSUMPTION];
 
-/* Each item's workspace, as the Summary groups it. */
+/* Each item's workspace, as the Items page groups it. */
 function workspaceOf(it) { return it.workspace || it.catalogue || ""; }
 
 /* Workspaces in the order the catalogues were given. */

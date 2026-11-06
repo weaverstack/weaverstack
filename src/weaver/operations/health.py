@@ -299,51 +299,77 @@ def _joined_health(
         with opened.task("Health", f"{len(places)} catalogues"):
 
             def read(place):
+                """The catalogue as a member, what its targets hold, and why
+                either could not be had."""
+
                 with opened.concurrent_substep(f"Read {place.reference}"):
-                    catalogue, source = retried(
-                        lambda: _read(opened, place.workspace, steps=False),
-                        session=opened,
-                        workspace=place.workspace,
-                    )
+                    try:
+                        catalogue, source = retried(
+                            lambda: _read(opened, place.workspace, steps=False),
+                            session=opened,
+                            workspace=place.workspace,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return None, None, f"Its catalogue could not be read: {exc}"
+                    try:
+                        dag = catalogue.dag()
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return (
+                            None,
+                            None,
+                            f"Its catalogue could not be interpreted: {exc}",
+                        )
                     member = Member(
                         label=place.label,
                         workspace=place.workspace.workspace,
                         catalogue_name=place.catalogue_name,
                         catalogue=catalogue,
-                        dag=catalogue.dag(),
+                        dag=dag,
                         source=source,
                     )
-                    seen = retried(
-                        lambda: _observe(
-                            opened,
+                    if requested and place.label not in requested:
+                        # Context only: its graph and load state are what is used.
+                        return member, None, None
+                    try:
+                        seen = retried(
+                            lambda: _observe(
+                                opened,
+                                workspace=place.workspace,
+                                catalogue=catalogue,
+                                items=requested.get(place.label, ()),
+                                inventories=inventories,
+                                steps=False,
+                            ),
+                            session=opened,
                             workspace=place.workspace,
-                            catalogue=catalogue,
-                            items=requested.get(place.label, ()),
-                            inventories=inventories,
-                            steps=False,
-                        ),
-                        session=opened,
-                        workspace=place.workspace,
-                    )
-                return member, seen
+                        )
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return (
+                            member,
+                            None,
+                            f"Its targets could not be inventoried: {exc}",
+                        )
+                return member, seen, None
 
             with opened.step(f"Read {len(places)} catalogues"):
                 outcomes = concurrently(places, read)
-            entries, observed = [], {}
-            for place, outcome in zip(places, outcomes):
-                if isinstance(outcome, Exception):
+            entries, observed, failures = [], {}, {}
+            for place, (member, seen, failure) in zip(places, outcomes):
+                if member is None:
                     entries.append(
                         Unread(
                             place.label,
                             place.workspace.workspace,
                             place.reference,
-                            f"Its catalogue could not be read: {outcome}",
+                            failure,
                         )
                     )
                     continue
-                member, seen = outcome
                 entries.append(member)
-                observed[place.label] = seen
+                if seen is not None:
+                    observed[place.label] = seen
+                if failure is not None:
+                    failures[place.label] = failure
             return assess_joined(
                 entries,
                 as_of=resolved_as_of,
@@ -351,6 +377,7 @@ def _joined_health(
                 observed=observed,
                 # With items named, the other catalogues give context only.
                 reported=tuple(requested) or None,
+                failures=failures,
             )
 
 

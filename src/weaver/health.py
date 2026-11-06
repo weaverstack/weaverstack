@@ -1270,10 +1270,14 @@ def assess_joined(
     generated_at: datetime,
     observed: Mapping[str, Observed] | None = None,
     reported: Sequence[str] | None = None,
+    failures: Mapping[str, str] | None = None,
 ) -> JoinedHealthReport:
     """Several catalogues' Health, in the order given.
 
     ``reported`` limits the report to those labels; every entry still joins.
+    ``failures`` names members that joined but could not be assessed in full,
+    such as one whose targets could not be inventoried; each is reported with
+    the reason in its place.
 
     ``entries`` are :class:`weaver.catalogues.Member` values and
     :class:`Unread` ones, in the order the catalogues were given. Each member is
@@ -1287,8 +1291,15 @@ def assess_joined(
     observed = dict(observed or {})
     members = [entry for entry in entries if isinstance(entry, Member)]
     unread = tuple(entry.workspace for entry in entries if isinstance(entry, Unread))
+    failures = dict(failures or {})
     joined = join(members)
-    statuses = joined_statuses(members)
+    statuses, unknown = joined_statuses(members)
+    for label, error in unknown.items():
+        failures.setdefault(label, f"Its load state could not be interpreted: {error}")
+    unread = (
+        *unread,
+        *(member.workspace for member in members if member.label in unknown),
+    )
     reports = []
     for entry in entries:
         if (
@@ -1302,6 +1313,13 @@ def assess_joined(
                 CatalogueHealth(entry.label, entry.reference, error=entry.reason)
             )
             continue
+        if entry.label in failures:
+            reports.append(
+                CatalogueHealth(
+                    entry.label, entry.reference, error=failures[entry.label]
+                )
+            )
+            continue
         seen = observed.get(entry.label, Observed())
         try:
             report = assess(
@@ -1313,7 +1331,7 @@ def assess_joined(
                 inventories=seen.inventories,
                 source=entry.source,
                 installation_faults=seen.installation_faults,
-                across=joined.across(entry, statuses, unread),
+                across=joined.across(entry, statuses, unread, unknown=set(unknown)),
             )
         except Exception as exc:  # noqa: BLE001 - one catalogue's rows stop only it
             reports.append(
@@ -1333,22 +1351,28 @@ def assess_joined(
     )
 
 
-def joined_statuses(members) -> dict:
-    """Each member node's effective load status, by qualified node."""
+def joined_statuses(members) -> tuple[dict, dict]:
+    """Each member node's effective load status, by qualified node, and the
+    members whose load state could not be read, with why.
+
+    A member in the second has no statuses here: what reads it is unverified,
+    not behind a load that never ran.
+    """
 
     from .catalogues import qualify
 
-    statuses = {}
+    statuses, unknown = {}, {}
     for member in members:
         try:
             effective = effective_load_state(member.catalogue, source=member.source)
-        except Exception:  # noqa: BLE001 - its own assessment reports the error
+        except Exception as exc:  # noqa: BLE001 - its readers are told
+            unknown[member.label] = str(exc)
             continue
         for node in member.dag.nodes:
             status = effective.statuses.get(node.identity)
             if status is not None:
                 statuses[qualify(member.label, node.node_id)] = status
-    return statuses
+    return statuses, unknown
 
 
 class _Assessment:

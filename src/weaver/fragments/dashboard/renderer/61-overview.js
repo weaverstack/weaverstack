@@ -14,13 +14,11 @@ function workspaceList(m) {
 
 function overviewPage(body, m) {
   var all = assessHealth(m), s = pageState("overview");
-  var workspaces = workspaceList(m), several = workspaces.length > 1;
-  var shown = new Set((s.workspaces || []).filter(function (w) { return workspaces.indexOf(w) >= 0; }));
-  if (!shown.size) shown = new Set(workspaces);
-  function inScope(n) { var it = n && m.items.get(n.item); return !it || shown.has(workspaceOf(it)); }
+  var workspaces = workspaceList(m), several = workspaces.length > 1, pick = pageItems(m, "overview", ITEM_TYPES, true);
+  function inScope(n) { return !n || pick.all || pick.set.has(n.item); }
   var health = {
     load: all.load.filter(function (f) { return inScope(f.node); }), tests: all.tests.filter(function (f) { return inScope(f.node); }),
-    build: all.build.filter(function (f) { return f.node ? inScope(f.node) : !m.items.has(f.item) || shown.has(workspaceOf(m.items.get(f.item))); }),
+    build: all.build.filter(function (f) { return f.node ? inScope(f.node) : pick.all || pick.set.has(f.item); }),
     counts: { load: { subjects: 0 }, tests: { subjects: 0 } }
   };
   health.all = health.load.concat(health.tests, health.build).sort(byFinding);
@@ -36,20 +34,16 @@ function overviewPage(body, m) {
     details(side, m, key, { onOpen: open, health: all });
     if (key) side.insertBefore(el("button", { "class": "wd-icon wd-close", type: "button", "aria-label": "Close", onclick: function () { open(null); } }, ["×"]), side.firstChild);
   }
-  var items = visibleItems(m).filter(function (it) { return (it.nodes.length || it.target) && shown.has(workspaceOf(it)); });
-  if (several) body.appendChild(el("div", { "class": "wd-toolbar" }, [chooser({
-    title: "Workspaces", plural: "workspaces", allLabel: "All workspaces", all: true,
-    chosen: s.workspaces && s.workspaces.length ? Array.from(shown) : [],
-    entries: workspaces.map(function (w) { return { key: w, label: w }; }),
-    onChange: function (keys) { s.workspaces = keys; saveState(); redraw(); }
-  })]));
+  var items = visibleItems(m).filter(function (it) { return (it.nodes.length || it.target) && pick.set.has(it.label); });
+  var shownWorkspaces = new Set(items.map(workspaceOf));
+  body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser]));
   var loadRed = health.load.filter(function (f) { return f.severity === RED; }).length;
   var loadAmber = health.load.filter(function (f) { return f.severity === AMBER && !f.unobserved; }).length;
   var testRed = health.tests.filter(function (f) { return f.severity === RED; }).length;
   var testAmber = health.tests.filter(function (f) { return f.severity === AMBER; }).length;
   body.appendChild(el("div", { "class": "wd-tiles" }, [
     tile("Items", items.filter(function (it) { return it.nodes.length; }).length,
-      fmt(items.reduce(function (a, it) { return a + it.nodes.length; }, 0)) + " installed objects" + (several ? " in " + fmt(shown.size) + (shown.size === 1 ? " workspace" : " workspaces") : ""), "none"),
+      fmt(items.reduce(function (a, it) { return a + it.nodes.length; }, 0)) + " installed objects" + (several ? " in " + fmt(shownWorkspaces.size) + (shownWorkspaces.size === 1 ? " workspace" : " workspaces") : ""), "none"),
     tile("Load", loadRed ? loadRed + " red" : loadAmber ? loadAmber + " amber" : "Green", health.counts.load.subjects + " subjects · " + loadAmber + " amber", loadRed ? "bad" : loadAmber ? "wait" : "ok"),
     tile("Tests", testRed ? testRed + " red" : testAmber ? testAmber + " amber" : "Green", health.counts.tests.subjects + " Tests and Assumptions", testRed ? "bad" : testAmber ? "wait" : "ok"),
     tile("Build", health.build.length ? health.build.length + " red" : "Consistent", "catalogue consistency only", health.build.length ? "bad" : "ok"),
@@ -146,7 +140,13 @@ function workflowTable(m, limit) {
 }
 
 function healthPage(body, m) {
-  var health = assessHealth(m), s = pageState("health");
+  var health = assessHealth(m), s = pageState("health"), pick = pageItems(m, "health", ITEM_TYPES, true);
+  function inScope(f) { return pick.all || (f.node ? pick.set.has(f.node.item) : pick.set.has(f.item)); }
+  health = Object.assign({}, health, {
+    load: health.load.filter(inScope), tests: health.tests.filter(inScope), build: health.build.filter(inScope),
+    all: health.all.filter(inScope), green: health.green.filter(inScope)
+  });
+  body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser]));
   s.area = s.area || "all"; s.severity = s.severity || "all";
   var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
   function open(key) {

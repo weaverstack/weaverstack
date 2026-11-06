@@ -151,7 +151,7 @@ var SEMANTIC_TYPES = ["SemanticModel", "Report"];
 function entitiesPage(body, m) {
   var s = pageState("entities"), md = metadata(m);
   s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
-  var eligible = eligibleItems(m, DETAIL_KINDS), chosen = new Set(chosenItems(s, eligible));
+  var pick = pageItems(m, "entities", DETAIL_KINDS, false), chosen = pick.set;
   var entries = dictionaryEntries(m).filter(function (e) {
     return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
   });
@@ -159,7 +159,7 @@ function entitiesPage(body, m) {
   entries.forEach(function (e) { counts[e.kind] = (counts[e.kind] || 0) + 1; });
   // Columns are listed when asked for; the default list is of items and objects.
   var browsed = entries.filter(function (e) { return e.kind !== "Column"; });
-  var picker = itemChooser(m, s, eligible);
+  var picker = pick.chooser;
   var search = searchBox({
     placeholder: "Search " + fmt(entries.length) + " tables, views, folders and columns · * matches any text · Shift adds",
     find: function (q) {
@@ -169,7 +169,7 @@ function entitiesPage(body, m) {
     onPattern: function (q) { er.addPattern(q); }
   });
 
-  var er = erWorkspace(body, m, s.er, { item: chosen, tools: [search, picker], describe: renderSide,
+  var er = erWorkspace(body, m, s.er, { item: chosen, tools: [picker, search], describe: renderSide,
     // A wildcard term selects the objects it names; a column's table joins only by name.
     matches: function (q) { return searchEntries(entries, q, "All").filter(function (e) { return e.ref && e.ref.key; }).map(function (e) { return e.ref.id; }); },
     onPick: function (id) {

@@ -395,7 +395,8 @@ function performancePage(body, m) {
   if (["all", "load", "test"].indexOf(s.task) < 0) s.task = "all";
   if (["fit", "day"].indexOf(s.axis) < 0) s.axis = "fit";
   if (s.deadline === undefined || s.deadline === null) s.deadline = "";
-  s.item = s.item || "all";
+  var shown = pageItems(m, "performance", ITEM_TYPES, true);
+  function chosenItem(item) { return shown.all || shown.set.has(item); }
   if (!s.card || typeof s.card.kind !== "string") s.card = null;
   var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
   /* The card follows the window, so it is drawn again whenever the page is. */
@@ -406,18 +407,14 @@ function performancePage(body, m) {
   }
   function pick(choice) { s.card = choice; card(); saveState(); }
   var host = el("div", { "class": "wd-overview-main" });
-  var allItems = Array.from(new Set(["perfmonth", "testmonth"].reduce(function (all, name) {
-    return all.concat((m.tables[name] || []).map(function (r) { return r.item || targetItem(m, r.targettype, r.target, r.catalogue); }));
-  }, []).filter(Boolean))).filter(function (it) { return !isInternal(m, it); }).sort(compare);
   var deadlines = [el("option", { value: "", selected: s.deadline === "" ? "selected" : null, text: "No deadline" })];
   for (var h = 0; h < 24; h++) deadlines.push(el("option", { value: String(h), selected: s.deadline === String(h) ? "selected" : null, text: (h < 10 ? "0" : "") + h + ":00 " + zone }));
   body.appendChild(el("div", { "class": "wd-toolbar" }, [
+    shown.chooser,
     segmented("Window", ["day", "week", "month"], s.window, function (v) { s.window = v; render(); saveState(); }, function (v) { return { day: "Last 24 hours", week: "Last 7 days", month: "Last 30 days" }[v]; }),
     segmented("Task", ["all", "load", "test"], s.task, function (v) { s.task = v; render(); saveState(); }, function (v) { return { all: "All", load: "Load", test: "Test" }[v]; }),
     segmented("Axis", ["fit", "day"], s.axis, function (v) { s.axis = v; render(); saveState(); }, function (v) { return v === "fit" ? "Fit runs" : "24 hours"; }),
     el("select", { "class": "wd-select", "aria-label": "Deadline", onchange: function () { s.deadline = this.value; render(); saveState(); } }, deadlines),
-    el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () { s.item = this.value; render(); saveState(); } },
-      [el("option", { value: "all", text: "Every item" })].concat(allItems.map(function (it) { return el("option", { value: it, selected: it === s.item ? "selected" : null, text: it }); })))
   ]));
   body.appendChild(el("div", { "class": "wd-overview" }, [host, side]));
   function render() {
@@ -458,7 +455,7 @@ function performancePage(body, m) {
 
     var picked = views.filter(function (v) { return v.run.id === s.run; })[0] || null;
     if (picked) host.appendChild(runObjects(picked));
-    function itemFilter(r) { return s.item === "all" || r.item === s.item; }
+    function itemFilter(r) { return chosenItem(r.item); }
     if (s.task !== "test") {
       var loads = perfRows(m, "perf" + s.window).filter(itemFilter);
       host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
@@ -505,7 +502,7 @@ function performancePage(body, m) {
     var title = "Objects in the run of " + stamp(v.started).slice(0, 16);
     var carried = runObjectRows(m).filter(function (r) { return r.workflow === v.run.id; });
     if (!carried.length) return section(title, [empty("Objects are listed for the 8 latest runs. Select a newer run, or find this one in the Gantt.")]);
-    var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && (s.item === "all" || r.item === s.item); });
+    var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && chosenItem(r.item); });
     var columns = [
       { key: "label", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, r.task); } },
       { key: "item", title: "Item", value: function (r) { return r.item; } },

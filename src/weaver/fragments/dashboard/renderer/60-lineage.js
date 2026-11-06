@@ -18,7 +18,6 @@ function graphWorkspace(body, m, options) {
   if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
   if (s.up === undefined) s.up = 1;
   if (s.down === undefined) s.down = 1;
-  if (s.item && !m.items.has(s.item)) s.item = null;
   s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
   s.moved = s.moved || {};
   s.patterns = s.patterns || [];
@@ -35,9 +34,7 @@ function graphWorkspace(body, m, options) {
   s.mode = s.mode || options.mode;
   var view, f = workspaceFrame(s, function () { if (view) view.resize(); });
   var host = f.host, side = f.side, line = f.line, legendHost = f.legend;
-  function within() {
-    return s.item ? new Set(m.items.get(s.item).nodes.map(function (n) { return n.key; })) : null;
-  }
+
   /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
   function select(key, adding) {
     if (!key) { s.selection = []; s.patterns = []; }
@@ -45,7 +42,6 @@ function graphWorkspace(body, m, options) {
       var at = s.selection.indexOf(key);
       if (at >= 0) s.selection.splice(at, 1); else s.selection.push(key);
     } else s.selection = [key];
-    if (key && s.item && m.nodes.get(key).item !== s.item) { s.item = null; itemPicker.value = ""; }
     s.focus = key && s.selection.indexOf(key) >= 0 ? key : s.selection[s.selection.length - 1] || null;
     s.expanded = []; s.moved = {};
     apply(true);
@@ -70,8 +66,7 @@ function graphWorkspace(body, m, options) {
   }
   function moved(key, p) { s.moved[key] = { x: p.x, y: p.y }; saveState(); }
   function apply(refit) {
-    var only = within();
-    var seed = seeds(), win = seed.length || only ? focusWindow(m, seed, s.up, s.down, s.expanded, only) : null;
+    var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null) : null;
     var lay = win ? layoutEstate(subModel(m, win.shown), WINDOW_GEOMETRY) : layoutEstate(m);
     Object.keys(s.moved).forEach(function (k) { var p = lay.pos.get(k); if (p) { p.x = s.moved[k].x; p.y = s.moved[k].y; } });
     view.setWindow(win, lay);
@@ -101,22 +96,15 @@ function graphWorkspace(body, m, options) {
     if (win.edgesDropped) parts.push(el("b", { "class": "wd-warn-text", text: win.edgesDropped + " edges not drawn" }));
     parts.forEach(function (p, i) { if (i) line.appendChild(document.createTextNode(" · ")); line.appendChild(typeof p === "string" ? document.createTextNode(p) : p); });
   }
-  var itemPicker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-    s.item = this.value || null; s.expanded = []; s.moved = {};
-    if (s.item) s.selection = s.selection.filter(function (k) { return m.nodes.get(k).item === s.item; });
-    s.focus = s.selection[s.selection.length - 1] || null;
-    apply(true);
-  } }, [el("option", { value: "", text: "Every item" })].concat(estate.bands.map(function (b) {
-    return el("option", { value: b.item.label, selected: b.item.label === s.item ? "selected" : null, text: shownItem(b.item.label) });
-  })));
+
   if (options.above) body.appendChild(options.above);
   var mirrorToggle = el("label", { "class": "wd-check", title: "Hiding mirrored objects changes the drawing only; Health still reads them." }, [
     el("input", { type: "checkbox", checked: s.mirrors ? "checked" : null, onchange: function () { s.mirrors = this.checked; saveState(); redraw(); } }),
     "Show mirrored objects"
   ]);
   f.mount(body, [
+    options.chooser,
     nodeSearch(m, select, addPattern),
-    options.chooser || itemPicker,
     mirrorToggle,
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
@@ -129,7 +117,7 @@ function graphWorkspace(body, m, options) {
       el("button", { "class": "wd-icon", type: "button", title: "Zoom in", "aria-label": "Zoom in", onclick: function () { view.zoomAt(1.25, view.width / 2, view.height / 2); } }, ["+"]),
       el("button", { "class": "wd-text-btn", type: "button", title: "Fit what is shown", onclick: function () { view.fitWindow(true); } }, ["Fit"]),
       el("button", { "class": "wd-text-btn", type: "button", title: "Show the whole estate", onclick: function () {
-        s.item = null; itemPicker.value = ""; select(null);
+        select(null);
       } }, ["Estate"])
     ])
   ]);
@@ -139,7 +127,7 @@ function graphWorkspace(body, m, options) {
   view = new GraphView(host, m, estate, { state: s, mode: s.mode, onSelect: select, onReveal: expand, onMove: moved, label: options.label });
   apply(false);
   // A remembered viewport is kept unless it no longer shows the focus or the estate.
-  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || s.item || scoped.length) view.fitWindow(false); else view.fitAll(false); }
+  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || scoped.length) view.fitWindow(false); else view.fitAll(false); }
   return { select: select };
 }
 
@@ -276,9 +264,9 @@ function orchestrationPage(body, m) {
     latest ? tile("Latest workflow", duration((latest.completed || 0) - (latest.started || 0)), fmt(latest.records) + " processed records · " + ago(latest.completed, m.at), latest.failed ? "bad" : "none") : null
   ]);
   var note = el("p", { "class": "wd-note", text: "Readiness is derived from the recorded state of each object's nearest loadable dependencies. It is not a queue: the catalogue records processed work only, so nothing here is shown as running." });
-  var s = pageState("orchestration"), eligible = eligibleItems(m, DETAIL_KINDS);
+  var pick = pageItems(m, "orchestration", DETAIL_KINDS, false);
   graphWorkspace(body, m, { page: "orchestration", mode: "load", health: true, label: "Orchestration graph", above: el("div", { "class": "wd-summary" }, [tiles, note]),
-    items: chosenItems(s, eligible), chooser: itemChooser(m, s, eligible),
+    items: pick.items, chooser: pick.chooser,
     empty: "Search for an object, or select one in the graph, to follow its lineage, last outcome and readiness." });
   var lists = el("div", { "class": "wd-columns-2" }, [
     section("Ready · " + ready.length, [dataTable([

@@ -148,71 +148,114 @@ function eligibleItems(m, kinds) {
    with the catalogue whatever the order given. */
 function stableItem(label) { var c = CATALOGUES.get(ownerCode(label)); return (c ? c.reference : "") + "|" + bare(label); }
 
-/* The items a page shows: those chosen, or else the first it offers. */
-function chosenItems(s, eligible) {
+/* An item as a chooser lists it. */
+function choiceLabel(it) { return (it.workspace || it.catalogue || "") + "/" + kindName(it.type) + "/" + it.name; }
+
+/* The items a page shows. A workspace chosen brings every item it offers
+   there. Nothing chosen is every item on a page that shows the estate, and
+   the first item it offers on a page about one. */
+function chosenItems(s, eligible, everything) {
   var byStable = new Map(eligible.map(function (it) { return [stableItem(it.label), it.label]; }));
-  var chosen = (s.items || []).map(function (k) { return byStable.get(k); }).filter(Boolean);
-  return chosen.length ? chosen : eligible.length ? [eligible[0].label] : [];
+  var out = [];
+  (s.items || []).forEach(function (k) {
+    if (k.indexOf("workspace:") === 0) {
+      var w = k.slice(10);
+      eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w && out.indexOf(it.label) < 0) out.push(it.label); });
+    } else if (byStable.has(k) && out.indexOf(byStable.get(k)) < 0) out.push(byStable.get(k));
+  });
+  if (out.length) return out;
+  return everything ? eligible.map(function (it) { return it.label; }) : eligible.length ? [eligible[0].label] : [];
 }
 
-function chooseItems(s, labels) { s.items = labels.map(stableItem); saveState(); redraw(); }
+/* A chooser that stays open across the redraw a Ctrl, ⌘ or tick causes. */
+var OPEN_CHOOSER = null;
 
-/* A compact chooser. A plain click on an entry chooses it alone; its box, or
-   Ctrl or ⌘ with the click, adds or removes it. Entries are grouped and
-   searchable. With options.all, choosing nothing means every entry. */
+/* One list, filtered by typing. A plain click shows that entry alone and
+   closes the list; Ctrl, ⌘ or the box adds or removes it and keeps the list
+   open. Choosing nothing returns to the page's default. */
 function chooser(options) {
   var chosen = new Set(options.chosen), wrap = el("div", { "class": "wd-chooser" }), panel = el("div", { "class": "wd-chooser-panel", hidden: "hidden" });
   var names = options.entries.filter(function (e) { return chosen.has(e.key); }).map(function (e) { return e.label; });
-  var summary = !names.length ? options.allLabel : names.length === 1 ? names[0] : fmt(names.length) + " " + options.plural;
+  var summary = !names.length ? options.allLabel : names.length === 1 ? names[0] : fmt(names.length) + " chosen";
   var button = el("button", { type: "button", "class": "wd-chooser-button", "aria-haspopup": "listbox", "aria-expanded": "false", title: names.join("\n") || options.allLabel }, [
     el("span", { "class": "wd-seg-label", text: options.title }), el("b", { text: summary }), el("span", { "class": "wd-chooser-caret", text: "▾" })]);
-  var search = el("input", { "class": "wd-search", type: "search", placeholder: "Filter " + fmt(options.entries.length) + " " + options.plural, "aria-label": "Filter " + options.plural, autocomplete: "off", spellcheck: "false" });
+  var search = el("input", { "class": "wd-search", type: "search", placeholder: "Filter " + fmt(options.entries.length), "aria-label": "Filter " + options.title.toLowerCase(), autocomplete: "off", spellcheck: "false" });
   var list = el("div", { "class": "wd-chooser-list", role: "listbox", "aria-multiselectable": "true" });
-  function commit(keys) { options.onChange(keys); }
+  function keep() { OPEN_CHOOSER = { id: options.id, query: search.value, scroll: list.scrollTop }; }
+  function toggle(key) {
+    if (chosen.has(key)) chosen.delete(key); else chosen.add(key);
+    keep();
+    options.onChange(Array.from(chosen));
+  }
   function render() {
-    var q = search.value.trim().toLowerCase(), group = null;
+    var q = search.value.trim().toLowerCase();
     list.textContent = "";
     options.entries.forEach(function (e) {
-      if (q && (e.label + " " + (e.group || "") + " " + (e.meta || "")).toLowerCase().indexOf(q) < 0) return;
-      if (e.group && e.group !== group) { group = e.group; list.appendChild(el("div", { "class": "wd-eyebrow wd-chooser-group", text: group })); }
-      var box = el("input", { type: "checkbox", checked: chosen.has(e.key) ? "checked" : null, "aria-label": (chosen.has(e.key) ? "Remove " : "Add ") + e.label,
-        onchange: function () { if (this.checked) chosen.add(e.key); else chosen.delete(e.key); commit(Array.from(chosen)); } });
-      list.appendChild(el("div", { "class": "wd-chooser-entry" + (chosen.has(e.key) ? " wd-current" : ""), role: "option", "aria-selected": String(chosen.has(e.key)) }, [
-        box,
-        el("button", { type: "button", "class": "wd-chooser-name", onclick: function (ev) {
-          if (ev.ctrlKey || ev.metaKey || ev.shiftKey) { if (chosen.has(e.key)) chosen.delete(e.key); else chosen.add(e.key); commit(Array.from(chosen)); }
-          else commit([e.key]);
-        } }, [e.kind ? kindMark(e.kind) : null, e.label, e.meta ? el("span", { "class": "wd-muted", text: " " + e.meta }) : null])
+      if (q && e.label.toLowerCase().indexOf(q) < 0) return;
+      var on = chosen.has(e.key);
+      list.appendChild(el("label", { "class": "wd-chooser-entry" + (on ? " wd-current" : "") + (e.whole ? " wd-chooser-whole" : ""), role: "option", "aria-selected": String(on), title: e.label,
+        onclick: function (ev) {
+          if (ev.target.tagName === "INPUT") return;
+          ev.preventDefault();
+          if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggle(e.key);
+          else { OPEN_CHOOSER = null; options.onChange([e.key]); }
+        } }, [
+        el("input", { type: "checkbox", checked: on ? "checked" : null, onchange: function () { toggle(e.key); } }),
+        el("span", { "class": "wd-chooser-name", text: e.label })
       ]));
     });
     if (!list.firstChild) list.appendChild(empty("Nothing matches."));
   }
   function open(on) {
     panel.hidden = !on; button.setAttribute("aria-expanded", String(on));
-    if (on) { render(); search.focus(); }
+    if (on) render(); else if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) OPEN_CHOOSER = null;
   }
-  button.addEventListener("click", function () { open(panel.hidden); });
+  button.addEventListener("click", function () { open(panel.hidden); if (!panel.hidden) search.focus(); });
   search.addEventListener("input", render);
-  document.addEventListener("click", function (ev) { if (!panel.hidden && !wrap.contains(ev.target)) open(false); });
-  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !panel.hidden) open(false); });
+  // A redraw leaves these listeners on a chooser no longer shown, and the
+  // click that caused it on an element no longer shown; neither closes the new one.
+  document.addEventListener("click", function (ev) {
+    if (!wrap.isConnected || !ev.target.isConnected) return;
+    if (!panel.hidden && !wrap.contains(ev.target)) open(false);
+  });
+  document.addEventListener("keydown", function (ev) { if (wrap.isConnected && ev.key === "Escape" && !panel.hidden) open(false); });
   panel.appendChild(el("div", { "class": "wd-chooser-tools" }, [search,
-    el("button", { type: "button", "class": "wd-text-btn", onclick: function () { commit([]); } }, [options.all ? "All" : "First"])]));
+    el("button", { type: "button", "class": "wd-text-btn", onclick: function () { OPEN_CHOOSER = null; options.onChange([]); } }, [options.resetLabel])]));
   panel.appendChild(list);
-  panel.appendChild(el("div", { "class": "wd-chooser-hint", text: "Click to show one · tick, Ctrl or ⌘ to add" }));
+  panel.appendChild(el("div", { "class": "wd-chooser-hint", text: "Click to show one · Ctrl, ⌘ or the box to add" }));
   wrap.appendChild(button); wrap.appendChild(panel);
+  if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) {
+    var kept = OPEN_CHOOSER;
+    search.value = kept.query || "";
+    open(true);
+    list.scrollTop = kept.scroll || 0;
+  }
   return wrap;
 }
 
-/* The chooser over a page's items, defaulting to the first it offers. */
-function itemChooser(m, s, eligible) {
-  var several = CATALOGUES.size > 1;
-  return chooser({
-    title: "Items", plural: "items", allLabel: "No items", chosen: chosenItems(s, eligible),
-    entries: eligible.map(function (it) {
-      return { key: it.label, label: it.name, kind: null, group: several ? (it.workspace || it.catalogue) + " · " + kindName(it.type) : kindName(it.type), meta: it.target && it.target !== it.name ? it.target : "" };
-    }),
-    onChange: function (labels) { chooseItems(s, labels); }
+/* The chooser every page but Workspaces starts its toolbar with, and the items
+   it leaves the page showing. everything says whether choosing nothing shows
+   every item or only the first. */
+function pageItems(m, page, kinds, everything) {
+  var s = pageState(page), eligible = eligibleItems(m, kinds), shown = chosenItems(s, eligible, everything);
+  var workspaces = [];
+  eligible.forEach(function (it) { var w = it.workspace || it.catalogue; if (w && workspaces.indexOf(w) < 0) workspaces.push(w); });
+  var entries = [];
+  workspaces.forEach(function (w) {
+    if (workspaces.length > 1) entries.push({ key: "workspace:" + w, label: w, whole: true });
+    eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w) entries.push({ key: stableItem(it.label), label: choiceLabel(it) }); });
   });
+  var keys = new Set(entries.map(function (e) { return e.key; }));
+  var chosen = (s.items || []).filter(function (k) { return keys.has(k); });
+  if (!chosen.length && !everything && shown.length) chosen = [stableItem(shown[0])];
+  return {
+    items: shown, set: new Set(shown), all: everything && !(s.items || []).some(function (k) { return keys.has(k); }),
+    chooser: chooser({
+      id: page, title: "Items", allLabel: everything ? "All items" : "No items", resetLabel: everything ? "All" : "First",
+      chosen: chosen, entries: entries,
+      onChange: function (picked) { s.items = picked; saveState(); redraw(); }
+    })
+  };
 }
 
 /* The latest processed load, test or workflow, or undefined when the page

@@ -39,7 +39,9 @@ function ganttSummary(rows) {
 }
 
 function ganttPage(body, m) {
-  var s = pageState("gantt"), all = logRows(m), flows = m.workflows || [];
+  var pick = pageItems(m, "gantt", ITEM_TYPES, true);
+  // A workflow's own records belong to no item and always show.
+  var s = pageState("gantt"), all = logRows(m).filter(function (r) { return pick.all || r.envelope || !r.item || pick.set.has(r.item); }), flows = m.workflows || [];
   var included = new Map((m.tables.logflows || []).map(function (r) { return [r.workflow, { records: num(r.records), included: num(r.included) }]; }));
   if (!flows.length) { body.appendChild(empty("No workflow has processed a record in the last 7 days. Run weaver load to see its timeline.")); return; }
   if (!s.workflow || !flows.some(function (w) { return w.id === s.workflow; }) || s.follow !== false) s.workflow = flows[0].id;
@@ -85,7 +87,7 @@ function ganttPage(body, m) {
       text: (i === 0 ? "Latest · " : "") + stamp(w.started).slice(0, 16) + " · " + duration((w.completed || 0) - (w.started || 0)) + " · " + fmt(w.records) + " records" + (w.failed ? " · " + w.failed + " failed" : "") + " · " + w.id.slice(0, 8) });
   }));
   var host = el("div", { "class": "wd-overview-main" });
-  body.appendChild(el("div", { "class": "wd-toolbar" }, [select,
+  body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser, select,
     segmented("Show", ["objects", "all"], s.scope, function (v) { s.scope = v; render(); saveState(); }, function (v) { return v === "objects" ? "Objects" : "All records"; }),
     el("span", { "class": "wd-grow" }),
     el("span", { "class": "wd-muted", text: "Click a row for its details. Ctrl or ⌘ and scroll to zoom time; drag to pan; double-click to reset" })]));

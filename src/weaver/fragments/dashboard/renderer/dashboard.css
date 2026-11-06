@@ -382,16 +382,17 @@ body { background: #f7f7f6; }
 .wd-chooser-button { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; padding: 3px 10px 3px 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer; }
 .wd-chooser-button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
 .wd-chooser-caret { color: var(--muted); font-size: 10px; }
-.wd-chooser-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(380px, calc(100vw - 32px)); max-height: 460px; display: flex; flex-direction: column;
+.wd-chooser-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(460px, calc(100vw - 32px)); max-height: 460px; display: flex; flex-direction: column;
   border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
 .wd-chooser-tools { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
 .wd-chooser-tools .wd-search { flex: 1 1 auto; min-width: 0; }
 .wd-chooser-list { overflow: auto; padding: 4px 0; }
-.wd-chooser-group { padding: 8px 12px 2px; }
-.wd-chooser-entry { display: flex; align-items: center; gap: 8px; padding: 2px 12px; }
+.wd-chooser-entry { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; }
 .wd-chooser-entry.wd-current { background: var(--blue-soft); }
-.wd-chooser-name { flex: 1 1 auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.wd-chooser-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
 .wd-chooser-hint { padding: 6px 12px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .wd-ws-group { margin-bottom: 18px; }
 .wd-ws-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; }
 .wd-ws-head h3 { margin: 0; font-size: 15px; }
+.wd-model-part + .wd-model-part { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+.wd-chooser-whole .wd-chooser-name { font-weight: 700; }

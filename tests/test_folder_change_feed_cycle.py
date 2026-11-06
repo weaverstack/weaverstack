@@ -136,6 +136,42 @@ def test_a_mixed_load_writes_one_document_with_actual_changes(landing):
 
 
 @weaver_test()
+def test_publication_changes_destination_files_through_the_mount(landing, monkeypatch):
+    # A mount keeps reporting a path absent once it looked it up while absent,
+    # until the file is created through that mount.
+    store = landing.lakehouse.store
+    changed = []
+    for name in ("write", "delete", "make_directory", "copy", "move"):
+        original = getattr(store, name)
+
+        def record(*locations, _original=original, **options):
+            changed.extend(
+                location.value for location in locations if hasattr(location, "value")
+            )
+            return _original(*locations, **options)
+
+        monkeypatch.setattr(store, name, record)
+
+    landing.files = {"June.csv": "old", "remove.csv": "old"}
+    landing.load()
+    landing.files = {"June.csv": "new", "nested/July.csv": "new"}
+    landing.deletes = ("remove.csv",)
+    result = landing.load()
+
+    assert (result.rows_inserted, result.rows_updated, result.rows_deleted) == (1, 1, 1)
+    destination = landing.spark_path()
+    through_store = [
+        value
+        for value in changed
+        if value.startswith(f"{destination}/")
+        and not value.startswith(f"{destination}/{CHANGES_DIRECTORY}/")
+    ]
+    assert through_store == []
+    assert (landing.path() / "June.csv").read_text(encoding="utf-8") == "new"
+    assert not (landing.path() / "remove.csv").exists()
+
+
+@weaver_test()
 def test_wholesale_omission_records_a_delete(landing):
     landing.incremental = False
     landing.files = {"keep.csv": "same", "remove.csv": "old"}
@@ -158,45 +194,6 @@ def test_an_identical_reload_adds_no_change_document(landing):
 
     assert (result.rows_inserted, result.rows_updated, result.rows_deleted) == (0, 0, 0)
     assert _documents(landing) == before
-
-
-def _mount_generation(folder: Folder) -> int:
-    from weaver import lakehouse
-
-    folder.path()
-    return lakehouse._MOUNTS[folder.lakehouse.spark_root].generation
-
-
-@weaver_test()
-def test_a_publication_moves_downstream_paths_to_a_mount_made_after_it(landing):
-    """A mount made earlier can keep reporting a published file as missing."""
-
-    landing.files = {"June.csv": "june"}
-    before = _mount_generation(landing)
-    landing.load()
-    published = _mount_generation(landing)
-
-    landing.load()
-
-    assert published > before
-    assert _mount_generation(landing) == published
-
-
-@weaver_test()
-def test_a_failed_publication_still_moves_downstream_paths(landing, monkeypatch):
-    import weaver.runtime.folder_load as runtime
-
-    def fails(*args, **kwargs):
-        raise LoadError("publication failed")
-
-    landing.files = {"June.csv": "june"}
-    before = _mount_generation(landing)
-    monkeypatch.setattr(runtime, "_write_change_document", fails)
-
-    with pytest.raises(LoadError, match="publication failed"):
-        landing._load()
-
-    assert _mount_generation(landing) > before
 
 
 @weaver_test()

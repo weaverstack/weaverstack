@@ -222,8 +222,8 @@ def mounted_lakehouse(
     """A Fabric Lakehouse whose Files area is this directory.
 
     A Lakehouse lives in OneLake. Authored Python reaches its Files through a
-    Fabric mount, and Weaver lists and changes them through the session's
-    store. Those are the two boundaries a fast test may stand in for: the
+    Fabric mount, Weaver lists them through the session's store and publishes
+    a Folder through the mount. Those are the two boundaries a fast test may stand in for: the
     directory is registered as the mount point and served as the store, and
     every other property of the Lakehouse stays what it is in production.
 
@@ -234,46 +234,15 @@ def mounted_lakehouse(
     OneLake address, and Spark paths are composed from it as they always are.
     """
 
-    from weaver import lakehouse as module
+    from weaver.lakehouse import _MOUNTS, Lakehouse, _Mount
 
     root = f"abfss://ws@onelake.dfs.fabric.microsoft.com/{name}"
-    _MOUNTED_DIRECTORIES[root] = str(directory)
-    if not getattr(module._mount, "stands_in", False):
-        module._mount = _directory_mount(module._mount)
-    module._MOUNTS[root] = module._Mount(
-        point=f"/weaver/{name}/test",
-        local=str(directory),
-        generation=module._GENERATIONS.get(root, 0),
-    )
-    return module.Lakehouse(
+    _MOUNTS[root] = _Mount(point=f"/weaver/{name}/test", local=str(directory))
+    return Lakehouse(
         name=name,
         spark_root=root,
         store=OneLakeDirectory(root, directory, deleted=deleted),
     )
-
-
-#: Directories standing in for a Lakehouse's Files, by OneLake root.
-_MOUNTED_DIRECTORIES: dict[str, str] = {}
-
-
-def _directory_mount(host_mount):
-    """Mount a registered root at its directory again, as Fabric would mount OneLake."""
-
-    from weaver import lakehouse as module
-
-    def mount(name, spark_root, generation):
-        directory = _MOUNTED_DIRECTORIES.get(spark_root)
-        if directory is None:
-            return host_mount(name, spark_root, generation)
-        module._MOUNTS[spark_root] = module._Mount(
-            point=f"/weaver/{name}/test-{generation}",
-            local=directory,
-            generation=generation,
-        )
-        return directory
-
-    mount.stands_in = True
-    return mount
 
 
 class OneLakeDirectory:

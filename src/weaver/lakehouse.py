@@ -76,10 +76,11 @@ class Lakehouse:
         return _join(_mounted(self.name, self.spark_root), FILES_AREA)
 
     def files_store(self):
-        """The store Weaver lists and changes this Lakehouse's Files through.
+        """The store Weaver lists this Lakehouse's Files through.
 
         A mount's listing can still show a file deleted through OneLake, so
-        Weaver's own file work goes through ``notebookutils.fs`` instead.
+        Weaver lists through ``notebookutils.fs``. Folder publication writes
+        through the mount, which authored code reads.
         """
 
         if self.store is not None:
@@ -202,27 +203,20 @@ def default_lakehouse(spark: Any) -> Lakehouse:
 class _Mount:
     point: str
     local: str
-    generation: int = 0
 
 
 #: Active mounts by resolved OneLake root.
 _MOUNTS: dict[str, _Mount] = {}
-#: Mounts superseded by a Files change. Paths already handed out may still be in
-#: use, so they stay mounted until :func:`release_mounts`.
-_SUPERSEDED: list[str] = []
-#: Files changes made through OneLake, per resolved root.
-_GENERATIONS: dict[str, int] = {}
 _MOUNTING = threading.Lock()
 
 #: Reusing a released path can retain stale filesystem metadata in Fabric.
-_MOUNT_POINT = "/weaver/{item}/{unique}"
+_MOUNT_POINT = "/weaver/{item}/{generation}"
 
 #: Mount configuration. ``fileCacheTimeout=0`` because Weaver reaches the same
 #: Files area two ways, ``abfss://`` for storage work and this mount for authored
 #: Python, so a change made outside the mount must be visible through
 #: it at once. With caching on, a directory listing still holds entries the
-#: storage no longer has, and ``shutil.rmtree`` fails with ``ENOTEMPTY``. It does
-#: not cover a failed lookup, which :func:`_mounted` handles.
+#: storage no longer has, and ``shutil.rmtree`` fails with ``ENOTEMPTY``.
 #:
 #: Invalidating afterwards does not work: dropping Weaver's record of the mount
 #: leaves the host's in place, and asking again recovers the same stale view.
@@ -247,44 +241,24 @@ def _quiet_mount():
 def _mounted(name: str, spark_root: str) -> str:
     """Return a session mount for this resolved OneLake root.
 
-    A mount caches a failed lookup: a path looked up through it while absent
-    can stay absent there for over five minutes after OneLake creates it, while
-    a mount made afterwards sees it at once. So a mount made before the root's
-    latest Files change is replaced, and never unmounted here.
-
     Serialised, because loads running at once reach the same root and a mount
     still being made has no path yet.
     """
 
     with _MOUNTING:
-        generation = _GENERATIONS.get(spark_root, 0)
         cached = _MOUNTS.get(spark_root)
-        if cached and cached.generation == generation:
-            return cached.local
-        local = _mount(name, spark_root, generation)
         if cached:
-            _SUPERSEDED.append(cached.point)
-        return local
+            return cached.local
+        return _mount(name, spark_root)
 
 
-def files_changed(spark_root: str) -> None:
-    """Record that this root's Files changed through OneLake.
-
-    The next path resolved for the root is on a mount made after the change.
-    """
-
-    root = _root(spark_root, what="root")
-    with _MOUNTING:
-        _GENERATIONS[root] = _GENERATIONS.get(root, 0) + 1
-
-
-def _mount(name: str, spark_root: str, generation: int) -> str:
+def _mount(name: str, spark_root: str) -> str:
 
     utils = _notebook_utils()
     if utils is None:
         raise LoadError(_outside_fabric(name))
 
-    point = _MOUNT_POINT.format(item=_item_of(spark_root), unique=uuid.uuid4().hex)
+    point = _MOUNT_POINT.format(item=_item_of(spark_root), generation=uuid.uuid4().hex)
     try:
         with _quiet_mount():
             utils.fs.mount(spark_root, point, MOUNT_OPTIONS)
@@ -304,7 +278,7 @@ def _mount(name: str, spark_root: str, generation: int) -> str:
     if not isinstance(local, str) or not local.strip():
         _unmount(utils, point)
         raise LoadError(f"Lakehouse {name!r} mount returned no filesystem path")
-    _MOUNTS[spark_root] = _Mount(point=point, local=local, generation=generation)
+    _MOUNTS[spark_root] = _Mount(point=point, local=local)
     return local
 
 
@@ -341,12 +315,10 @@ def release_mounts() -> None:
 
     utils = _notebook_utils()
     with _MOUNTING:
-        points = [mount.point for mount in _MOUNTS.values()] + _SUPERSEDED
-        if utils is not None:
-            for point in points:
-                _unmount(utils, point)
-        _MOUNTS.clear()
-        _SUPERSEDED.clear()
+        for spark_root in list(_MOUNTS):
+            if utils is not None:
+                _unmount(utils, _MOUNTS[spark_root].point)
+            del _MOUNTS[spark_root]
 
 
 def _item_of(spark_root: str) -> str:

@@ -611,3 +611,188 @@ def test_a_retry_lets_the_workspace_acquire_a_failed_connection_again(monkeypatc
 
     assert retried(work, session=session, workspace="Sales") == "read"
     assert recovered == ["Sales"]
+
+
+# --- shortcut arrangements --------------------------------------------------------
+
+
+def _schema_reader(root) -> Catalogue:
+    """Sales shortcuts Central's whole CORE schema and reads its Customer."""
+
+    from factories import (
+        installed_catalogue,
+        item_bindings,
+        lakehouse_table,
+        schema_document,
+    )
+
+    from weaver.declaration import parse_item_repository
+    from weaver.locations import Location
+
+    item = "Lakehouse/Bridge"
+    files = {
+        f"{item}/schemas/SALES.yml": schema_document("SALES"),
+        f"{item}/shortcuts.py": (
+            "from weaver import Shortcut\n\n"
+            "CORE = Shortcut(\n"
+            '    shortcut_type="schema",\n'
+            '    target_type="physical",\n'
+            '    target="Lakehouse/Core_LH/CORE",\n'
+            '    workspace="Central",\n)\n'
+        ),
+        f"{item}/Tables/SALES__Revenue.py": lakehouse_table("SALES.Revenue").replace(
+            "from weaver import Table",
+            "from shortcuts import CORE\n\nfrom weaver import Table",
+        ),
+    }
+    for relative, text in files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    repository = parse_item_repository(Location(str(root)))
+    mapping = installed_catalogue(
+        repository, item_bindings((item, "Bridge_LH"))
+    ).to_mapping()
+    tables = next(each["tables"] for each in mapping["items"] if each["item"] == item)
+    tables["LoadStatus"] = [
+        load_status_row(REVENUE, started_at=EARLIER, completed_at=EARLIER)
+    ]
+    return Catalogue.from_mapping(mapping)
+
+
+@weaver_test()
+def test_a_schema_shortcut_joins_the_namespace_its_readers_read(tmp_path):
+    consumer = _schema_reader(tmp_path)
+    joined = join(members(central(), consumer))
+
+    (crossing,) = [each for each in joined.crossings if each.producer]
+    assert crossing.producer == f"Central::{PRODUCER}"
+    assert f"Sales::{REVENUE}" in joined.graph.descendants(crossing.producer)
+
+    report = assess_joined(
+        members(central(), consumer), as_of=NOW - timedelta(days=1), generated_at=NOW
+    )
+    (finding,) = [
+        each
+        for each in report.catalogues[1].report.findings
+        if each.object_id == REVENUE and each.code == LOAD_ANCESTOR_UNESTABLISHED
+    ]
+    assert finding.message == f"the last load of Central: {PRODUCER} failed"
+
+
+@weaver_test()
+def test_two_items_on_one_lakehouse_join_the_one_that_installs_the_table():
+    """Central binds Core and Archive to one Lakehouse; only Core has Customer."""
+
+    producer = central()
+    archive = WeaverItemId.parse("Lakehouse/Archive")
+    rows = dict(producer.rows)
+    rows[archive] = {
+        "Installation": (installation_row(archive, "Core_LH"),),
+        "Registry": tuple(_loadable("Lakehouse/Archive/Tables/OLD.Customer")),
+    }
+    shared = Catalogue(rows=rows)
+    joined = join(members(shared, sales()))
+
+    (crossing,) = joined.crossings
+    assert crossing.producer == f"Central::{PRODUCER}"
+    assert crossing.reason is None
+
+
+# --- keeping what was read ------------------------------------------------------
+
+
+@weaver_test()
+def test_unreadable_load_state_makes_readers_unverified_not_behind(monkeypatch):
+    import importlib
+
+    module = importlib.import_module("weaver.health")
+    real = module.effective_load_state
+
+    def effective(catalogue, **asked):
+        if WeaverItemId.parse(CORE) in catalogue.rows:
+            raise ValueError("malformed LoadStatus row")
+        return real(catalogue, **asked)
+
+    monkeypatch.setattr(module, "effective_load_state", effective)
+    report = assess_joined(
+        members(central(), sales(revenue_loaded=LATER)),
+        as_of=NOW - timedelta(days=1),
+        generated_at=NOW,
+    )
+
+    first, second = report.catalogues
+    assert first.report is None and "malformed LoadStatus row" in first.error
+    codes = {each.code for each in second.report.findings if each.object_id == REVENUE}
+    assert codes == {LOAD_ANCESTOR_UNOBSERVED}
+    assert report.complete is False
+
+
+def _operation(monkeypatch, held, *, observe=None):
+    from support.sessions import given_session
+
+    import weaver.operations.joined as joined
+    from weaver.health import Observed
+    from weaver.operations import health as operation
+    from weaver.workspaces import Workspace
+
+    observed = []
+
+    def read(session, workspace, *, steps=True):
+        return held[workspace.workspace], None
+
+    def inventory(session, *, workspace, **asked):
+        observed.append(workspace.workspace)
+        if observe is not None:
+            observe(workspace.workspace)
+        return Observed()
+
+    monkeypatch.setattr(operation, "_read", read)
+    monkeypatch.setattr(operation, "_observe", inventory)
+    monkeypatch.setattr(joined, "retried", lambda work, **asked: work())
+    return given_session(workspace=Workspace(workspace="Sales")), observed
+
+
+@weaver_test()
+def test_a_context_catalogue_is_not_inventoried(monkeypatch):
+    import weaver
+
+    session, observed = _operation(
+        monkeypatch, {"Central": central(), "Sales": sales(revenue_loaded=LATER)}
+    )
+
+    report = weaver.health(
+        ["Sales"],
+        catalogue=["Central/Warehouse/Weaver", "Sales/Warehouse/Weaver"],
+        session=session,
+    )
+
+    assert observed == ["Sales"]
+    assert [each.label for each in report.catalogues] == ["Sales"]
+
+
+@weaver_test()
+def test_a_failed_inventory_keeps_the_catalogue_as_context(monkeypatch):
+    import weaver
+
+    def refuse(workspace):
+        if workspace == "Central":
+            raise PermissionError("no access to an unrelated Warehouse")
+
+    session, _observed = _operation(
+        monkeypatch,
+        {"Central": central(), "Sales": sales(revenue_loaded=LATER)},
+        observe=refuse,
+    )
+
+    report = weaver.health(
+        catalogue=["Central/Warehouse/Weaver", "Sales/Warehouse/Weaver"],
+        session=session,
+    )
+
+    central_health, sales_health = report.catalogues
+    assert "could not be inventoried" in central_health.error
+    assert LOAD_ANCESTOR_UNESTABLISHED in {
+        each.code for each in sales_health.report.findings if each.object_id == REVENUE
+    }
+    assert report.complete is False

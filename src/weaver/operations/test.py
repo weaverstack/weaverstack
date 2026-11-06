@@ -104,6 +104,7 @@ def test(
         return _joined_test(
             items,
             tuple(catalogue),
+            source=source,
             names=selected_names,
             workspace=workspace,
             environment=environment,
@@ -174,6 +175,7 @@ def _joined_test(
     items,
     catalogues,
     *,
+    source=None,
     names,
     workspace,
     environment,
@@ -195,7 +197,7 @@ def _joined_test(
         session=session,
     )
     requested = (
-        requested_by_label("test", items, places, home)
+        requested_by_label("test", items, places, home, project=Project(source, home))
         if items
         else default_request("test", places, home)
     )
@@ -297,33 +299,16 @@ def run_joined_test(
 
 
 def _stale_validations_across(session, state, items) -> tuple:
-    """The requested validations not green, a load in any catalogue counting."""
+    """The requested validations not green, a load or build in any catalogue
+    counting."""
 
-    from ..catalogues import Member, join
-    from ..health import assess_validations, joined_statuses
+    from ..health import assess_validations
     from ..joined_dag import Owned
-    from .mirror import mirrored_source
+    from .load import stale_context
 
-    members = [
-        Member(
-            label=place.label,
-            workspace=place.workspace.workspace,
-            catalogue_name=place.catalogue_name,
-            catalogue=place.catalogue,
-            dag=place.catalogue.dag(),
-            # A mirrored ancestor's load is recorded in the catalogue it mirrors.
-            source=mirrored_source(
-                place.catalogue,
-                workspace=place.workspace,
-                session=session,
-                operation="test --stale",
-                tables=(LOAD_STATUS,),
-            ),
-        )
-        for place in state.places
-    ]
-    joined = join(members)
-    statuses = joined_statuses(members)
+    members, joined, statuses = stale_context(
+        session, state, items, operation="test --stale"
+    )
     selected = []
     for member in members:
         chosen = [item.value for item in items if item.owner == member.label]

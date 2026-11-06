@@ -86,6 +86,8 @@ class ForeignAncestor:
     established_at: datetime | None
     result: str
     in_cycle: bool = False
+    #: When a build last certified it.
+    built_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -116,7 +118,7 @@ class CatalogueSet:
             if len({split(each)[0] for each in members}) > 1
         )
 
-    def across(self, member: Member, statuses, unread=()) -> "Across":
+    def across(self, member: Member, statuses, unread=(), *, unknown=()) -> "Across":
         """What Health needs about ``member``'s nodes from the other catalogues.
 
         ``statuses`` maps a qualified node to its effective load status.
@@ -124,18 +126,20 @@ class CatalogueSet:
         read.
         """
 
-        return Across(self, member, statuses, unread)
+        return Across(self, member, statuses, unread, unknown=unknown)
 
 
 class Across:
     """Ancestry beyond one catalogue, for that catalogue's Health."""
 
     def __init__(
-        self, joined: CatalogueSet, member: Member, statuses, unread=()
+        self, joined: CatalogueSet, member: Member, statuses, unread=(), *, unknown=()
     ) -> None:
         self._joined = joined
         self._member = member
         self._statuses = statuses
+        #: Members whose load state could not be read: their nodes say nothing.
+        self._unknown = frozenset(unknown)
         crossed = set()
         unobserved: dict[str, set[str]] = {}
         unread = {workspace.casefold() for workspace in unread}
@@ -145,7 +149,9 @@ class Across:
             reached = {crossing.consumer, *joined.graph.descendants(crossing.consumer)}
             if crossing.producer is not None:
                 crossed.update(reached)
-            elif (crossing.workspace or "").casefold() in unread:
+            if (crossing.workspace or "").casefold() in unread and (
+                crossing.producer is None or split(crossing.producer)[0] in unknown
+            ):
                 for each in reached:
                     unobserved.setdefault(each, set()).add(crossing.target)
         self._crossed = frozenset(crossed)
@@ -174,7 +180,7 @@ class Across:
         """Ancestors reached only through another catalogue."""
 
         from .catalogue.tables import PENDING
-        from .health import established, participates_in_load_state
+        from .health import _instant, established, participates_in_load_state
 
         qualified = qualify(self._member.label, node.node_id)
         if qualified not in self._crossed:
@@ -187,18 +193,23 @@ class Across:
         }
         found = []
         for each in graph.ancestors(qualified):
-            if each in local:
+            if each in local or split(each)[0] in self._unknown:
                 continue
             _owner, other = self._joined.locate(each)
             if not participates_in_load_state(other):
                 continue
             status = self._statuses.get(each)
+            owner, _ = self._joined.locate(each)
+            registered = owner.catalogue.registered.get(other.identity)
             found.append(
                 ForeignAncestor(
                     name=self._joined.display(each),
                     established_at=established(status),
                     result=PENDING if status is None else status.result,
                     in_cycle=each in cycle,
+                    built_at=None
+                    if registered is None
+                    else _instant(registered.build_datetime),
                 )
             )
         return tuple(found)
@@ -274,7 +285,11 @@ def join(members: Sequence[Member]) -> CatalogueSet:
 
 
 def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
-    from .installed import stored_identity
+    """What one physical shortcut lands on in the catalogues given.
+
+    Several logical items can share one physical item, so the producer is the
+    one that installs what the shortcut names.
+    """
 
     workspace = shortcut.target_workspace or member.workspace
     item = shortcut.target_item
@@ -283,92 +298,90 @@ def _crossings(member: Member, shortcut: "InstalledShortcut", installed):
     )
     target = f"{workspace}/{item}/{path}"
     consumer = qualify(member.label, str(shortcut.destination))
-    found = installed.get(
+
+    def unmatched(reason: str):
+        return (Crossing(consumer, target, reason=reason, workspace=workspace),)
+
+    candidates = installed.get(
         (workspace.casefold(), item.item_type.casefold(), item.item_name.casefold()), []
     )
-    if not found:
-        return (
-            Crossing(
-                consumer,
-                target,
-                reason=f"No catalogue given installs {workspace}/{item}.",
-                workspace=workspace,
-            ),
+    if not candidates:
+        return unmatched(f"No catalogue given installs {workspace}/{item}.")
+    if (
+        shortcut.shortcut_type == FOLDER_SHORTCUT
+        and len(shortcut.target_schema.strip("/").split("/")) != 2
+    ):
+        return unmatched("Only a Schema/Folder path names one installed folder.")
+    reached = {
+        (producer.label, logical): _reached(producer, logical, shortcut)
+        for producer, logical in candidates
+    }
+    holding = [key for key, nodes in reached.items() if nodes]
+    if len(holding) > 1:
+        names = ", ".join(sorted(f"{label}: {logical}" for label, logical in holding))
+        return unmatched(
+            f"{workspace}/{item}/{path} is installed by more than one item given: "
+            f"{names}."
         )
-    if len(found) > 1:
-        names = ", ".join(sorted(producer.label for producer, _ in found))
-        return (
-            Crossing(
-                consumer,
-                target,
-                reason=f"{workspace}/{item} is installed by more than one catalogue given: {names}.",
-                workspace=workspace,
-            ),
-        )
-    producer, logical = found[0]
-    by_id = producer.dag.by_id
-
-    if shortcut.shortcut_type == SCHEMA_SHORTCUT:
-        destination_schema = shortcut.destination.schema
-        reached = []
-        for node in producer.dag.nodes:
-            identity = node.identity
-            if (
-                node.item != logical
-                or not isinstance(identity, WeaverDocumentId)
-                or identity.is_files
-                or identity.object_id.schema.casefold()
-                != shortcut.target_schema.casefold()
-            ):
-                continue
-            destination = WeaverDocumentId(
-                shortcut.destination.item,
-                ObjectId(destination_schema, identity.object_id.object),
-            )
-            if str(destination) in member.dag.by_id:
-                reached.append(
-                    Crossing(
-                        qualify(member.label, str(destination)),
-                        target,
-                        producer=qualify(producer.label, node.node_id),
-                        workspace=workspace,
+    if not holding:
+        labels = ", ".join(sorted({label for label, _ in reached}))
+        return unmatched(f"{path} is not installed in {labels}.")
+    label = holding[0][0]
+    found = []
+    for node in reached[holding[0]]:
+        if shortcut.shortcut_type == SCHEMA_SHORTCUT:
+            destination = qualify(
+                member.label,
+                str(
+                    WeaverDocumentId(
+                        shortcut.destination.item,
+                        ObjectId(
+                            shortcut.destination.schema, node.identity.object_id.object
+                        ),
                     )
-                )
-        return tuple(reached)
-
-    if shortcut.shortcut_type == FOLDER_SHORTCUT:
-        parts = shortcut.target_schema.strip("/").split("/")
-        if len(parts) != 2:
-            return (
-                Crossing(
-                    consumer,
-                    target,
-                    reason="Only a Schema/Folder path names one installed folder.",
-                    workspace=workspace,
                 ),
             )
-        identity = stored_identity(logical, f"Files/{parts[0]}", parts[1])
+            # Tables a schema shortcut presents are not documents of the
+            # consumer; its readers read the namespace.
+            if split(destination)[1] not in member.dag.by_id:
+                destination = consumer
+        else:
+            destination = consumer
+        found.append(
+            Crossing(
+                destination,
+                target,
+                producer=qualify(label, node.node_id),
+                workspace=workspace,
+            )
+        )
+    return tuple(found)
+
+
+def _reached(producer: Member, logical: WeaverItemId, shortcut) -> list:
+    """The producer's installed objects a shortcut names, under one logical item."""
+
+    from .installed import stored_identity
+
+    if shortcut.shortcut_type == SCHEMA_SHORTCUT:
+        return [
+            node
+            for node in producer.dag.nodes
+            if node.item == logical
+            and isinstance(node.identity, WeaverDocumentId)
+            and not node.identity.is_files
+            and node.identity.object_id.schema.casefold()
+            == shortcut.target_schema.casefold()
+        ]
+    if shortcut.shortcut_type == FOLDER_SHORTCUT:
+        schema, folder = shortcut.target_schema.strip("/").split("/")
+        identity = stored_identity(logical, f"Files/{schema}", folder)
     else:
         identity = stored_identity(
             logical, shortcut.target_schema, shortcut.target_object or ""
         )
-    if str(identity) not in by_id:
-        return (
-            Crossing(
-                consumer,
-                target,
-                reason=f"{identity} is not installed in {producer.label}.",
-                workspace=workspace,
-            ),
-        )
-    return (
-        Crossing(
-            consumer,
-            target,
-            producer=qualify(producer.label, str(identity)),
-            workspace=workspace,
-        ),
-    )
+    node = producer.dag.by_id.get(str(identity))
+    return [] if node is None else [node]
 
 
 __all__ = [

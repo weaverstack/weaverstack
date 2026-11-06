@@ -126,6 +126,7 @@ def load(
         return _joined_load(
             items,
             tuple(catalogue),
+            source=source,
             names=selected_names,
             ancestors=ancestors,
             descendants=descendants,
@@ -400,6 +401,7 @@ def _joined_load(
     items,
     catalogues,
     *,
+    source=None,
     names,
     ancestors: bool,
     descendants: bool,
@@ -428,7 +430,7 @@ def _joined_load(
         session=session,
     )
     requested = (
-        requested_by_label("load", items, places, home)
+        requested_by_label("load", items, places, home, project=Project(source, home))
         if items
         else default_request("load", places, home)
     )
@@ -554,31 +556,11 @@ def _stale_across(session, state, items, *, as_of):
     """The requested loadables not green, judged against every catalogue, and
     the mirrored ones a load leaves where they are mirrored from."""
 
-    from ..catalogues import Member, join
-    from ..health import joined_statuses
     from ..joined_dag import Owned
-    from .mirror import mirrored_source
 
-    members = [
-        Member(
-            label=place.label,
-            workspace=place.workspace.workspace,
-            catalogue_name=place.catalogue_name,
-            catalogue=place.catalogue,
-            dag=place.catalogue.dag(),
-            # Mirrored load state is recorded at its source.
-            source=mirrored_source(
-                place.catalogue,
-                workspace=place.workspace,
-                session=session,
-                operation="load --stale",
-                tables=(LOAD_STATUS,),
-            ),
-        )
-        for place in state.places
-    ]
-    joined = join(members)
-    statuses = joined_statuses(members)
+    members, joined, statuses = stale_context(
+        session, state, items, operation="load --stale"
+    )
     selected, left = [], []
     for member in members:
         chosen = [item.value for item in items if item.owner == member.label]
@@ -599,6 +581,70 @@ def _stale_across(session, state, items, *, as_of):
             _mirrored_behind(assessment, state.by_label[member.label].workspace)
         )
     return tuple(selected), tuple(left)
+
+
+def stale_context(session, state, items, *, operation: str):
+    """Each catalogue as a member, joined, with every node's load status.
+
+    A catalogue's mirrored state is read from its source only where a requested
+    object depends on something it mirrors; an unrelated mirror changes
+    nothing. A catalogue whose load state cannot be interpreted refuses the run.
+    """
+
+    from ..catalogues import Member, join, qualify
+    from ..health import joined_statuses
+    from .mirror import mirrored_source
+
+    def member(place, source=None):
+        return Member(
+            label=place.label,
+            workspace=place.workspace.workspace,
+            catalogue_name=place.catalogue_name,
+            catalogue=place.catalogue,
+            dag=place.catalogue.dag(),
+            source=source,
+        )
+
+    members = [member(place) for place in state.places]
+    joined = join(members)
+    requested = {
+        qualify(each.label, node.node_id)
+        for each in members
+        for node in each.dag.nodes
+        if any(item.owner == each.label and item.value == node.item for item in items)
+    }
+    needed = set(requested)
+    for node_id in requested:
+        needed.update(joined.graph.ancestors(node_id))
+    sourced = []
+    for place, each in zip(state.places, members):
+        mirrored = {
+            qualify(each.label, node.node_id)
+            for node in each.dag.nodes
+            if node.is_mirrored
+        }
+        if mirrored & needed:
+            each = member(
+                place,
+                # Mirrored load state is recorded at its source.
+                mirrored_source(
+                    place.catalogue,
+                    workspace=place.workspace,
+                    session=session,
+                    operation=operation,
+                    tables=(LOAD_STATUS,),
+                ),
+            )
+        sourced.append(each)
+    joined = join(sourced)
+    statuses, unknown = joined_statuses(sourced)
+    if unknown:
+        raise CommandError(
+            "The load state of these catalogues could not be interpreted, so what "
+            "is stale cannot be judged: "
+            + "; ".join(f"{label}: {error}" for label, error in unknown.items())
+        )
+    return sourced, joined, statuses
 
 
 def _mirrored_behind(assessment, workspace) -> tuple:

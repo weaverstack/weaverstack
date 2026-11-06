@@ -423,9 +423,30 @@ class _Planner:
             return node.node_id
         visited.add(installed.node_id)
         self._report_external(installed)
-        for producer, crossed, read in self._upstream_loadable(
+        found, refreshed, published = self._upstream_loadable(
             installed, allowed_items=allowed_items
-        ):
+        )
+        requested = {
+            self.dag.installations[item]
+            for item in allowed_items
+            if item in self.dag.installations
+        }
+        for target, read in refreshed:
+            # A requested Lakehouse a reader sees through its endpoint is synced
+            # first, whether or not what fills it runs here.
+            if target in requested:
+                self.edges.add((self._refresh_node(target, read).node_id, node.node_id))
+        for producer, readiness, crossing in published:
+            barrier = self._context_publication(producer, readiness)
+            nearer = [
+                self.refresh_nodes[key]
+                for key in (
+                    _scoped(owner_of(each), f"refresh:{each}") for each in crossing
+                )
+                if key in self.refresh_nodes
+            ]
+            self.edges.add((barrier.node_id, (nearer[-1] if nearer else node).node_id))
+        for producer, crossed, read in found:
             upstream_id = self._select(producer, visited, allowed_items=allowed_items)
             # Barriers are listed from the consumer outwards; each replaces the
             # direct edge, so the consumer waits for the last of them.
@@ -533,6 +554,32 @@ class _Planner:
         self.nodes[node_id] = node
         return node
 
+    def _context_publication(self, producer, readiness: OneLakeReadiness) -> LoadNode:
+        """The wait for a Warehouse table's last load, which this run does not
+        run, to be published to a reader's Lakehouse path."""
+
+        identity = producer.identity
+        node_id = _scoped(
+            owner_of(identity),
+            f"publish:{producer.target}/{identity.object_id.qualified}",
+        )
+        prior = self.nodes.get(node_id)
+        node = LoadNode(
+            node_id=node_id,
+            logical_id=None,
+            physical_target=producer.target,
+            primitive_kind=ONELAKE_PUBLICATION,
+            publication_of=identity,
+            publication_targets=tuple(
+                dict.fromkeys(
+                    (*(() if prior is None else prior.publication_targets), readiness)
+                )
+            ),
+            owner=owner_of(identity),
+        )
+        self.nodes[node_id] = node
+        return node
+
     def _refresh_node(self, target: PhysicalTargetRef, read: InstalledNode) -> LoadNode:
         """The one refresh barrier for this Lakehouse, syncing what is read through it."""
 
@@ -562,9 +609,10 @@ class _Planner:
         installed: InstalledNode,
         *,
         allowed_items: frozenset[WeaverItemId],
-    ) -> tuple[tuple[InstalledNode, tuple, InstalledNode | None], ...]:
-        """The selected loadable ancestors, the barriers each path crosses, and
-        what the consumer's engine read where it crossed.
+    ) -> tuple[tuple, tuple]:
+        """The selected loadable ancestors, with the barriers each path crosses
+        and what the consumer's engine read where it crossed; and the endpoints
+        the consumer reads through.
 
         Passing through non-loadable producers is what makes a view a conduit:
         it owns no load work, so it is not a node here, but a consumer still
@@ -575,10 +623,14 @@ class _Planner:
         The barriers are listed from the consumer outwards. The closest read
         that leaves the consumer's engine decides the first; a shortcut onto
         another catalogue's Warehouse table adds the OneLake publication its
-        Lakehouse path waits for.
+        Lakehouse path waits for. A producer reached along several paths keeps
+        each path's barriers. A barrier already on a path is not added again,
+        so a walk around a cycle ends.
         """
 
-        found: dict[str, tuple[InstalledNode, tuple, InstalledNode | None]] = {}
+        found: dict[str, dict[tuple, tuple]] = {}
+        refreshed: dict[tuple, None] = {}
+        published: dict[tuple, tuple] = {}
         seen: set[tuple[str, tuple]] = set()
         frontier: list[tuple[InstalledNode, tuple, InstalledNode | None]] = [
             (installed, (), None)
@@ -586,7 +638,7 @@ class _Planner:
         while frontier:
             current, crossing, read = frontier.pop()
             for producer, hop, stacks in self._direct_producers(current):
-                if hop is None:
+                if hop is None or hop in crossing:
                     crossed = crossing
                 elif stacks:
                     crossed = (*crossing, hop)
@@ -595,21 +647,50 @@ class _Planner:
                 # What the consumer's engine reads at the crossing.
                 at = read if crossing else (producer if hop else None)
                 if (
+                    crossed
+                    and not crossing
+                    and not isinstance(crossed[0], OneLakeReadiness)
+                    and crossed[0] != ONELAKE_PUBLICATION
+                ):
+                    refreshed[(crossed[0], at)] = None
+                selected = (
                     producer.item in allowed_items
                     and producer.can_load
                     and self._is_chosen(producer)
+                )
+                if (
+                    not selected
+                    and stacks
+                    and isinstance(hop, OneLakeReadiness)
+                    and producer.can_load
                 ):
-                    # A closer crossing wins: the barrier belongs to the hop that
-                    # actually left the consumer's engine.
-                    prior = found.get(producer.node_id)
-                    if prior is None or not prior[1]:
-                        found[producer.node_id] = (producer, crossed, at)
+                    # A Warehouse table this run does not load still has to be
+                    # published before a reader here sees its last load.
+                    published[(producer.node_id, hop)] = (producer, hop, crossing)
+                if selected:
+                    found.setdefault(producer.node_id, {})[crossed] = (
+                        producer,
+                        crossed,
+                        at,
+                    )
                     continue
                 if (producer.node_id, crossed) in seen:
                     continue
                 seen.add((producer.node_id, crossed))
                 frontier.append((producer, crossed, at))
-        return tuple(found[node_id] for node_id in sorted(found))
+        paths = []
+        for node_id in sorted(found):
+            chains = found[node_id]
+            # A path with barriers covers the order a bare path would give.
+            kept = [each for key, each in chains.items() if key] or list(
+                chains.values()
+            )
+            paths.extend(sorted(kept, key=lambda each: str(each[1])))
+        return (
+            tuple(paths),
+            tuple(refreshed),
+            tuple(published[key] for key in sorted(published, key=str)),
+        )
 
     def _direct_producers(
         self, consumer: InstalledNode

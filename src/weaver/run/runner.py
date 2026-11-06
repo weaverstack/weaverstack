@@ -223,16 +223,20 @@ class Lanes:
         run = workspace.execution.run
         return cls(spark=run.spark_concurrency, warehouse=run.warehouse_concurrency)
 
-    def of(self, node) -> tuple:
+    def of(self, node, workspace: str | None = None) -> tuple:
+        """The lane a node takes. ``workspace`` names the workspace of a node
+        in a run across catalogues: a Warehouse name is unique only within one,
+        and two catalogues there share its Warehouses."""
+
         from .resolution import SPARK_KINDS, WAREHOUSE_PROCEDURE
 
         if node.primitive_kind in SPARK_KINDS:
             return ("spark",)
         if node.primitive_kind == WAREHOUSE_PROCEDURE:
             name = getattr(node.physical_target, "name", "")
-            # A Warehouse name is unique only within its workspace.
-            owner = getattr(node, "owner", None)
-            return ("warehouse", name) if owner is None else ("warehouse", owner, name)
+            if workspace is None:
+                return ("warehouse", name)
+            return ("warehouse", workspace.casefold(), name.casefold())
         return ("other",)
 
     def limit(self, lane: tuple) -> int:
@@ -389,7 +393,10 @@ class Runner:
             return self._result(self._dry_run(ordered), started=started)
 
         # With no catalogue each installation was just resolved from Fabric.
-        if session is not None and getattr(self.workspace, "catalogue", None):
+        # A joined run's places each have one, whatever the working workspace.
+        if session is not None and (
+            self.state.places or getattr(self.workspace, "catalogue", None)
+        ):
             from .identity import identity_messages
 
             owners = dict.fromkeys(getattr(node, "owner", None) for node in ordered)
@@ -612,7 +619,10 @@ class Runner:
 
         def admit(pool) -> None:
             for node, resolved in runnable():
-                lane = lanes.of(node)
+                lane = lanes.of(
+                    node,
+                    None if node.owner is None else self.workspace_for(node).workspace,
+                )
                 if (
                     self.request.concurrency is not None
                     and len(running) >= self.request.concurrency

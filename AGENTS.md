@@ -146,10 +146,18 @@ targets by catalogue label (`Owned`), and the ordinary load planner and
 workspace, runtime scope and catalogue record; `logical_id` and
 `physical_target` stay local to it. Items bound what runs, and traversal passes
 through unrequested items, so two selected objects keep their order through a
-View or shortcut another team owns. A physical shortcut onto another
-catalogue's Warehouse table adds that table's OneLake publication before the
-reader's endpoint refresh. Warehouse lanes are keyed by workspace, the total
-cap is one per invocation, every record shares one workflow ID, and a run with
+View or shortcut another team owns; a barrier already on a path is not added
+again, so a walk around a cycle ends, and a producer reached along several
+paths keeps each path's barriers. A physical shortcut onto another catalogue's
+Warehouse table adds that table's OneLake publication before the reader's
+endpoint refresh. When the run does not load that table, the wait asks the
+table's catalogue when its last successful load started and, if it wrote rows,
+waits for a commit from then; a Fabric Warehouse commit has no commitInfo, so
+its instant is that of the newest file it added. A requested Lakehouse a reader sees through its endpoint
+is refreshed before it even when nothing that fills it runs. With no items, or
+items without a catalogue, the working workspace's configured catalogue runs;
+two catalogues there and neither configured is refused. Warehouse lanes are
+keyed by workspace and Warehouse name, the total cap is one per invocation, every record shares one workflow ID, and a run with
 Spark work is sent to Fabric once, to the first catalogue with a requested
 Lakehouse. A catalogue that cannot be read refuses the run. A failed refresh or
 publication blocks its readers even in a fault-tolerant run.

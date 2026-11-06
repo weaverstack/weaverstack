@@ -247,10 +247,18 @@ class JoinedDag:
                 and producer.effective_object_type == "table"
                 and node.target.is_lakehouse
             ):
+                destination = node.inner.identity
+                # A schema shortcut presents the producer's table under its own
+                # schema name; a table shortcut names its own table.
+                named = getattr(destination, "object_id", None)
                 readiness = OneLakeReadiness(
                     target=node.target,
-                    schema=node.inner.identity.object_id.schema,
-                    object=node.inner.identity.object_id.object,
+                    schema=destination.schema if named is None else named.schema,
+                    object=(
+                        producer.inner.identity.object_id.object
+                        if named is None
+                        else named.object
+                    ),
                 )
             found.append((producer, readiness))
         return tuple(found)

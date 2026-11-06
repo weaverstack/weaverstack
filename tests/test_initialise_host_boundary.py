@@ -189,11 +189,17 @@ def test_notebook_initialise_allows_project_configuration_in_the_same_workspace(
 
 
 @weaver_test()
-def test_notebook_refuses_a_different_physical_workspace(notebook):
-    from weaver.errors import CommandError
+def test_a_notebook_reaches_another_workspace_with_a_resolver_of_its_own(notebook):
     from weaver.sessions.notebook import NotebookSession
     from weaver.workspaces import Workspace
 
-    with NotebookSession(workspace=Workspace(workspace=WORKSPACE)) as session:
-        with pytest.raises(CommandError, match="cannot execute against"):
-            session.scope(Workspace(workspace="AnotherWorkspace"))
+    given = object()
+    with NotebookSession(
+        workspace=Workspace(workspace=WORKSPACE), resolver=given
+    ) as session:
+        own = session.scope(Workspace(workspace=WORKSPACE))
+        other = session.scope(Workspace(workspace="AnotherWorkspace"))
+
+        assert own.resolver is given
+        assert other.resolver is not given
+        assert other.resolver.configuration.workspace == "AnotherWorkspace"

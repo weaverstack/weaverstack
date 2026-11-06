@@ -307,9 +307,9 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// Where each mirrored object's rows come from. Beside a mirror, each
-    /// object's source signature, so an object a mirror left unchanged can be
-    /// told from one it changed; with no mirror read, nothing more.
+    /// Where each mirrored object's rows come from, with the rows of objects
+    /// since built locally, which still name the catalogue mirrored. Beside a
+    /// mirror, each object's source signature; with no mirror read, nothing more.
     measure 'Mirror data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
@@ -323,7 +323,8 @@ table 'Dashboard measures'
             "@workspace", 'Mirror'[Source workspace name],
             "@target", 'Mirror'[Source target name],
             "@sourceschema", 'Mirror'[Source schema name],
-            "@sourceobject", 'Mirror'[Source object name]
+            "@sourceobject", 'Mirror'[Source object name],
+            "@live", IF(YEAR('Mirror'[Row delete datetime]) = 9999, 1, 0)
         )
         VAR _signed = UNION(
             CATALOGUES(
@@ -344,13 +345,14 @@ table 'Dashboard measures'
             )
         )
         RETURN
-            _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject"
+            _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject" & _f & "live"
             & CONCATENATEX(
                 _mirrors,
                 _r & [@item] & _q & [@code]
                     & _f & [@schema] & _f & [@object]
                     & _f & [@workspace] & _f & [@target]
-                    & _f & [@sourceschema] & _f & [@sourceobject],
+                    & _f & [@sourceschema] & _f & [@sourceobject]
+                    & _f & [@live],
                 ""
             )
             & IF(

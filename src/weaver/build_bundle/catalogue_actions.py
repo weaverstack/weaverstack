@@ -6,18 +6,14 @@ import json
 from collections import defaultdict
 from typing import Iterable, Mapping
 
-from ..catalogue.claims import (
-    CatalogueClaim,
-    catalogue_schema,
-    claim_rules_for_object_type,
-)
+from ..catalogue.borrow import retire_statement
+from ..catalogue.claims import CatalogueClaim, claim_rules_for_object_type
 from ..catalogue.reconcile import publish
-from ..catalogue.render import InstallationScope, render_delete_rows
+from ..catalogue.render import InstallationScope
 from ..catalogue.state import Catalogue, for_targets, retaining
 from ..catalogue.tables import (
     DICTIONARY_TABLES,
     INSTALLATION,
-    MIRROR,
     REGISTRY,
     SCOPE_ITEM_NAME,
     SCOPE_ITEM_TYPE,
@@ -330,20 +326,8 @@ def render_mirror_deregistration(
         slug=DEREGISTER_MIRROR_SLUG,
         description="stop recording materialised objects as borrowed",
         kind=PUBLISH_CATALOGUE,
-        statements=(render_delete_rows(MIRROR, _mirror_keys(materialised)),),
+        statements=(retire_statement(materialised),),
         catalogue_target=catalogue_target,
-    )
-
-
-def _mirror_keys(identities: Iterable[WeaverDocumentId]) -> tuple[dict, ...]:
-    return tuple(
-        {
-            SCOPE_ITEM_TYPE: identity.item.item_type,
-            SCOPE_ITEM_NAME: identity.item.item_name,
-            "schema_name": catalogue_schema(identity),
-            "object_name": identity.object_id.object,
-        }
-        for identity in identities
     )
 
 

@@ -1558,7 +1558,8 @@ MIRROR = RuntimeTable(
     name="Mirror",
     description=(
         "Source and local physical type for installed objects whose data comes "
-        "from another target. Removed when the object is built locally."
+        "from another target. When the object is built locally its row stays, "
+        "marked deleted, as the record of the catalogue this one mirrors."
     ),
     # The Registry's identity exactly: both rows describe one installed object.
     key=(SCOPE_ITEM_TYPE, SCOPE_ITEM_NAME, "schema_name", "object_name"),

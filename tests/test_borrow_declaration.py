@@ -395,6 +395,26 @@ def test_nothing_is_copied_for_a_source_with_no_code():
 
 
 @weaver_test()
+def test_only_rows_still_borrowed_are_read_or_marked_mirrored():
+    """A row whose object was built locally stays, marked deleted."""
+
+    from weaver.catalogue.borrow import lineage_statement
+    from weaver.catalogue.reader import table_query
+    from weaver.catalogue.tables import MIRROR, REGISTRY
+
+    class _Catalogue:
+        def columns_of(self, table):
+            return {
+                column.casefold(): column for column in table.public_columns
+            }
+
+    live = "[Row delete datetime] = convert(datetime2(6), '9999-12-31 23:59:59.999999')"
+    assert table_query(_Catalogue(), MIRROR).endswith(f"WHERE {live}")
+    assert "WHERE" not in table_query(_Catalogue(), REGISTRY)
+    assert lineage_statement().endswith(f"and [m].{live};")
+
+
+@weaver_test()
 def test_recording_creates_the_table_before_it_writes_to_it():
     """No document declares ``_.Mirror``, so no build has made one."""
 

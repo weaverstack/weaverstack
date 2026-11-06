@@ -15,6 +15,7 @@ from ..declaration.metadata import AUDIT_LIVE_DELETE_DATETIME
 from ..declaration.model import LAKEHOUSE, WeaverDocumentId
 from .claims import catalogue_columns, stored_area
 from .fork import create_statement, local_relation
+from .reader import live_rows
 from .tables import (
     CATALOGUE_SCHEMA,
     LINEAGE_NODE,
@@ -361,6 +362,34 @@ def _insert(rows: Sequence[Mapping[str, str]]) -> str:
 _AUDIT = ("Row insert datetime", "Row update datetime", "Row delete datetime")
 
 
+def retire_statement(identities: Sequence[WeaverDocumentId]) -> str | None:
+    """Mark these objects' ``_.Mirror`` rows deleted, now they are built locally.
+
+    The rows stay as the record of the catalogue this one mirrors.
+    """
+
+    keys = [
+        (identity.item.item_type, identity.item.item_name, *catalogue_columns(identity))
+        for identity in identities
+    ]
+    if not keys:
+        return None
+    values = ",\n       ".join(
+        "(" + ", ".join(literal(value) for value in key) + ")" for key in keys
+    )
+    named = ", ".join(identifier(column) for column in _KEY)
+    joined = " and ".join(
+        f"[m].{identifier(column)} = [k].{identifier(column)}" for column in _KEY
+    )
+    deleted, updated = identifier("Row delete datetime"), identifier("Row update datetime")
+    return (
+        f"update [m] set {deleted} = sysutcdatetime(), {updated} = sysutcdatetime()\n"
+        f"from {local_relation(MIRROR)} as [m]\n"
+        f"join (values {values}) as [k] ({named})\non {joined}\n"
+        f"where {live_rows('[m].')};"
+    )
+
+
 def lineage_statement() -> str:
     """Mark every object ``_.Mirror`` records as mirrored in ``_.LineageNode``.
 
@@ -381,7 +410,7 @@ def lineage_statement() -> str:
         f"update [n] set {mirrored} = 1, {can_load} = 0\n"
         f"from {local_relation(LINEAGE_NODE)} as [n]\n"
         f"join {local_relation(MIRROR)} as [m] on {keys}\n"
-        f"where [n].{mirrored} = 0 or [n].{can_load} = 1;"
+        f"where ([n].{mirrored} = 0 or [n].{can_load} = 1) and {live_rows('[m].')};"
     )
 
 
@@ -392,6 +421,7 @@ __all__ = [
     "Borrowed",
     "borrow_statements",
     "lineage_statement",
+    "retire_statement",
     "borrowable",
     "catalogue_schema_statements",
     "executable",

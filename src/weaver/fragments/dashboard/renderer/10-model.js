@@ -227,14 +227,14 @@ function mirrorSources(m, rows) {
   m.items.forEach(function (it) {
     if (it.target) byTarget.set(String(it.workspace || "").toLowerCase() + "|" + String(it.target).toLowerCase(), it);
   });
+  // A row whose object was since built locally still names the catalogue mirrored.
+  m.mirrored = new Map();
   rows.forEach(function (r) {
-    var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
-    if (!n) return;
     var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
-    if (!source) return;
-    n.mirror = { read: true, item: source, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+    if (source) m.mirrored.set(ownerCode(r.item), source.code);
+    var n = r.live === "0" ? null : m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+    if (n && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
   });
-
 }
 
 /* How each object differs between a mirror and the catalogue it mirrors,
@@ -245,8 +245,7 @@ function mirrorSources(m, rows) {
    that state. A mirror whose source is not read marks only what it borrows. */
 var CHANGE = { BORROWED: "borrowed", CHANGED: "changed", ADDED: "added" };
 function markChanges(m, signatures) {
-  var sources = new Map(), signed = new Map();
-  m.nodes.forEach(function (n) { if (n.mirror) sources.set(ownerCode(n.item), n.mirror.item.code); });
+  var sources = m.mirrored, signed = new Map();
   signatures.forEach(function (r) { signed.set(identityKey(r.item, r.schema, r.object) + "|" + r.kind, r.signature); });
   function signature(n) { return signed.get(identityKey(n.item, n.schema, n.object) + "|" + (isValidation(n) ? "test" : "data")) || null; }
   m.nodes.forEach(function (n) {

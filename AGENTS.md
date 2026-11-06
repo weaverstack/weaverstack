@@ -117,7 +117,9 @@ the ones the catalogue already records, and an endpoint in no known workspace
 hashes its ID alone. Mirror re-keys forked lineage by the destination's
 installations in its final transaction (`fork.lineage_key_statements`), and
 marks what `_.Mirror` records as mirrored (`borrow.lineage_statement`). Build
-projects an item's lineage with the `_.Mirror` rows that stay after it. A
+projects an item's lineage with the `_.Mirror` rows that stay after it. A row
+whose object Build materialises stays, marked deleted, as the record of the
+catalogue mirrored; catalogue reads and lineage marking take only live rows. A
 lineage signature leaves out the keys and the mirror flags, which differ
 between catalogues holding one item and are compared as columns, so Mirror's
 in-place rewrite leaves signatures valid.
@@ -187,8 +189,8 @@ catalogue holds `_.Mirror` only once it has been a mirror, so the model reads
 it where it exists; a mirrored object takes its source's state when the
 source's catalogue is among those read, and is unobserved otherwise. Beside a
 mirror, the model also carries each object's source signature. The renderer
-pairs a mirror's catalogue with the one it mirrors, through an object still
-mirrored, and classes each object there as borrowed (drawn muted), changed or
+pairs a mirror's catalogue with the one it mirrors through its `_.Mirror` rows,
+including those of objects since built locally, and classes each object there as borrowed (drawn muted), changed or
 added (marked) by its signature, or rebuilt with the same code (drawn as
 usual); the source's copy of a borrowed or changed object takes that state.
 

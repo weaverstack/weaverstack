@@ -381,7 +381,10 @@ def retire_statement(identities: Sequence[WeaverDocumentId]) -> str | None:
     joined = " and ".join(
         f"[m].{identifier(column)} = [k].{identifier(column)}" for column in _KEY
     )
-    deleted, updated = identifier("Row delete datetime"), identifier("Row update datetime")
+    deleted, updated = (
+        identifier("Row delete datetime"),
+        identifier("Row update datetime"),
+    )
     return (
         f"update [m] set {deleted} = sysutcdatetime(), {updated} = sysutcdatetime()\n"
         f"from {local_relation(MIRROR)} as [m]\n"

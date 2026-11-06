@@ -404,9 +404,7 @@ def test_only_rows_still_borrowed_are_read_or_marked_mirrored():
 
     class _Catalogue:
         def columns_of(self, table):
-            return {
-                column.casefold(): column for column in table.public_columns
-            }
+            return {column.casefold(): column for column in table.public_columns}
 
     live = "[Row delete datetime] = convert(datetime2(6), '9999-12-31 23:59:59.999999')"
     assert table_query(_Catalogue(), MIRROR).endswith(f"WHERE {live}")

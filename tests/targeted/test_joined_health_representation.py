@@ -567,7 +567,7 @@ def test_health_reads_every_catalogue_and_reports_one_it_cannot_read_in_place(
     monkeypatch.setattr(operation, "_observe", lambda *a, **k: Observed())
     import weaver.operations.joined as joined
 
-    monkeypatch.setattr(joined, "retried", lambda work: work())
+    monkeypatch.setattr(joined, "retried", lambda work, **asked: work())
     session = given_session(workspace=Workspace(workspace="Sales"))
 
     report = weaver.health(
@@ -586,3 +586,28 @@ def test_health_reads_every_catalogue_and_reports_one_it_cannot_read_in_place(
         each.code for each in sales_report.findings if each.object_id == REVENUE
     }
     assert not [call for call in session.calls if "report" in str(call).casefold()]
+
+
+@weaver_test()
+def test_a_retry_lets_the_workspace_acquire_a_failed_connection_again(monkeypatch):
+    import time
+    from types import SimpleNamespace
+
+    from weaver.operations.joined import retried
+
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    recovered, attempts = [], []
+    session = SimpleNamespace(
+        scope=lambda workspace: SimpleNamespace(
+            recover=lambda: recovered.append(workspace)
+        )
+    )
+
+    def work():
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise ConnectionError("refused")
+        return "read"
+
+    assert retried(work, session=session, workspace="Sales") == "read"
+    assert recovered == ["Sales"]

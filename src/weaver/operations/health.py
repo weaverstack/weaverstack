@@ -301,7 +301,9 @@ def _joined_health(
             def read(place):
                 with opened.concurrent_substep(f"Read {place.reference}"):
                     catalogue, source = retried(
-                        lambda: _read(opened, place.workspace, steps=False)
+                        lambda: _read(opened, place.workspace, steps=False),
+                        session=opened,
+                        workspace=place.workspace,
                     )
                     member = Member(
                         label=place.label,
@@ -319,7 +321,9 @@ def _joined_health(
                             items=requested.get(place.label, ()),
                             inventories=inventories,
                             steps=False,
-                        )
+                        ),
+                        session=opened,
+                        workspace=place.workspace,
                     )
                 return member, seen
 

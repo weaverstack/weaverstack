@@ -235,8 +235,12 @@ def concurrently(entries, work) -> list:
         return [future.result() for future in futures]
 
 
-def retried(work):
-    """Once more after a pause: a Warehouse can refuse a connection while busy."""
+def retried(work, *, session=None, workspace=None):
+    """Once more after a pause: a Warehouse can refuse a connection while busy.
+
+    With ``session``, the workspace's failed connections may be acquired again
+    first; a Session otherwise keeps a failed connection failed.
+    """
 
     import time
 
@@ -244,6 +248,8 @@ def retried(work):
         return work()
     except Exception:  # noqa: BLE001 - the second attempt's error is reported
         time.sleep(5)
+        if session is not None:
+            session.scope(workspace).recover()
         return work()
 
 

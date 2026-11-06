@@ -261,11 +261,17 @@ function runsOf(m) {
     if (completed === null) completed = started;
     if (started !== null) addTo(tasks, r.workflow, { task: r.task, started: started, completed: completed, records: num(r.records) || 0, failed: num(r.failed) || 0 });
   });
+  var touched = new Map();
+  (m.tables.runtargets || []).forEach(function (r) {
+    var item = targetItem(m, r.targettype, r.target, r.catalogue);
+    if (item) addTo(touched, r.workflow, item);
+  });
   m.runs = (m.tables.runs || []).map(function (r) {
     var started = num(r.started), completed = num(r.completed);
     if (started === null) started = completed;
     if (completed === null) completed = started;
-    return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [] };
+    return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [],
+      items: new Set(touched.get(r.workflow) || []) };
   }).filter(function (r) { return r.started !== null; });
   m.runs.sort(function (a, b) { return b.completed - a.completed || compare(a.id, b.id); });
   return m.runs;
@@ -420,7 +426,8 @@ function performancePage(body, m) {
   function render() {
     host.textContent = "";
     var from = m.at - WINDOW_DAYS[s.window] * DAY;
-    var views = runsOf(m).filter(function (r) { return r.completed >= from; }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
+    // A run shows when it touched an item chosen.
+    var views = runsOf(m).filter(function (r) { return r.completed >= from && (shown.all || Array.from(r.items).some(chosenItem)); }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
     if (!views.some(function (v) { return v.run.id === s.run; })) s.run = views.length ? views[0].run.id : null;
     var elapsed = views.map(function (v) { return v.elapsed; }), latest = views[0] || null;
     var longest = views.reduce(function (a, v) { return !a || v.elapsed > a.elapsed ? v : a; }, null);
@@ -460,7 +467,7 @@ function performancePage(body, m) {
       var loads = perfRows(m, "perf" + s.window).filter(itemFilter);
       host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "loads", title: "Loads", value: function (r) { return r.loads; }, numeric: true },
         { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
         { key: "reloads", title: "Reloads", value: function (r) { return r.reloads; }, numeric: true },
@@ -471,7 +478,7 @@ function performancePage(body, m) {
       var tests = testRows(m, "test" + s.window).filter(itemFilter);
       host.appendChild(section("Tests · " + fmt(tests.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "test"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "runs", title: "Runs", value: function (r) { return r.runs; }, numeric: true },
         { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
         { key: "failed", title: "Failed", value: function (r) { return r.failed; }, render: function (r) { return r.failed ? chip("Failed", fmt(r.failed)) : "0"; }, numeric: true },
@@ -482,7 +489,7 @@ function performancePage(body, m) {
       var largest = largestRows(m).filter(itemFilter);
       host.appendChild(section("Largest changes, last 7 days", [dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "completed", title: "Processed", value: function (r) { return r.completed; }, render: function (r) { return stamp(r.completed); }, numeric: true },
         { key: "duration", title: "Time", value: function (r) { return r.duration; }, render: function (r) { return duration(r.duration); }, numeric: true },
         { key: "inserted", title: "Inserted", value: function (r) { return r.inserted; }, render: function (r) { return fmt(r.inserted); }, numeric: true },
@@ -505,7 +512,7 @@ function performancePage(body, m) {
     var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && chosenItem(r.item); });
     var columns = [
       { key: "label", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, r.task); } },
-      { key: "item", title: "Item", value: function (r) { return r.item; } },
+      { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
       { key: "task", title: "Task", value: function (r) { return taskName(r.task); } },
       { key: "result", title: "Result", value: function (r) { return r.result; }, render: function (r) { return chip(r.result); } },
       { key: "started", title: "Started", value: function (r) { return r.started; }, render: function (r) { return stamp(r.started).slice(11); }, numeric: true },

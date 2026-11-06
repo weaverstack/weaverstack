@@ -258,7 +258,7 @@ test("Health reports Weaver's codes for the catalogue's own state", () => {
   const codes = (list) => list.map((f) => (f.node ? f.node.key : f.label) + ":" + f.code).sort();
   assert.deepEqual(codes(health.load), ["b:load_stale_ancestor", "b:load_stale_time", "m:load_pending"]);
   assert.deepEqual(codes(health.tests), ["v:test_failed"]);
-  assert.deepEqual(codes(health.build), ["Warehouse/Curated Sales.Ghost:not_installed"]);
+  assert.deepEqual(codes(health.build), ["Sales.Ghost:not_installed"]);
 });
 
 test("Health lists what each area finds nothing about as green, apart from the findings", () => {
@@ -837,7 +837,7 @@ test("items and nodes of two catalogues stay apart, and an item is shown with it
   const m = federatedModel();
   assert.ok(m.items.has(O("Warehouse/Mart", 1)) && m.items.has(O("Warehouse/Mart", 2)));
   assert.equal(m.items.get(O("Warehouse/Mart", 1)).nodes.length, 1);
-  assert.equal(D.shownItem(O("Warehouse/Mart", 2)), "Warehouse/Mart · SPOKE");
+  assert.equal(D.shownItem(O("Warehouse/Mart", 2)), "SPOKE/Warehouse/Mart");
 });
 
 test("a physical shortcut joins the catalogue that installs its target", () => {
@@ -941,4 +941,12 @@ test("a mirrored object takes its state from its source when that catalogue is r
   assert.deepEqual(assess(mirrors("HubMart_WH")).map((f) => [f.code, f.unobserved]), [["load_failed", false]]);
   assert.deepEqual(assess(mirrors("Elsewhere_WH")).map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
   assert.deepEqual(assess("").map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
+});
+
+test("a run knows the items it touched, so choosing items narrows the runs", () => {
+  const extra = table("runs", ["workflow", "started", "completed", "records", "objects", "failed"], [["w1", AT - H, AT, 3, 2, 0], ["w2", AT - H, AT, 1, 1, 0]]) +
+    table("runtargets", ["workflow", "catalogue", "targettype", "target"], [["w1", "2", "Warehouse", "Mart_WH"], ["w2", "1", "Warehouse", "Hub_WH"]]);
+  const p = D.parsePayload(federated({ extra }));
+  const runs = D.runsOf(D.buildModel(p.tables, p.problems));
+  assert.deepEqual(runs.map((r) => [r.id, Array.from(r.items)]).sort(), [["w1", [O("Warehouse/Mart", 2)]], ["w2", [O("Warehouse/Hub", 1)]]]);
 });

@@ -149,7 +149,7 @@ function eligibleItems(m, kinds) {
 function stableItem(label) { var c = CATALOGUES.get(ownerCode(label)); return (c ? c.reference : "") + "|" + bare(label); }
 
 /* An item as a chooser lists it. */
-function choiceLabel(it) { return (it.workspace || it.catalogue || "") + "/" + kindName(it.type) + "/" + it.name; }
+function choiceLabel(it) { return shownItem(it.label); }
 
 /* The items a page shows. A workspace chosen brings every item it offers
    there. Nothing chosen is every item on a page that shows the estate, and
@@ -423,10 +423,11 @@ function depthLabel(d) { return d < 0 ? "Max" : String(d); }
 
 /* ---- object details ----------------------------------------------------------- */
 
-function nodeLink(m, key, onOpen) {
+/* plain leaves the item out, for a table that shows it in a column of its own. */
+function nodeLink(m, key, onOpen, plain) {
   var n = m.nodes.get(key);
   return el("button", { "class": "wd-link", type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
-    [kindMark(n.kind), n.label, el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
+    [kindMark(n.kind), n.label, plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 
 function details(panel, m, key, options) {

@@ -53,14 +53,16 @@ function itemName(label) { var s = bare(label); return s.slice(s.indexOf("/") + 
 /* The catalogues the page reads, by code; set by buildModel. */
 var CATALOGUES = new Map();
 function catalogueLabel(value) { var c = CATALOGUES.get(ownerCode(value)); return c ? c.label : ""; }
-/* An item as shown: its kind and name, and its catalogue when several are read. */
+/* Each installed item's workspace; set by buildModel. */
+var ITEM_WORKSPACES = new Map();
+/* An item as every page shows it: Workspace/Kind/Name, as the chooser lists it. */
 function shownItem(label) {
   if (label === null || label === undefined) return "";
-  return CATALOGUES.size > 1 && catalogueLabel(label) ? bare(label) + " · " + catalogueLabel(label) : bare(label);
+  var w = ITEM_WORKSPACES.get(label) || catalogueLabel(label);
+  return (w ? w + "/" : "") + bare(label);
 }
-function shownName(label) {
-  return CATALOGUES.size > 1 && catalogueLabel(label) ? itemName(label) + " · " + catalogueLabel(label) : itemName(label);
-}
+/* An item's name alone, where its workspace and kind are shown beside it. */
+function shownName(label) { return itemName(label); }
 
 function typeRank(type) { var i = ITEM_TYPES.indexOf(type); return i < 0 ? ITEM_TYPES.length : i; }
 
@@ -99,6 +101,8 @@ function buildModel(tables, problems) {
     it.workspace = r.workspace; it.target = r.target; it.version = r.version;
     it.workspaceId = r.workspaceid || null; it.targetId = r.targetid || null;
   });
+  ITEM_WORKSPACES = new Map();
+  m.items.forEach(function (it) { if (it.workspace) ITEM_WORKSPACES.set(it.label, it.workspace); });
   var first = m.catalogues.length ? m.catalogues[0].code : "";
   var catalogue = m.items.get(owned(CATALOGUE_ITEM, first)) || m.items.get(CATALOGUE_ITEM);
   m.catalogue = { name: catalogue ? catalogue.target : null, workspace: catalogue ? catalogue.workspace : null, version: catalogue ? catalogue.version : null };

@@ -518,7 +518,7 @@ GraphView.prototype.hoverAt = function (cx, cy) {
       el("div", { "class": "wd-muted", text: "Select to show " + (h.marker.keys.length > BUDGET.REVEAL ? "the first " + BUDGET.REVEAL : h.marker.keys.length === 1 ? "it" : "them") })]);
   } else if (key) {
     var n = this.m.nodes.get(key), s = isValidation(n) ? n.test : effectiveLoad(n);
-    this.showTip(cx, cy, [el("b", { text: n.label }), el("div", { "class": "wd-muted", text: n.kind + " · " + n.item }),
+    this.showTip(cx, cy, [el("b", { text: n.label }), el("div", { "class": "wd-muted", text: n.kind + " · " + shownItem(n.item) }),
       s ? el("div", {}, [chip(s.result), " " + (s.completed ? stamp(s.completed) : "")]) : null]);
   } else this.hideTip();
   if (key !== this.hover) { this.hover = key; this.draw(); }

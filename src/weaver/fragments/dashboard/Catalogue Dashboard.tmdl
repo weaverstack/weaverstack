@@ -394,7 +394,7 @@ table 'Dashboard measures'
         displayFolder: Data
 
     /// The 300 latest workflows of the last 30 days with the span each task type
-    /// of each occupied, the 200 longest object records of the 8 latest of them,
+    /// of each occupied and the targets each touched, the 200 longest object records of the 8 latest of them,
     /// each load of those runs with its own counts (the 200 longest per run), and
     /// the Tests' statistics per object over the last day, 7 days and 30 days.
     measure 'Run data' = ```
@@ -411,7 +411,9 @@ table 'Dashboard measures'
             "@start", 'Log'[Started datetime],
             "@end", 'Log'[Completed datetime],
             "@isobject", IF(ISBLANK('Log'[Object name]), 0, 1),
-            "@failed", IF('Log'[Result] IN {"Failed", "Error", "Blocked"}, 1, 0)
+            "@failed", IF('Log'[Result] IN {"Failed", "Error", "Blocked"}, 1, 0),
+            "@targettype", 'Log'[Target type],
+            "@target", 'Log'[Target name]
         )
         VAR _all = GROUPBY(
             _log,
@@ -433,6 +435,10 @@ table 'Dashboard measures'
             "@trecords", SUMX(CURRENTGROUP(), 1),
             "@tfailed", SUMX(CURRENTGROUP(), [@failed])
         )
+        VAR _touched = DISTINCT(SELECTCOLUMNS(
+            FILTER(_log, [@isobject] = 1 && [@workflow] IN _recentids),
+            "@w", [@workflow], "@c", [@code], "@tt", [@targettype], "@tn", [@target]
+        ))
         VAR _eight = SELECTCOLUMNS(TOPN(8, _recent, [@last], DESC, [@workflow], ASC), "@workflow", [@workflow])
         VAR _records = CATALOGUES(
             'Log' WHERE 'Log'[Workflow ID] IN _eight && NOT ISBLANK('Log'[Object name]),
@@ -511,6 +517,8 @@ table 'Dashboard measures'
                 [@last], DESC,
                 [@workflow], ASC
             )
+            & _t & "runtargets" & _f & "workflow" & _f & "catalogue" & _f & "targettype" & _f & "target"
+            & CONCATENATEX(_touched, _r & [@w] & _f & [@c] & _f & [@tt] & _f & [@tn], "")
             & _t & "runtasks" & _f & "workflow" & _f & "task" & _f & "started" & _f & "completed" & _f & "records" & _f & "failed"
             & CONCATENATEX(
                 _spans,

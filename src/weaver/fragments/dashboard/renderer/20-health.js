@@ -182,7 +182,7 @@ function assessHealth(m, options) {
   });
   (m.tables.uncertified || []).forEach(function (r) {
     if (!m.items.has(r.item) || m.items.get(r.item).internal || !m.items.get(r.item).target) return;
-    build.push({ area: "build", code: "not_installed", severity: RED, node: null, label: r.item + " " + r.schema + "." + r.object,
+    build.push({ area: "build", code: "not_installed", severity: RED, node: null, label: r.schema + "." + r.object,
       item: r.item, schema: r.schema, object: r.object,
       result: null, message: "declared in the dictionary, but not certified in Registry", unobserved: false });
   });

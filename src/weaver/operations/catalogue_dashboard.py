@@ -142,14 +142,8 @@ def deploy_catalogue_dashboard(
 
     with use_or_create_session(session, workspace=base) as opened:
         with opened.task("Catalogue Dashboard", name):
-            sources = []
-            for reference, label, owner, warehouse in places:
-                with opened.step("Check the catalogue", reference):
-                    sources.append(
-                        _require_source(
-                            opened, base, label, owner, warehouse, reference, mode
-                        )
-                    )
+            with opened.step("Check the catalogues", f"{len(places)} given"):
+                sources = _require_sources(opened, base, places, mode)
             tables = tuple(f"_.{table}" for table in required_tables())
             with opened.step("Resolve the Dashboard's items", name):
                 model, report = _existing_targets(opened, base, name)
@@ -264,6 +258,46 @@ def required_tables() -> tuple[str, ...]:
     from ..dashboard_model import RELATIONS
 
     return tuple(sorted(RELATIONS.values()))
+
+
+def _require_sources(opened, base, places, mode):
+    """Every catalogue as the model reads it, read at once and retried once.
+
+    Every catalogue that cannot be read is named before anything changes.
+    """
+
+    from .joined import concurrently, retried
+
+    def read(place):
+        reference, label, owner, warehouse = place
+        workspace = (
+            base
+            if owner.casefold() == base.workspace.casefold()
+            else Workspace(workspace=owner)
+        )
+
+        def attempt():
+            # A refusal is the catalogue's answer; only a failed read is retried.
+            try:
+                return _require_source(
+                    opened, base, label, owner, warehouse, reference, mode
+                )
+            except CommandError as exc:
+                return exc
+
+        return retried(attempt, session=opened, workspace=workspace)
+
+    outcomes = concurrently(places, read)
+    failed = [
+        str(each) if isinstance(each, CommandError) else f"{place[0]}: {each}"
+        for place, each in zip(places, outcomes)
+        if isinstance(each, Exception)
+    ]
+    if len(failed) == 1:
+        raise CommandError(failed[0])
+    if failed:
+        raise CommandError("; ".join(failed))
+    return outcomes
 
 
 def _require_source(opened, base, label, owner, warehouse, reference, mode):

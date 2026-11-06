@@ -64,7 +64,7 @@ function sameCycle(m, a, b) { var c = components(m).of; return c.get(a) === c.ge
    was processed or built. Members of a cycle count as each other's ancestors
    for what has not been processed, never for what is newer. */
 function ancestry(m) {
-  var c = components(m), out = new Map(), within = [];
+  var c = components(m), out = new Map();
   function empty() { return { unprocessed: false, latest: null, changed: null }; }
   function merge(a, b) { if (b.unprocessed) a.unprocessed = true; a.latest = later(a.latest, b.latest); a.changed = later(a.changed, b.changed); }
   function own(p) {
@@ -77,19 +77,23 @@ function ancestry(m) {
     }
     return r;
   }
-  // Tarjan emits a component after every component it reads.
+  // Tarjan emits a component after every component it reads. full[i] is what
+  // a reader of any member of component i inherits: the members and their
+  // ancestry, since every member is an ancestor of every other.
+  var full = [];
   c.list.forEach(function (members, i) {
     var upstream = empty(), seen = new Set();
     members.forEach(function (key) {
       m.nodes.get(key).up.forEach(function (u) {
         var j = c.of.get(u);
-        if (j === i || seen.has(u)) return;
-        seen.add(u);
-        merge(upstream, within[j]);
-        merge(upstream, own(m.nodes.get(u)));
+        if (j === i || seen.has(j)) return;
+        seen.add(j);
+        merge(upstream, full[j]);
       });
     });
-    within[i] = upstream;
+    var whole = { unprocessed: upstream.unprocessed, latest: upstream.latest, changed: upstream.changed };
+    members.forEach(function (key) { merge(whole, own(m.nodes.get(key))); });
+    full[i] = whole;
     members.forEach(function (key) {
       var a = { unprocessed: upstream.unprocessed, latest: upstream.latest, changed: upstream.changed };
       if (members.length > 1) members.forEach(function (other) {
@@ -164,6 +168,13 @@ function assessHealth(m, options) {
       if (!n.isInstalled) build.push(finding("build", "missing_validation_artefact", RED, n, null, "its definition or artefact is not installed; build the item again"));
       else green.push(finding("build", "build_installed", GREEN, n, null, "installed and current"));
     } else green.push(finding("build", "build_installed", GREEN, n, null, "installed and current"));
+  });
+  // Objects that read one another are reported once per cycle, as weaver.health does.
+  components(m).list.forEach(function (members) {
+    if (members.length < 2) return;
+    var nodes = members.map(function (k) { return m.nodes.get(k); }).sort(function (a, b) { return compare(a.id, b.id); });
+    build.push(finding("build", "dependency_cycle", GREEN, nodes[0], null,
+      "These objects read one another, so each loads once and the first reads what the last loaded before: " + nodes.map(function (n) { return n.label; }).join(", ")));
   });
   (m.tables.uncertified || []).forEach(function (r) {
     if (!m.items.has(r.item) || m.items.get(r.item).internal || !m.items.get(r.item).target) return;

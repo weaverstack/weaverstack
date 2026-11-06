@@ -162,12 +162,28 @@ Spark work is sent to Fabric once, to the first catalogue with a requested
 Lakehouse. A catalogue that cannot be read refuses the run. A failed refresh or
 publication blocks its readers even in a fault-tolerant run.
 
-The Catalogue Dashboard observes a catalogue and is no part of its lifecycle.
+The Catalogue Dashboard observes catalogues and is no part of their lifecycle.
 `weaver catalogue-dashboard` (`operations.catalogue_dashboard`) writes the
 `dashboard` fragment as an ordinary Power BI project and builds it without a
-catalogue, with the source catalogue Warehouse as the configured target of
-`Warehouse/_weaver`, so the catalogue is read and never written. Initialise,
-Build, Wipe and Mirror know nothing of it, and no item name is reserved.
+catalogue in the invoking workspace; every catalogue given is read in its own
+workspace and never written. Initialise, Build, Wipe and Mirror know nothing of
+it, and no item name is reserved. `weaver.dashboard_model` generates the
+catalogue tables: up to ten catalogues read over Direct Lake on OneLake, one
+table per catalogue and relation, each table's source fixed in TMDL so Build
+binds nothing; `import_mode` imports one table per relation with a partition
+per catalogue, and is required for more. The measures are written once, over
+the `CATALOGUES` macro that each mode expands, so both modes share every
+measure, payload and Report binding, and a reduction such as the latest
+workflows runs once over every catalogue's rows. The columns the measures read
+are the catalogue's required schema. A Direct Lake model cannot refresh a
+calculated table over its Direct Lake tables without a fixed-identity
+connection, so `Dashboard item`, the list the detail pages' slicers choose
+from, is a `DATATABLE` written at deployment; the page counts installed items
+it lacks. A detail page carries a page filter on the item kinds it shows, so
+its measures see a filter on `Dashboard item` and keep the items picked, or
+the first listed, before they serialise. The renderer qualifies every item,
+node key and record ID with its catalogue's payload code, and joins physical
+`_.Shortcut` rows across catalogues as `weaver.catalogues.join` does.
 
 ## The core abstraction
 

@@ -905,3 +905,17 @@ test("view state is kept apart for each set of catalogues", () => {
   const m = federatedModel();
   assert.notEqual(D.storeKey(m), D.storeKey({ catalogues: [{ reference: "HUB/Warehouse/Weaver" }] }));
 });
+
+test("a scoped page shows the items chosen, with their catalogue, and says whether they were picked", () => {
+  const p = D.parsePayload(federated({ extra: table("scope", ["item", "picked"], [[O("Warehouse/Mart", 2), ""]]) }));
+  const m = D.buildModel(p.tables, p.problems);
+  assert.deepEqual(m.scope, [O("Warehouse/Mart", 2)]);
+  assert.equal(m.scopePicked, false);
+  assert.deepEqual(D.scopedKeys(m).sort(), [O("m", 2), O("s", 2)]);
+});
+
+test("a page whose data is too large says so instead of drawing part of it", () => {
+  const p = D.parsePayload(table("page", ["name"], [["orchestration"]]) + table("toolarge", ["size", "budget"], [[2500000, 2000000]]));
+  const m = D.buildModel(p.tables, p.problems);
+  assert.deepEqual(m.tooLarge, { size: "2500000", budget: "2000000" });
+});

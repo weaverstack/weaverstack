@@ -105,6 +105,7 @@ MEASURES = {
         "Lineage data",
         "Node data",
         "Status data",
+        "Mirror data",
         "Build data",
         "Workflow data",
         "Run data",
@@ -716,10 +717,10 @@ def test_a_catalogue_that_was_never_a_mirror_is_read_without_one():
     both = model_text([held, never], DIRECT_LAKE)
     assert f"table 'Mirror {held.alias}'" in both
     assert f"table 'Mirror {never.alias}'" not in both
-    status = both[both.index("measure 'Status data'") :]
+    status = both[both.index("measure 'Mirror data'") :]
     assert f"'Mirror {held.alias}'" in status[: status.index("displayFolder")]
 
     neither = model_text([never], IMPORT)
     assert "table 'Mirror'" not in neither
-    status = neither[neither.index("measure 'Status data'") :]
+    status = neither[neither.index("measure 'Mirror data'") :]
     assert 'FILTER(ROW("@catalogue", "", "@code", ""' in status

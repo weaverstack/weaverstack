@@ -868,17 +868,6 @@ test("members of a cycle never make each other stale, but a failed member still 
     [["B", "load_failed"], ["A", "load_ancestor_unestablished"]]);
 });
 
-test("hiding mirrors keeps paths through them, marked, and changes no assessment", () => {
-  const m = federatedModel({ mirrored: true });
-  const shown = D.withoutMirrors(m);
-  assert.equal(shown.hiddenMirrors, 1);
-  assert.ok(!shown.nodes.has(O("b", 2)));
-  const reader = shown.nodes.get(O("s", 2));
-  assert.deepEqual(reader.vup, [O("h", 1)]);
-  assert.equal(reader.kinds[O("h", 1)], "Hidden mirror");
-  assert.equal(m.nodes.size, 5);
-});
-
 test("the estate counts direct dependencies between workspaces, not reach or repeats", () => {
   const items = table("itemedges", ["up", "down", "count"], [[O("Lakehouse/Bridge", 2), O("Warehouse/Mart", 2), 1]]) +
     table("itemobjects", ["item", "objects"], [[O("Warehouse/Hub", 1), 1], [O("Lakehouse/Bridge", 2), 1], [O("Warehouse/Mart", 2), 2]]);
@@ -941,6 +930,33 @@ test("a mirrored object takes its state from its source when that catalogue is r
   assert.deepEqual(assess(mirrors("HubMart_WH")).map((f) => [f.code, f.unobserved]), [["load_failed", false]]);
   assert.deepEqual(assess(mirrors("Elsewhere_WH")).map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
   assert.deepEqual(assess("").map((f) => [f.code, f.unobserved]), [["load_pending", true]]);
+});
+
+test("a mirror leaves unchanged what it mirrors and what keeps its source signature, on both sides", () => {
+  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
+  // Spoke mirrors Hub's Mart: Summary is mirrored; Customer is rebuilt the
+  // same; Revenue is changed; Report is new.
+  const nodes = table("nodes", NODE, [
+    [O("hs", 1), O("Warehouse/Mart", 1), "MART", "Summary", "Table", "MART.Summary", 9, ""],
+    [O("hc", 1), O("Warehouse/Mart", 1), "HUB", "Customer", "Shortcut", "HUB.Customer", 8, ""],
+    [O("hr", 1), O("Warehouse/Mart", 1), "MART", "Revenue", "Table", "MART.Revenue", 9, ""],
+    [O("s", 2), O("Warehouse/Mart", 2), "MART", "Summary", "Table", "MART.Summary", 13, ""],
+    [O("c", 2), O("Warehouse/Mart", 2), "HUB", "Customer", "Shortcut", "HUB.Customer", 8, ""],
+    [O("r", 2), O("Warehouse/Mart", 2), "MART", "Revenue", "Table", "MART.Revenue", 9, ""],
+    [O("n", 2), O("Warehouse/Mart", 2), "MART", "Report", "View", "MART.Report", 8, ""]]);
+  const items = table("items", INSTALL, [
+    [O("Warehouse/Mart", 1), "HUB", "HubMart_WH", "1", "w-hub", "i-hubmart"], [O("Warehouse/Mart", 2), "SPOKE", "Mart_WH", "1", "w-spoke", "i-mart"]]);
+  const mirrors = table("mirrors", MIRROR, [[O("Warehouse/Mart", 2), "MART", "Summary", "HUB", "HubMart_WH", "MART", "Summary"]]);
+  const signatures = table("signatures", ["item", "schema", "object", "kind", "signature"], [
+    [O("Warehouse/Mart", 1), "HUB", "Customer", "data", "c1"], [O("Warehouse/Mart", 2), "HUB", "Customer", "data", "c1"],
+    [O("Warehouse/Mart", 1), "MART", "Revenue", "data", "r1"], [O("Warehouse/Mart", 2), "MART", "Revenue", "data", "r2"],
+    [O("Warehouse/Mart", 2), "MART", "Report", "data", "n1"]]);
+  const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes + mirrors + signatures);
+  const m = D.buildModel(p.tables, p.problems);
+  const unchanged = Array.from(m.nodes.values()).filter((n) => n.unchanged).map((n) => n.key).sort();
+  assert.deepEqual(unchanged, [O("hs", 1), O("hc", 1), O("s", 2), O("c", 2)].sort());
+  assert.equal(m.nodes.get(O("c", 2)).original.key, O("hc", 1));
+  assert.deepEqual(m.nodes.get(O("hs", 1)).copies.map((n) => n.key), [O("s", 2)]);
 });
 
 test("a run knows the items it touched, so choosing items narrows the runs", () => {

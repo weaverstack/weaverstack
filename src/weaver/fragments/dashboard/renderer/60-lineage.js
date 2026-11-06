@@ -9,10 +9,7 @@ var DEPTHS = [0, 1, 2, -1];
    graph can fill the page. Nodes are coloured by kind, or by last outcome with
    derived readiness ringed. */
 function graphWorkspace(body, m, options) {
-  var s = pageState(options.page), whole = m;
-  if (s.mirrors === undefined) s.mirrors = true;
-  // Hiding mirrors changes what is drawn, never what is assessed.
-  m = s.mirrors ? whole : withoutMirrors(whole);
+  var s = pageState(options.page);
   var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
   s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
   if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
@@ -30,7 +27,7 @@ function graphWorkspace(body, m, options) {
     s.patterns.forEach(function (q) { matches(q).forEach(function (k) { if (!seen.has(k)) { seen.add(k); out.push(k); } }); });
     return out;
   }
-  var health = options.health ? assessHealth(whole) : null;
+  var health = options.health ? assessHealth(m) : null;
   s.mode = s.mode || options.mode;
   var view, f = workspaceFrame(s, function () { if (view) view.resize(); });
   var host = f.host, side = f.side, line = f.line, legendHost = f.legend;
@@ -72,24 +69,22 @@ function graphWorkspace(body, m, options) {
     view.setWindow(win, lay);
     status(win);
     renderChips();
-    details(side, whole, s.focus, { onOpen: select, health: health, emptyText: options.empty });
+    details(side, m, s.focus, { onOpen: select, health: health, emptyText: options.empty });
     if (refit) { if (win) view.fitWindow(true); else view.fitAll(true); }
     saveState();
   }
   function renderChips() {
     selectionChips(f.chips, s.selection, s.focus, function (key) { var n = m.nodes.get(key); return { kind: n.kind, label: n.label, title: n.item + " · " + qualified(n) }; },
-      function (key) { s.focus = key; details(side, whole, key, { onOpen: select, health: health }); renderChips(); view.fitKeys([key], true); }, select,
+      function (key) { s.focus = key; details(side, m, key, { onOpen: select, health: health }); renderChips(); view.fitKeys([key], true); }, select,
       { list: s.patterns, count: function (q) { return matches(q).length; }, remove: removePattern });
   }
   function status(win) {
     line.textContent = "";
     if (!win) {
       line.appendChild(document.createTextNode(fmt(m.nodes.size) + " objects in " + fmt(estate.bands.length) + " items. Search or select an object to follow its lineage."));
-      if (m.hiddenMirrors) line.appendChild(document.createTextNode(" · " + fmt(m.hiddenMirrors) + " mirrored objects hidden"));
       return;
     }
     var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 && (s.selection.length || s.patterns.length) ? " · " + win.seeds.size + " selected" : "")];
-    if (m.hiddenMirrors) parts.push(fmt(m.hiddenMirrors) + " mirrored objects hidden; a path through one is drawn as via a hidden mirror");
     if (win.expanded.size) parts.push(fmt(win.expanded.size) + " expanded");
     if (win.hidden) parts.push(fmt(win.hidden) + " more beside them; select a ‹‹ or ›› marker to expand");
     if (win.truncated) parts.push(el("b", { "class": "wd-warn-text", text: "lineage cut to the " + fmt(win.lineage.size) + " nearest of " + fmt(win.reach) + "; lower a depth" }));
@@ -98,18 +93,13 @@ function graphWorkspace(body, m, options) {
   }
 
   if (options.above) body.appendChild(options.above);
-  var mirrorToggle = el("label", { "class": "wd-check", title: "Hiding mirrored objects changes the drawing only; Health still reads them." }, [
-    el("input", { type: "checkbox", checked: s.mirrors ? "checked" : null, onchange: function () { s.mirrors = this.checked; saveState(); redraw(); } }),
-    "Show mirrored objects"
-  ]);
   f.mount(body, [
     options.chooser,
     nodeSearch(m, select, addPattern),
-    mirrorToggle,
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Colour", ["load", "kind"], s.mode, function (v) {
-      s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v)); saveState();
+      s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v, m)); saveState();
     }, function (v) { return v === "load" ? "Outcome" : "Kind"; }),
     el("span", { "class": "wd-grow" }),
     el("div", { "class": "wd-zoom" }, [
@@ -121,7 +111,7 @@ function graphWorkspace(body, m, options) {
       } }, ["Estate"])
     ])
   ]);
-  legendHost.appendChild(legend(s.mode));
+  legendHost.appendChild(legend(s.mode, m));
   if (!m.nodes.size) { host.appendChild(empty("The catalogue records no installed objects yet. Build a project to see its graph.")); return; }
   var fresh = !s.view;
   view = new GraphView(host, m, estate, { state: s, mode: s.mode, onSelect: select, onReveal: expand, onMove: moved, label: options.label });
@@ -136,41 +126,6 @@ function keysOf(m, labels) {
   var out = [];
   labels.forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
   return out;
-}
-
-/* The graph without mirrored objects. An edge that passed through one is
-   drawn from the nearest shown upstream, marked as via a hidden mirror. */
-function withoutMirrors(m) {
-  var hidden = new Set();
-  m.nodes.forEach(function (n, k) { if (n.isMirrored) hidden.add(k); });
-  if (!hidden.size) return m;
-  var nodes = new Map(), items = new Map();
-  m.nodes.forEach(function (n, k) {
-    if (hidden.has(k)) return;
-    var c = Object.create(n);
-    c.vup = []; c.vdown = []; c.kinds = Object.assign({}, n.kinds);
-    nodes.set(k, c);
-  });
-  nodes.forEach(function (c, k) {
-    var seen = new Set(), stack = m.nodes.get(k).vup.map(function (u) { return [u, false]; });
-    while (stack.length) {
-      var top = stack.pop(), u = top[0];
-      if (seen.has(u)) continue;
-      seen.add(u);
-      if (hidden.has(u)) { m.nodes.get(u).vup.forEach(function (x) { stack.push([x, true]); }); continue; }
-      c.vup.push(u); nodes.get(u).vdown.push(k);
-      if (top[1]) c.kinds[u] = "Hidden mirror";
-    }
-  });
-  m.items.forEach(function (it, label) {
-    var own = it.nodes.filter(function (n) { return nodes.has(n.key); });
-    var c = Object.create(it);
-    c.nodes = own.map(function (n) { return nodes.get(n.key); });
-    items.set(label, c);
-  });
-  var shown = Object.create(m);
-  shown.nodes = nodes; shown.items = items; shown.hiddenMirrors = hidden.size;
-  return shown;
 }
 
 /* The frame both graph pages share: a toolbar, the selection as chips, a status
@@ -227,7 +182,7 @@ function selectionChips(chips, selection, focus, describe, onFocus, select, patt
   if (selection.length + terms.length > 1) chips.appendChild(el("button", { type: "button", "class": "wd-text-btn wd-chip-clear", onclick: function () { select(null); } }, ["Clear"]));
 }
 
-function legend(mode) {
+function legend(mode, m) {
   var entries = mode === "load" ? [
     ["swatch wd-ok", "Last load succeeded"], ["swatch wd-bad", "Failed, error or blocked"], ["swatch wd-warn", "Rejected rows or pending"],
     ["swatch wd-none", "Nothing processed, or loaded elsewhere"], ["ring wd-next", "Ready: dependencies processed"], ["ring wd-wait", "Waiting on a dependency"]
@@ -236,6 +191,7 @@ function legend(mode) {
     ["kind wd-kind wd-kind-test", "Test"], ["kind wd-kind wd-kind-assumption", "Assumption"], ["kind wd-kind wd-kind-semantic-model", "Semantic model"], ["kind wd-kind wd-kind-report", "Report"],
     ["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]
   ];
+  if (m && m.unchanged) entries.push(["swatch wd-unchanged", "Lighter: the same in a mirror and its source"]);
   return el("div", { "class": "wd-legend" }, entries.map(function (e) {
     return el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-" + e[0] }), e[1]]);
   }).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));

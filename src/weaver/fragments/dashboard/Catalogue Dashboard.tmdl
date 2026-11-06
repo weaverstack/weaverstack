@@ -241,8 +241,7 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// Current load and test outcomes, when each data object was last built,
-    /// and where each mirrored object's rows come from.
+    /// Current load and test outcomes, and when each data object was last built.
     measure 'Status data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
@@ -272,16 +271,6 @@ table 'Dashboard measures'
             "@schema", 'Registry'[Schema name],
             "@object", 'Registry'[Object name],
             "@built", 'Registry'[Build datetime]
-        )
-        VAR _mirrors = CATALOGUES(
-            'Mirror',
-            "@item", 'Mirror'[Item type] & "/" & 'Mirror'[Item name],
-            "@schema", 'Mirror'[Schema name],
-            "@object", 'Mirror'[Object name],
-            "@workspace", 'Mirror'[Source workspace name],
-            "@target", 'Mirror'[Source target name],
-            "@sourceschema", 'Mirror'[Source schema name],
-            "@sourceobject", 'Mirror'[Source object name]
         )
         RETURN
             _t & "loads" & _f & "item" & _f & "schema" & _f & "object" & _f & "result" & _f & "completed" & _f & "duration"
@@ -315,7 +304,47 @@ table 'Dashboard measures'
                     & _f & IF(ISBLANK([@built]), "", FORMAT(([@built] - DATE(1970, 1, 1)) * 86400000, "0")),
                 ""
             )
-            & _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject"
+        ```
+        displayFolder: Data
+
+    /// Where each mirrored object's rows come from. Beside a mirror, each
+    /// object's source signature, so an object a mirror left unchanged can be
+    /// told from one it changed; with no mirror read, nothing more.
+    measure 'Mirror data' = ```
+        VAR _f = UNICHAR(57345)
+        VAR _r = UNICHAR(57346)
+        VAR _t = UNICHAR(57347)
+        VAR _q = UNICHAR(57348)
+        VAR _mirrors = CATALOGUES(
+            'Mirror',
+            "@item", 'Mirror'[Item type] & "/" & 'Mirror'[Item name],
+            "@schema", 'Mirror'[Schema name],
+            "@object", 'Mirror'[Object name],
+            "@workspace", 'Mirror'[Source workspace name],
+            "@target", 'Mirror'[Source target name],
+            "@sourceschema", 'Mirror'[Source schema name],
+            "@sourceobject", 'Mirror'[Source object name]
+        )
+        VAR _signed = UNION(
+            CATALOGUES(
+                'Registry' WHERE 'Registry'[Object role] IN {"Data", "Shortcut"},
+                "@item", 'Registry'[Item type] & "/" & 'Registry'[Item name],
+                "@schema", 'Registry'[Schema name],
+                "@object", 'Registry'[Object name],
+                "@kind", "data",
+                "@signature", LEFT('Registry'[Signature], 16)
+            ),
+            CATALOGUES(
+                'Test dictionary',
+                "@item", 'Test dictionary'[Item type] & "/" & 'Test dictionary'[Item name],
+                "@schema", 'Test dictionary'[Schema name],
+                "@object", 'Test dictionary'[Object name],
+                "@kind", "test",
+                "@signature", LEFT('Test dictionary'[Signature], 16)
+            )
+        )
+        RETURN
+            _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject"
             & CONCATENATEX(
                 _mirrors,
                 _r & [@item] & _q & [@code]
@@ -323,6 +352,18 @@ table 'Dashboard measures'
                     & _f & [@workspace] & _f & [@target]
                     & _f & [@sourceschema] & _f & [@sourceobject],
                 ""
+            )
+            & IF(
+                ISEMPTY(_mirrors),
+                "",
+                _t & "signatures" & _f & "item" & _f & "schema" & _f & "object" & _f & "kind" & _f & "signature"
+                    & CONCATENATEX(
+                        _signed,
+                        _r & [@item] & _q & [@code]
+                            & _f & [@schema] & _f & [@object]
+                            & _f & [@kind] & _f & [@signature],
+                        ""
+                    )
             )
         ```
         displayFolder: Data
@@ -1016,31 +1057,31 @@ table 'Dashboard measures'
         isHidden
 
     /// The Summary page for HTML Content.
-    measure 'Overview page' = PAGE("overview", [Catalogue data] & [Lineage data] & [Status data] & [Workflow data] & [Build data])
+    measure 'Overview page' = PAGE("overview", [Catalogue data] & [Lineage data] & [Status data] & [Mirror data] & [Workflow data] & [Build data])
         displayFolder: Pages
 
     /// The Health page for HTML Content.
-    measure 'Health page' = PAGE("health", [Catalogue data] & [Lineage data] & [Status data] & [Workflow data] & [Build data])
+    measure 'Health page' = PAGE("health", [Catalogue data] & [Lineage data] & [Status data] & [Mirror data] & [Workflow data] & [Build data])
         displayFolder: Pages
 
     /// The Orchestration page for HTML Content.
-    measure 'Orchestration page' = PAGE("orchestration", [Catalogue data] & [Lineage data] & [Status data] & [Workflow data])
+    measure 'Orchestration page' = PAGE("orchestration", [Catalogue data] & [Lineage data] & [Status data] & [Mirror data] & [Workflow data])
         displayFolder: Pages
 
     /// The Performance page for HTML Content.
-    measure 'Performance page' = PAGE("performance", [Catalogue data] & [Node data] & [Run data] & [Statistic data])
+    measure 'Performance page' = PAGE("performance", [Catalogue data] & [Node data] & [Mirror data] & [Run data] & [Statistic data])
         displayFolder: Pages
 
     /// The Gantt page for HTML Content.
-    measure 'Gantt page' = PAGE("gantt", [Catalogue data] & [Node data] & [Workflow data] & [Log data])
+    measure 'Gantt page' = PAGE("gantt", [Catalogue data] & [Node data] & [Mirror data] & [Workflow data] & [Log data])
         displayFolder: Pages
 
     /// The Entity dictionary page for HTML Content.
-    measure 'Entity dictionary page' = PAGE("entities", [Catalogue data] & [Lineage data] & [Metadata data])
+    measure 'Entity dictionary page' = PAGE("entities", [Catalogue data] & [Lineage data] & [Mirror data] & [Metadata data])
         displayFolder: Pages
 
     /// The Semantic model page for HTML Content.
-    measure 'Semantic model page' = PAGE("semantic", [Catalogue data] & [Lineage data] & [Status data] & [Semantic data])
+    measure 'Semantic model page' = PAGE("semantic", [Catalogue data] & [Lineage data] & [Status data] & [Mirror data] & [Semantic data])
         displayFolder: Pages
 
     /// The Workspaces page for HTML Content.

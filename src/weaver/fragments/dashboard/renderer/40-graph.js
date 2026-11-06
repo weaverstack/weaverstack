@@ -4,6 +4,8 @@
 // starts on a node moves the node instead.
 
 var CELL = 64, LABEL_DROP = 20;
+/* The opacity of an object a mirror left unchanged, and of edges between two. */
+var UNCHANGED_ALPHA = 0.3;
 
 function GraphView(host, m, lay, options) {
   var self = this;
@@ -174,31 +176,39 @@ GraphView.prototype.paint = function () {
   var shown = win ? win.shown : null;
   // Edges: everything faintly without a focus; with one, the window's edges.
   ctx.lineWidth = 1 / Math.max(k, 0.5);
+  function unchanged(u, d) { return !!(m.nodes.get(u).unchanged && m.nodes.get(d).unchanged); }
   if (!win) {
-    ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = k < 0.3 ? 0.35 : 0.6; ctx.beginPath();
-    m.nodes.forEach(function (n) {
-      var b = lay.pos.get(n.key);
-      n.vup.forEach(function (u) {
-        var a = lay.pos.get(u);
-        if (a && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
+    [false, true].forEach(function (light) {
+      ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = (k < 0.3 ? 0.35 : 0.6) * (light ? UNCHANGED_ALPHA : 1); ctx.beginPath();
+      m.nodes.forEach(function (n) {
+        var b = lay.pos.get(n.key);
+        n.vup.forEach(function (u) {
+          var a = lay.pos.get(u);
+          if (a && unchanged(u, n.key) === light && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
+        });
       });
+      ctx.stroke();
     });
-    ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1;
   } else {
     var hl = this.hover && shown.has(this.hover) ? this.hover : null;
     [null, "up", "down"].forEach(function (side) {
-      ctx.beginPath();
-      var heads = [];
-      win.edges.forEach(function (e) {
-        if (e.side !== side) return;
-        var a = lay.pos.get(e.u), b = lay.pos.get(e.d);
-        curve(ctx, a, b); heads.push(b);
+      [false, true].forEach(function (light) {
+        ctx.beginPath();
+        var heads = [];
+        win.edges.forEach(function (e) {
+          if (e.side !== side || unchanged(e.u, e.d) !== light) return;
+          var a = lay.pos.get(e.u), b = lay.pos.get(e.d);
+          curve(ctx, a, b); heads.push(b);
+        });
+        if (!heads.length) return;
+        if (side === null) { ctx.strokeStyle = P["line-strong"]; ctx.lineWidth = 1 / Math.max(k, 0.6); ctx.globalAlpha = 0.75; }
+        else { ctx.strokeStyle = side === "up" ? P.up : P.down; ctx.lineWidth = 1.8 / Math.max(k, 0.7); ctx.globalAlpha = 1; }
+        if (light) ctx.globalAlpha *= UNCHANGED_ALPHA;
+        ctx.stroke();
+        if (side !== null && k > 0.4) { ctx.beginPath(); heads.forEach(function (b) { arrow(ctx, b); }); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); }
+        ctx.globalAlpha = 1;
       });
-      if (side === null) { ctx.strokeStyle = P["line-strong"]; ctx.lineWidth = 1 / Math.max(k, 0.6); ctx.globalAlpha = 0.75; }
-      else { ctx.strokeStyle = side === "up" ? P.up : P.down; ctx.lineWidth = 1.8 / Math.max(k, 0.7); ctx.globalAlpha = 1; }
-      ctx.stroke();
-      if (side !== null && k > 0.4) { ctx.beginPath(); heads.forEach(function (b) { arrow(ctx, b); }); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); }
-      ctx.globalAlpha = 1;
     });
     if (hl) {
       ctx.beginPath();
@@ -218,6 +228,7 @@ GraphView.prototype.paint = function () {
       ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fillStyle = P["blue-soft"]; ctx.fill();
       ctx.lineWidth = 2 / Math.max(k, 0.8); ctx.strokeStyle = P.ink; ctx.stroke();
     }
+    ctx.globalAlpha = n.unchanged ? UNCHANGED_ALPHA : 1;
     glyph(ctx, n.kind, p.x, p.y, colour, P);
     self.marks(ctx, n, p, P);
     if (labels || (win && k > 0.3)) {
@@ -232,6 +243,7 @@ GraphView.prototype.paint = function () {
       ctx.fillText(text, p.x - half, p.y + LABEL_DROP);
       self.labels.set(n.key, { x0: p.x - half, x1: p.x + half });
     }
+    ctx.globalAlpha = 1;
   });
 
   // Expansion markers: neighbours outside the window, upstream on the left.
@@ -252,7 +264,6 @@ GraphView.prototype.paint = function () {
 GraphView.prototype.nodeColour = function (n, P) {
   if (this.o.mode !== "load") return kindColour(n.kind, P);
   var s = isValidation(n) ? n.test : effectiveLoad(n);
-  if (n.isMirrored) return P.faint;
   return s ? toneColour(tone(s.result), P) : participates(n) ? P.faint : kindColour(n.kind, P);
 };
 

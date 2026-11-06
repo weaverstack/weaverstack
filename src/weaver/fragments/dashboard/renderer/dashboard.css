@@ -352,8 +352,10 @@ body { background: #f7f7f6; }
 .wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
 
 /* The mirror toggle sits in the toolbar. */
-.wd-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.wd-check input { margin: 0; }
+/* An object a mirror left unchanged, and the object it mirrors. */
+.wd-unchanged { opacity: 0.4; }
+.wd-unchanged:hover, .wd-unchanged:focus-visible { opacity: 0.8; }
+.wd-key-swatch.wd-unchanged { background: var(--ink); opacity: 0.3; }
 
 /* --- estate ------------------------------------------------------------------ */
 

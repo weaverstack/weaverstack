@@ -158,6 +158,8 @@ function ganttChart(rows, sum, s, m, select) {
       var r = rows[i], y = GANTT.AXIS + i * GANTT.ROW, mid = y + GANTT.ROW / 2;
       if (i % 2) { ctx.fillStyle = P["paper-deep"]; ctx.globalAlpha = 0.45; ctx.fillRect(0, y, width, GANTT.ROW); ctx.globalAlpha = 1; }
       if (r.id === s.pick) { ctx.fillStyle = P["blue-soft"]; ctx.fillRect(0, y, width, GANTT.ROW); }
+      var light = r.node && r.node.unchanged ? UNCHANGED_ALPHA : 1;
+      ctx.globalAlpha = light;
       var kind = r.envelope ? null : recordKind(r.node, r.task);
       if (kind) glyph(ctx, kind, 17, mid, kindColour(kind, P), P);
       ctx.lineWidth = 1;
@@ -169,9 +171,10 @@ function ganttChart(rows, sum, s, m, select) {
       var x1 = Math.max(labelW, time(r.started)), x2 = Math.min(width - 8, time(r.completed));
       if (x2 >= labelW && x1 <= width - 8) {
         ctx.fillStyle = toneColour(tone(r.result), P);
-        ctx.globalAlpha = r.envelope ? 0.35 : 0.9;
-        ctx.beginPath(); roundRect(ctx, x1, y + 4, Math.max(2.5, x2 - x1), GANTT.ROW - 8, 3); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.globalAlpha = (r.envelope ? 0.35 : 0.9) * light;
+        ctx.beginPath(); roundRect(ctx, x1, y + 4, Math.max(2.5, x2 - x1), GANTT.ROW - 8, 3); ctx.fill();
       }
+      ctx.globalAlpha = 1;
     }
     // The time axis stays at the top of the visible part.
     var axisY = Math.max(top, 0);

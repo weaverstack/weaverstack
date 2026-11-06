@@ -160,6 +160,7 @@ function buildModel(tables, problems) {
     if (n) n.load = status(r);
   });
   mirrorSources(m, t("mirrors"));
+  markUnchanged(m, t("signatures"));
   t("tests").forEach(function (r) {
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     if (n) { n.test = status(r); n.test.failures = num(r.failures); }
@@ -231,7 +232,30 @@ function mirrorSources(m, rows) {
     if (!n) return;
     var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
     if (!source) return;
-    n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+    n.mirror = { read: true, item: source, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+  });
+
+}
+
+/* What a mirror left unchanged. A mirror's catalogue is paired with the
+   catalogue it mirrors, where both are read; an object is unchanged when it is
+   mirrored, or when its source signature equals that of the same object there.
+   Both sides are marked, and pages draw them lighter. */
+function markUnchanged(m, signatures) {
+  var sources = new Map(), signed = new Map();
+  m.nodes.forEach(function (n) { if (n.mirror) sources.set(ownerCode(n.item), n.mirror.item.code); });
+  signatures.forEach(function (r) { signed.set(identityKey(r.item, r.schema, r.object) + "|" + r.kind, r.signature); });
+  function signature(n) { return signed.get(identityKey(n.item, n.schema, n.object) + "|" + (isValidation(n) ? "test" : "data")) || null; }
+  m.nodes.forEach(function (n) {
+    var code = sources.get(ownerCode(n.item));
+    var original = n.mirror && n.mirror.source ? n.mirror.source
+      : code ? m.byIdentity.get(identityKey(owned(bare(n.item), code), n.schema, n.object)) || null : null;
+    if (!n.isMirrored && !(original && signature(n) && signature(n) === signature(original))) return;
+    n.unchanged = m.unchanged = true;
+    if (!original) return;
+    n.original = original;
+    original.unchanged = true;
+    (original.copies = original.copies || []).push(n);
   });
 }
 

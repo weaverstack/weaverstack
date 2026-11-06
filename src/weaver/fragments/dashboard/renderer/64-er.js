@@ -272,7 +272,7 @@ function erWorkspace(body, m, s, options) {
     }
     boxes.forEach(function (box, id) {
       var n = g.nodes.get(id), seed = w.seeds.has(id);
-      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
+      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + (n.owner && n.owner.unchanged ? " wd-unchanged" : "") + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
       group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
       group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
       group.appendChild(sv("text", { "class": "wd-er-title", x: 12, y: 17 }, [clipText(n.label, 28)]));

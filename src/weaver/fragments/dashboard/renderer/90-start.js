@@ -62,7 +62,7 @@ var api = {
   layoutEstate: layoutEstate, WINDOW_GEOMETRY: WINDOW_GEOMETRY, subModel: subModel, focusWindow: focusWindow, searchNodes: searchNodes, nodeMatches: nodeMatches, dictionaryEntries: dictionaryEntries,
   searchEntries: searchEntries, metadata: metadata, modelTables: modelTables, busMatrix: busMatrix, erGraph: erGraph,
   erWindow: erWindow, erLayout: erLayout, ER: ER, ganttSummary: ganttSummary, clockTicks: clockTicks, clockLabel: clockLabel, canvasRatio: canvasRatio, duration: duration, stamp: stamp, wallOf: wallOf, instantOf: instantOf, zoneLabel: zoneLabel, logRows: logRows, perfRows: perfRows, performanceCard: performanceCard, largestRows: largestRows, runStatRows: runStatRows, sortRows: sortRows, taskRank: taskRank, runsOf: runsOf, runObjectRows: runObjectRows, runView: runView, dayStartHour: dayStartHour, testRows: testRows, recordKind: recordKind, tone: tone, BUDGET: BUDGET,
-  estateTopology: estateTopology, loopsOf: loopsOf, topologyColumns: topologyColumns, withoutMirrors: withoutMirrors,
+  estateTopology: estateTopology, loopsOf: loopsOf, topologyColumns: topologyColumns,
   joinCatalogues: joinCatalogues, components: components, keysOf: keysOf, eligibleItems: eligibleItems, chosenItems: chosenItems, stableItem: stableItem, shownItem: shownItem, storeKey: storeKey,
   FIELD: FIELD, ROW: ROW, TABLE: TABLE, LESS: LESS, OWNER: OWNER
 };

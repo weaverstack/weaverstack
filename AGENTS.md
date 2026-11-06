@@ -185,7 +185,11 @@ node key and record ID with its catalogue's payload code, and joins physical
 `_.Shortcut` rows across catalogues as `weaver.catalogues.join` does. A
 catalogue holds `_.Mirror` only once it has been a mirror, so the model reads
 it where it exists; a mirrored object takes its source's state when the
-source's catalogue is among those read, and is unobserved otherwise.
+source's catalogue is among those read, and is unobserved otherwise. Beside a
+mirror, the model also carries each object's source signature: the renderer
+pairs a mirror's catalogue with the one it mirrors and draws an object lighter on
+both sides when it is mirrored or keeps its signature, so what changed in the
+mirror stands out.
 
 ## The core abstraction
 

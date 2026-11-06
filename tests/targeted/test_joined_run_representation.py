@@ -390,7 +390,7 @@ def estate(monkeypatch):
     monkeypatch.setattr(run, "dispatch_primitive", dispatch)
     import weaver.operations.joined as joined
 
-    monkeypatch.setattr(joined, "retried", lambda work: work())
+    monkeypatch.setattr(joined, "retried", lambda work, **asked: work())
     session = given_session(workspace=Workspace(workspace="Sales"))
     return session, reads, dispatched, writers
 

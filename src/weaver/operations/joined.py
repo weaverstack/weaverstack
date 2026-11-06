@@ -266,7 +266,9 @@ def read_run_places(session, places, *, tables=None):
         return retried(
             lambda: read_installed_catalogue(
                 session=session, workspace=place.workspace, tables=tables
-            )
+            ),
+            session=session,
+            workspace=place.workspace,
         )
 
     found, failed = [], []

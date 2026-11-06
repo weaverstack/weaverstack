@@ -950,3 +950,12 @@ test("a run knows the items it touched, so choosing items narrows the runs", () 
   const runs = D.runsOf(D.buildModel(p.tables, p.problems));
   assert.deepEqual(runs.map((r) => [r.id, Array.from(r.items)]).sort(), [["w1", [O("Warehouse/Mart", 2)]], ["w2", [O("Warehouse/Hub", 1)]]]);
 });
+
+test("two items one workspace shows alike are told apart by their Fabric item", () => {
+  const items = table("items", INSTALL, [
+    [O("Warehouse/Mart", 1), "SPOKE", "Mart_WH", "1", "w", "i1"], [O("Warehouse/Mart", 2), "SPOKE", "Mirror_WH", "1", "w", "i2"]]);
+  const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + table("catalogues", ["code", "label", "reference"], [["1", "SPOKE/Warehouse/A", "SPOKE/Warehouse/A"], ["2", "SPOKE/Warehouse/B", "SPOKE/Warehouse/B"]]) + items);
+  D.buildModel(p.tables, p.problems);
+  assert.equal(D.shownItem(O("Warehouse/Mart", 1)), "SPOKE/Warehouse/Mart (Mart_WH)");
+  assert.equal(D.shownItem(O("Warehouse/Mart", 2)), "SPOKE/Warehouse/Mart (Mirror_WH)");
+});

@@ -55,11 +55,13 @@ var CATALOGUES = new Map();
 function catalogueLabel(value) { var c = CATALOGUES.get(ownerCode(value)); return c ? c.label : ""; }
 /* Each installed item's workspace; set by buildModel. */
 var ITEM_WORKSPACES = new Map();
+/* The Fabric item of each item whose path another item shares. */
+var ITEM_TARGETS = new Map();
 /* An item as every page shows it: Workspace/Kind/Name, as the chooser lists it. */
 function shownItem(label) {
   if (label === null || label === undefined) return "";
-  var w = ITEM_WORKSPACES.get(label) || catalogueLabel(label);
-  return (w ? w + "/" : "") + bare(label);
+  var w = ITEM_WORKSPACES.get(label) || catalogueLabel(label), target = ITEM_TARGETS.get(label);
+  return (w ? w + "/" : "") + bare(label) + (target ? " (" + target + ")" : "");
 }
 /* An item's name alone, where its workspace and kind are shown beside it. */
 function shownName(label) { return itemName(label); }
@@ -101,8 +103,13 @@ function buildModel(tables, problems) {
     it.workspace = r.workspace; it.target = r.target; it.version = r.version;
     it.workspaceId = r.workspaceid || null; it.targetId = r.targetid || null;
   });
-  ITEM_WORKSPACES = new Map();
+  ITEM_WORKSPACES = new Map(); ITEM_TARGETS = new Map();
   m.items.forEach(function (it) { if (it.workspace) ITEM_WORKSPACES.set(it.label, it.workspace); });
+  // Two catalogues in one workspace can each install an item of one name, as a
+  // mirror does; those are told apart by the Fabric item each is installed to.
+  var paths = new Map();
+  m.items.forEach(function (it) { if (!it.internal) addTo(paths, shownItem(it.label), it); });
+  paths.forEach(function (list) { if (list.length > 1) list.forEach(function (it) { if (it.target) ITEM_TARGETS.set(it.label, it.target); }); });
   var first = m.catalogues.length ? m.catalogues[0].code : "";
   var catalogue = m.items.get(owned(CATALOGUE_ITEM, first)) || m.items.get(CATALOGUE_ITEM);
   m.catalogue = { name: catalogue ? catalogue.target : null, workspace: catalogue ? catalogue.workspace : null, version: catalogue ? catalogue.version : null };

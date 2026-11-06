@@ -218,10 +218,13 @@ returns the session-native `FabricStore`. From a desktop that construction fails
 and does not substitute DFS.
 
 A Lakehouse's Files mount is for authored code: `Folder.path()` and the staging
-directory `read()` writes into. Weaver lists, compares, copies and deletes
-Folder files through `Lakehouse.files_store()`, because a mount's listing can
-still show a file deleted through OneLake. Authored code lists with
-`current_files`, `files_since` and `latest_files` for the same reason.
+directory `read()` writes into. Weaver lists and compares Folder files through
+`Lakehouse.files_store()`, because a mount's listing can still show a file
+deleted through OneLake. Authored code lists with `current_files`, `files_since`
+and `latest_files` for the same reason. Folder publication copies, moves and
+deletes destination files through the run's mount: a mount caches a failed
+lookup, so a path looked up there while absent stays absent until the file is
+created through that mount. The mount is one per OneLake root per run.
 
 `FilesystemStore` is named for its transport. A build reads its repository
 through one wherever it runs, because every incoming source tree is copied to a

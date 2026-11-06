@@ -222,8 +222,8 @@ def mounted_lakehouse(
     """A Fabric Lakehouse whose Files area is this directory.
 
     A Lakehouse lives in OneLake. Authored Python reaches its Files through a
-    Fabric mount, and Weaver lists and changes them through the session's
-    store. Those are the two boundaries a fast test may stand in for: the
+    Fabric mount, Weaver lists them through the session's store and publishes
+    a Folder through the mount. Those are the two boundaries a fast test may stand in for: the
     directory is registered as the mount point and served as the store, and
     every other property of the Lakehouse stays what it is in production.
 

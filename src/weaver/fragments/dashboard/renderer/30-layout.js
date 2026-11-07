@@ -198,8 +198,9 @@ function subModel(m, keys) {
    up to the budget, plus whatever the reader has expanded. Every neighbour left
    out is counted on the shown node it hangs from, as a marker that expands it.
    Given within, the lineage stays inside it, and with nothing selected the
-   window is all of it. */
-function focusWindow(m, selection, upDepth, downDepth, expanded, within) {
+   window is all of it. whole lifts the budget, for the objects of a chosen
+   item, which the estate drawing would show in full. */
+function focusWindow(m, selection, upDepth, downDepth, expanded, within, whole) {
   var seeds = (Array.isArray(selection) ? selection : [selection]).filter(function (k) { return m.nodes.has(k) && (!within || within.has(k)); });
   if (!seeds.length && !within) return null;
   var focus = seeds.length ? seeds[seeds.length - 1] : null, dist = new Map();
@@ -222,7 +223,7 @@ function focusWindow(m, selection, upDepth, downDepth, expanded, within) {
       compare(m.nodes.get(a.key).label, m.nodes.get(b.key).label) || compare(a.key, b.key);
   });
   var lineage = new Map();
-  if (seeds.length) ranked.slice(0, BUDGET.NODES).forEach(function (r) { lineage.set(r.key, r.dist); });
+  if (seeds.length) ranked.slice(0, whole ? ranked.length : BUDGET.NODES).forEach(function (r) { lineage.set(r.key, r.dist); });
   else within.forEach(function (k) { if (m.nodes.has(k)) lineage.set(k, 0); });
   var shown = new Set(lineage.keys()), added = new Set();
   (expanded || []).forEach(function (k) {
@@ -238,7 +239,7 @@ function focusWindow(m, selection, upDepth, downDepth, expanded, within) {
     });
   });
   var edgeTotal = edges.length + plain.length;
-  edges = edges.concat(plain).slice(0, BUDGET.EDGES);
+  edges = edges.concat(plain).slice(0, whole ? edgeTotal : BUDGET.EDGES);
   var more = new Map(), hidden = new Set();
   shown.forEach(function (k) {
     var n = m.nodes.get(k);

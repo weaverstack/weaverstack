@@ -9,19 +9,16 @@ var DEPTHS = [0, 1, 2, -1];
    graph can fill the page. Nodes are coloured by kind, or by last outcome with
    derived readiness ringed. */
 function graphWorkspace(body, m, options) {
-  var s = pageState(options.page), estate = layoutEstate(m);
-  s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
-  if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+  var s = pageState(options.page);
+  var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
+  scopeSelection(m, s, options.items || null);
   if (s.up === undefined) s.up = 1;
   if (s.down === undefined) s.down = 1;
-  if (s.item && !m.items.has(s.item)) s.item = null;
-  s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
-  s.moved = s.moved || {};
-  s.patterns = s.patterns || [];
   var matched = new Map();
   function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(m, q)); return matched.get(q); }
   /* The selected objects and every match of each wildcard term. */
   function seeds() {
+    if (!s.selection.length && !s.patterns.length && scoped.length) return scoped.slice();
     var out = s.selection.slice(), seen = new Set(out);
     s.patterns.forEach(function (q) { matches(q).forEach(function (k) { if (!seen.has(k)) { seen.add(k); out.push(k); } }); });
     return out;
@@ -30,9 +27,7 @@ function graphWorkspace(body, m, options) {
   s.mode = s.mode || options.mode;
   var view, f = workspaceFrame(s, function () { if (view) view.resize(); });
   var host = f.host, side = f.side, line = f.line, legendHost = f.legend;
-  function within() {
-    return s.item ? new Set(m.items.get(s.item).nodes.map(function (n) { return n.key; })) : null;
-  }
+
   /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
   function select(key, adding) {
     if (!key) { s.selection = []; s.patterns = []; }
@@ -40,7 +35,6 @@ function graphWorkspace(body, m, options) {
       var at = s.selection.indexOf(key);
       if (at >= 0) s.selection.splice(at, 1); else s.selection.push(key);
     } else s.selection = [key];
-    if (key && s.item && m.nodes.get(key).item !== s.item) { s.item = null; itemPicker.value = ""; }
     s.focus = key && s.selection.indexOf(key) >= 0 ? key : s.selection[s.selection.length - 1] || null;
     s.expanded = []; s.moved = {};
     apply(true);
@@ -65,8 +59,7 @@ function graphWorkspace(body, m, options) {
   }
   function moved(key, p) { s.moved[key] = { x: p.x, y: p.y }; saveState(); }
   function apply(refit) {
-    var only = within();
-    var seed = seeds(), win = seed.length || only ? focusWindow(m, seed, s.up, s.down, s.expanded, only) : null;
+    var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null, !s.selection.length && !s.patterns.length) : null;
     var lay = win ? layoutEstate(subModel(m, win.shown), WINDOW_GEOMETRY) : layoutEstate(m);
     Object.keys(s.moved).forEach(function (k) { var p = lay.pos.get(k); if (p) { p.x = s.moved[k].x; p.y = s.moved[k].y; } });
     view.setWindow(win, lay);
@@ -87,29 +80,22 @@ function graphWorkspace(body, m, options) {
       line.appendChild(document.createTextNode(fmt(m.nodes.size) + " objects in " + fmt(estate.bands.length) + " items. Search or select an object to follow its lineage."));
       return;
     }
-    var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 ? " · " + win.seeds.size + " selected" : "")];
+    var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 && (s.selection.length || s.patterns.length) ? " · " + win.seeds.size + " selected" : "")];
     if (win.expanded.size) parts.push(fmt(win.expanded.size) + " expanded");
     if (win.hidden) parts.push(fmt(win.hidden) + " more beside them; select a ‹‹ or ›› marker to expand");
     if (win.truncated) parts.push(el("b", { "class": "wd-warn-text", text: "lineage cut to the " + fmt(win.lineage.size) + " nearest of " + fmt(win.reach) + "; lower a depth" }));
     if (win.edgesDropped) parts.push(el("b", { "class": "wd-warn-text", text: win.edgesDropped + " edges not drawn" }));
     parts.forEach(function (p, i) { if (i) line.appendChild(document.createTextNode(" · ")); line.appendChild(typeof p === "string" ? document.createTextNode(p) : p); });
   }
-  var itemPicker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-    s.item = this.value || null; s.expanded = []; s.moved = {};
-    if (s.item) s.selection = s.selection.filter(function (k) { return m.nodes.get(k).item === s.item; });
-    s.focus = s.selection[s.selection.length - 1] || null;
-    apply(true);
-  } }, [el("option", { value: "", text: "Every item" })].concat(estate.bands.map(function (b) {
-    return el("option", { value: b.item.label, selected: b.item.label === s.item ? "selected" : null, text: b.item.label });
-  })));
+
   if (options.above) body.appendChild(options.above);
   f.mount(body, [
+    options.chooser,
     nodeSearch(m, select, addPattern),
-    itemPicker,
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Colour", ["load", "kind"], s.mode, function (v) {
-      s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v)); saveState();
+      s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v, m)); saveState();
     }, function (v) { return v === "load" ? "Outcome" : "Kind"; }),
     el("span", { "class": "wd-grow" }),
     el("div", { "class": "wd-zoom" }, [
@@ -117,18 +103,46 @@ function graphWorkspace(body, m, options) {
       el("button", { "class": "wd-icon", type: "button", title: "Zoom in", "aria-label": "Zoom in", onclick: function () { view.zoomAt(1.25, view.width / 2, view.height / 2); } }, ["+"]),
       el("button", { "class": "wd-text-btn", type: "button", title: "Fit what is shown", onclick: function () { view.fitWindow(true); } }, ["Fit"]),
       el("button", { "class": "wd-text-btn", type: "button", title: "Show the whole estate", onclick: function () {
-        s.item = null; itemPicker.value = ""; select(null);
+        select(null);
       } }, ["Estate"])
     ])
   ]);
-  legendHost.appendChild(legend(s.mode));
+  legendHost.appendChild(legend(s.mode, m));
   if (!m.nodes.size) { host.appendChild(empty("The catalogue records no installed objects yet. Build a project to see its graph.")); return; }
   var fresh = !s.view;
   view = new GraphView(host, m, estate, { state: s, mode: s.mode, onSelect: select, onReveal: expand, onMove: moved, label: options.label });
   apply(false);
   // A remembered viewport is kept unless it no longer shows the focus or the estate.
-  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || s.item) view.fitWindow(false); else view.fitAll(false); }
+  if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || scoped.length) view.fitWindow(false); else view.fitAll(false); }
   return { select: select };
+}
+
+/* A graph page's selection, made consistent with the catalogue and the items
+   chosen. When the chosen items change, what the page held for the previous
+   ones goes: objects, search terms with no match among the new items,
+   expansions and moved nodes. What still belongs stays selected. */
+function scopeSelection(m, s, items) {
+  s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
+  s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
+  s.moved = s.moved || {};
+  s.patterns = s.patterns || [];
+  var scope = items ? items.slice().sort().join("\n") : null;
+  if (s.scope !== undefined && s.scope !== scope && items) {
+    var inside = new Set(keysOf(m, items));
+    s.selection = s.selection.filter(function (k) { return inside.has(k); });
+    s.patterns = s.patterns.filter(function (q) { return nodeMatches(m, q).some(function (k) { return inside.has(k); }); });
+    s.expanded = []; s.moved = {};
+  }
+  s.scope = scope;
+  if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+  return s;
+}
+
+/* The objects of the given items. */
+function keysOf(m, labels) {
+  var out = [];
+  labels.forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
+  return out;
 }
 
 /* The frame both graph pages share: a toolbar, the selection as chips, a status
@@ -153,7 +167,7 @@ function workspaceFrame(s, onResize) {
   f.mount = function (body, tools) {
     tools.forEach(function (t) { if (t) f.bar.appendChild(t); });
     f.host.appendChild(maximise);
-    [f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.host, f.legend]), f.side])]
+    [f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.legend, f.host]), f.side])]
       .forEach(function (c) { f.frame.appendChild(c); });
     body.appendChild(f.frame);
     set(!!s.maximised);
@@ -185,19 +199,18 @@ function selectionChips(chips, selection, focus, describe, onFocus, select, patt
   if (selection.length + terms.length > 1) chips.appendChild(el("button", { type: "button", "class": "wd-text-btn wd-chip-clear", onclick: function () { select(null); } }, ["Clear"]));
 }
 
-function legend(mode) {
+function legend(mode, m) {
   var entries = mode === "load" ? [
     ["swatch wd-ok", "Last load succeeded"], ["swatch wd-bad", "Failed, error or blocked"], ["swatch wd-warn", "Rejected rows or pending"],
     ["swatch wd-none", "Nothing processed, or loaded elsewhere"], ["ring wd-next", "Ready: dependencies processed"], ["ring wd-wait", "Waiting on a dependency"]
-  ] : [
-    ["kind wd-kind wd-kind-table", "Table"], ["kind wd-kind wd-kind-view", "View"], ["kind wd-kind wd-kind-folder", "Folder"], ["kind wd-kind wd-kind-shortcut", "Shortcut"],
-    ["kind wd-kind wd-kind-test", "Test"], ["kind wd-kind wd-kind-assumption", "Assumption"], ["kind wd-kind wd-kind-semantic-model", "Semantic model"], ["kind wd-kind wd-kind-report", "Report"],
-    ["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]
-  ];
-  return el("div", { "class": "wd-legend" }, entries.map(function (e) {
+  ] : [["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]];
+  return el("div", { "class": "wd-legend" }, objectKey(m, mode === "load").concat(entries.map(function (e) {
     return el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-" + e[0] }), e[1]]);
-  }).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
+  })).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
 }
+
+/* The kinds of item the Orchestration and Entity dictionary pages offer. */
+var DETAIL_KINDS = ["Lakehouse", "Warehouse", "SQLDatabase"];
 
 function orchestrationPage(body, m) {
   var counts = {}, failed = [], ready = [], waiting = [];
@@ -219,12 +232,14 @@ function orchestrationPage(body, m) {
     latest ? tile("Latest workflow", duration((latest.completed || 0) - (latest.started || 0)), fmt(latest.records) + " processed records · " + ago(latest.completed, m.at), latest.failed ? "bad" : "none") : null
   ]);
   var note = el("p", { "class": "wd-note", text: "Readiness is derived from the recorded state of each object's nearest loadable dependencies. It is not a queue: the catalogue records processed work only, so nothing here is shown as running." });
+  var pick = pageItems(m, "orchestration", DETAIL_KINDS, false);
   graphWorkspace(body, m, { page: "orchestration", mode: "load", health: true, label: "Orchestration graph", above: el("div", { "class": "wd-summary" }, [tiles, note]),
+    items: pick.items, chooser: pick.chooser,
     empty: "Search for an object, or select one in the graph, to follow its lineage, last outcome and readiness." });
   var lists = el("div", { "class": "wd-columns-2" }, [
     section("Ready · " + ready.length, [dataTable([
       { key: "object", title: "Object", value: function (r) { return r.n.label; } },
-      { key: "item", title: "Item", value: function (r) { return r.n.item; } },
+      { key: "item", title: "Item", value: function (r) { return shownItem(r.n.item); } },
       { key: "outcome", title: "Last outcome", render: function (r) { var s = effectiveLoad(r.n); return chip(s ? s.result : null, s ? null : "None"); }, value: function (r) { var s = effectiveLoad(r.n); return s ? s.result : ""; } }
     ], ready, { limit: 100, sort: "object", desc: false, emptyText: "Nothing is ready to load." })]),
     section("Waiting · " + waiting.length, [dataTable([

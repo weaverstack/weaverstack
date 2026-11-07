@@ -99,11 +99,16 @@ def recreatable(
     *,
     item: WeaverItemId,
     bindings: Mapping[WeaverItemId, str],
+    homes: Mapping[WeaverItemId, str] | None = None,
+    origin: str | None = None,
 ) -> tuple[Recreated, ...]:
     """Resolve one item's recorded shortcuts to physical targets.
 
     ``bindings`` is the destination's final Installation map, allowing logical
     targets to move with the fork. Every selected shortcut must resolve.
+    ``homes`` names the workspace of a logical target the fork leaves where it
+    is, and ``origin`` the source item's workspace, where a physical target
+    recorded without one is; ``None`` is the destination's workspace.
     """
 
     found = []
@@ -123,13 +128,19 @@ def recreatable(
                     f"{shortcut.destination} points at {target_item}, which the "
                     "catalogue records no installation for"
                 )
-            found.append(Recreated(shortcut=shortcut, target_name=bound))
+            found.append(
+                Recreated(
+                    shortcut=shortcut,
+                    target_name=bound,
+                    target_workspace=(homes or {}).get(target_item),
+                )
+            )
             continue
         found.append(
             Recreated(
                 shortcut=shortcut,
                 target_name=target_item.item_name,
-                target_workspace=shortcut.target_workspace,
+                target_workspace=shortcut.target_workspace or origin,
             )
         )
     return tuple(sorted(found, key=lambda each: str(each.destination)))

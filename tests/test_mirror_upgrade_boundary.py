@@ -341,3 +341,50 @@ def test_a_source_holding_no_catalogue_is_named(monkeypatch):
 
     with pytest.raises(CommandError, match="does not contain a Weaver catalogue"):
         module.check_mirror(plan, session=session)
+
+
+# --- a source in another workspace --------------------------------------------
+
+
+@weaver_test()
+def test_a_source_in_another_workspace_crosses_as_rows_read_by_name():
+    """Fabric names another Warehouse only within a workspace.
+
+    The rows are read with the projection a copy would use, and written as
+    literals, a thousand to a statement.
+    """
+
+    from datetime import datetime
+
+    from weaver.catalogue.fork import insert_statements, read_copied_rows
+
+    built = datetime(2026, 11, 7, 1, 2, 3, 456789)
+
+    class _Source:
+        def __init__(self):
+            self.read = []
+
+        def rows(self, statement):
+            self.read.append(statement)
+            if "from [_].[Registry]" not in statement:
+                return []
+            return [
+                {
+                    "Item type": "Warehouse",
+                    "Item name": f"Model{n}",
+                    "Build datetime": built,
+                }
+                for n in range(1001)
+            ]
+
+    source = _Source()
+    rows = read_copied_rows(source, _fork(current()))
+    statements = insert_statements(rows)
+
+    (registry,) = [s for s in source.read if "from [_].[Registry]" in s]
+    assert "not ([Item type] = N'Warehouse' and [Item name] = N'_weaver')" in registry
+    assert [s.split("\n")[0] for s in statements] == [
+        "insert into [_].[Registry] ([Item type], [Item name], [Build datetime])"
+    ] * 2
+    assert "CAST('2026-11-07T01:02:03.456789' AS datetime2(6))" in statements[0]
+    assert "N'Model1000'" in statements[1]

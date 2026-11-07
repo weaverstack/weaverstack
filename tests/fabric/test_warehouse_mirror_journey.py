@@ -424,8 +424,9 @@ def _observe(run) -> Estate:
     objects, dependant = _asked(run.target_sql, _OBJECTS, _DEPENDANT_ROWS)
     borrowed, installed, load_status, bookmarks, registry = _asked(
         run.catalogue_sql,
+        # A materialised object's row stays, marked deleted.
         "select [Schema name], [Object name], [Physical type] "
-        f"from {_q(MIRROR_TABLE.name)}",
+        f"from {_q(MIRROR_TABLE.name)} where year([Row delete datetime]) = 9999",
         "select [Item name], [Target name] from [_].[Installation]",
         f"select [Schema name], [Object name], [Result] from {_q('LoadStatus')}",
         "select [Schema name], [Object name], [Bookmark datetime] "

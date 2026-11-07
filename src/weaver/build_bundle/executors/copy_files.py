@@ -24,8 +24,9 @@ class CopyFilesExecutor:
         manifest = json.loads(payload.decode("utf-8"))
         source = context.resolved(manifest["source_target_id"])
         parts = manifest["path"].split("/")
-        source_root = context.resolver.folder_root(
-            FolderTarget(lakehouse=source.lakehouse)
+        source_root = (
+            source.files_root
+            or context.resolver.folder_root(FolderTarget(lakehouse=source.lakehouse))
         ).join(*parts)
         destination_root = context.resolver.folder_root(
             FolderTarget(lakehouse=context.target.lakehouse)

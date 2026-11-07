@@ -138,6 +138,18 @@ def estates():
         .table(f"{RAW}/Tables/Sales.Order", loaded=at(1), moved=at(1))
         .declared_not_installed(f"{RAW}/Tables/Sales.Ghost")
         .validation(f"{RAW}/Sales.Absent", installed=False),
+        "a cycle": _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(1), moved=at(1))
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(5), moved=at(5))
+        .reads(f"{RAW}/Tables/Sales.A", "Sales.B")
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.A"),
+        "a failed member of a cycle": _Estate()
+        .table(f"{RAW}/Tables/Sales.A", loaded=at(1), result="failed")
+        .table(f"{RAW}/Tables/Sales.B", loaded=at(5), moved=at(5))
+        .table(f"{RAW}/Tables/Sales.C", loaded=at(6), moved=at(6))
+        .reads(f"{RAW}/Tables/Sales.A", "Sales.B")
+        .reads(f"{RAW}/Tables/Sales.B", "Sales.A")
+        .reads(f"{RAW}/Tables/Sales.C", "Sales.B"),
         "mirrored": _Estate()
         .table(f"{REPORTING}/Sales.Order", loaded=at(1), moved=at(1))
         .mirrors(f"{REPORTING}/Sales.Order"),

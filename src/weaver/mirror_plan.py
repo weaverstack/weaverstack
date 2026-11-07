@@ -518,7 +518,7 @@ def _warehouse(
     from .targets import ItemRef, WarehouseTarget
 
     slug = destination.id
-    pointers = _recreatable(each, bindings=resolved.bindings)
+    pointers = _recreatable(each, bindings=resolved.bindings, homes=resolved.homes)
     rows = tuple(
         session.sql_executor(
             WarehouseTarget(ItemRef(each.source_target)), workspace=resolved.workspace
@@ -671,13 +671,16 @@ def _lakehouse(
     from .fabric.resources import LAKEHOUSE as LAKEHOUSE_ITEM
     from .fabric.resources import WAREHOUSE as WAREHOUSE_ITEM
     from .operations.mirror import _recreatable
+    from .spark import FabricSparkTarget
     from .targets import ItemRef
 
     resolver = session.resolver(resolved.workspace)
     store = session.store(resolved.workspace)
     names = StoredNames(store)
     slug = destination.id
-    source_item = resolver.external_item(each.source_target, item_type=LAKEHOUSE_ITEM)
+    source_item = resolver.external_item(
+        each.source_target, item_type=LAKEHOUSE_ITEM, workspace=each.source_workspace
+    )
     source_root = resolver.external_root(source_item)
 
     from .catalogue.borrow import pointer_shortcuts, surface_shortcuts
@@ -692,7 +695,7 @@ def _lakehouse(
             what=f"mirror reads {each.source} for {borrowed.identity}",
         ),
     )
-    recreatable = _recreatable(each, bindings=resolved.bindings)
+    recreatable = _recreatable(each, bindings=resolved.bindings, homes=resolved.homes)
     # This plan builds these destinations, under their recorded spellings.
     built_here = {other.destination.casefold() for other in resolved.items}
     recreated = []
@@ -728,8 +731,6 @@ def _lakehouse(
     spark = ("spark",)
     schemas = sorted({borrowed.schema for borrowed in each.relations})
     if schemas:
-        from .spark import FabricSparkTarget
-
         target = FabricSparkTarget(
             workspace=str(resolved.workspace.workspace), lakehouse=each.destination
         )
@@ -826,15 +827,21 @@ def _lakehouse(
     # The ``_`` surface reads the destination catalogue's tables.
     create("surface", surface, (*after, catalogue_built))
 
+    # Bound by its IDs: a source in another workspace may share the
+    # destination's name, and a name alone cannot tell the two apart.
     source = BoundTarget(
         id=f"source-lakehouse-{each.source_target}",
         kind="lakehouse",
-        item_id=each.source_target,
-        item_name=each.source_target,
-        workspace_name=compiling.workspace,
+        item_id=source_item.id,
+        item_name=source_item.name,
+        workspace_id=source_item.workspace_id,
+        workspace_name=each.source_workspace or compiling.workspace,
     )
     destination_spark = resolver.spark_destination(ItemRef(each.destination))
-    source_spark = resolver.spark_destination(ItemRef(each.source_target))
+    source_spark = FabricSparkTarget(
+        workspace=each.source_workspace or resolver.workspace.name,
+        lakehouse=source_item.name,
+    )
     wrapped = [
         wrapper_view_statement(
             borrowed, destination=destination_spark, source=source_spark
@@ -918,6 +925,7 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
     from .catalogue.fork import (
         copy_statements,
         create_statement,
+        insert_statements,
         lineage_key_statements,
     )
     from .catalogue.render import InstallationScope, render_merge
@@ -931,7 +939,7 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
         for each in resolved.items
         for statement in record_statements(
             each.relations,
-            source_workspace=resolved.workspace.workspace,
+            source_workspace=each.source_workspace or resolved.workspace.workspace,
             source_target=each.source_target,
         )
         # ``_.Mirror`` is created below, outside the transaction.
@@ -963,12 +971,17 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
                 scope=InstallationScope(item.item_type, item.item_name),
             )
         )
-    forked = copy_statements(
-        source_catalogue=resolved.source.name,
-        borrowed=resolved.borrowed,
-        graphed=resolved.graphed,
-        source=resolved.fork,
+    forked = (
+        insert_statements(resolved.copied_rows)
+        if resolved.copied_rows is not None
+        else copy_statements(
+            source_catalogue=resolved.source.name,
+            borrowed=resolved.borrowed,
+            graphed=resolved.graphed,
+            source=resolved.fork,
+        )
     )
+    released = _released(resolved, workspace_id=resolver.workspace.id)
     created = [create_statement(MIRROR)] if resolved.borrowed or recorded else []
     # The forked lineage was projected where nothing was borrowed.
     marked = [lineage_statement()] if created else []
@@ -977,7 +990,14 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
         transaction_script(
             created,
             # Lineage is keyed by workspace once each item's binding is merged.
-            [*forked, *recorded, *marked, *merges, *lineage_key_statements()],
+            [
+                *forked,
+                *released,
+                *recorded,
+                *marked,
+                *merges,
+                *lineage_key_statements(),
+            ],
         ).encode("utf-8"),
     )
     published = _action(
@@ -991,6 +1011,33 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
         resources=(f"warehouse:{catalogue.item_id}",),
     )
     compiling.stage("publish the mirrored catalogue", catalogue, [published])
+
+
+def _released(resolved, *, workspace_id: str) -> tuple[str, ...]:
+    """Remove the copied claims of unmirrored items in another workspace.
+
+    Nothing in this workspace can reach such an item, and a mirror never claims
+    the source's items, so Build installs it here as a new item.
+    """
+
+    from .catalogue.reconcile import prune_installation
+    from .catalogue.render import InstallationScope, InstallationScopes
+    from .catalogue.tables import INSTALLATION
+
+    if resolved.copied_rows is None:
+        return ()
+    mirrored = {(each.item.item_type, each.item.item_name) for each in resolved.items}
+    scopes = sorted(
+        {
+            InstallationScope(str(row["Item type"]), str(row["Item name"]))
+            for row in resolved.copied_rows.get(INSTALLATION.name, ())
+            if (row["Item type"], row["Item name"]) not in mirrored
+            and str(row.get("Workspace GUID") or "").casefold()
+            != workspace_id.casefold()
+        },
+        key=str,
+    )
+    return prune_installation(InstallationScopes(tuple(scopes))) if scopes else ()
 
 
 def _installation_target(resolver, reference, *, kind):

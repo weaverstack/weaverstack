@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+from ..declaration.metadata import AUDIT_DELETE, AUDIT_LIVE_DELETE_DATETIME
 from .render import InstallationScope, InstallationScopes, Row
 from .tables import CatalogueTable
 from .tsql import identifier, qualified_name
@@ -89,6 +90,8 @@ def table_query(
         for condition in (None if scope is None else scope.predicate, predicate)
         if condition
     ]
+    if getattr(table, "is_borrowed", False):
+        conditions.append(live_rows())
     where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
     limit = "" if top is None else f"TOP {int(top)} "
     ordering = (
@@ -98,6 +101,19 @@ def table_query(
         + ", ".join(identifier(table.public_name_of(name)) for name in order)
     )
     return f"SELECT {limit}{projected} FROM {qualified_name(table)}{where}{ordering}"
+
+
+def live_rows(alias: str = "") -> str:
+    """The rows of a borrowed table that still borrow.
+
+    A row whose object was built locally stays, marked deleted, as the record of
+    what the catalogue mirrors.
+    """
+
+    return (
+        f"{alias}{identifier(AUDIT_DELETE)} = "
+        f"convert(datetime2(6), '{AUDIT_LIVE_DELETE_DATETIME}')"
+    )
 
 
 def _projected_column(table: CatalogueTable, column, present: dict[str, str]) -> str:

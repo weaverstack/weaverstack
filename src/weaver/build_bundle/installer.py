@@ -281,9 +281,21 @@ class MutationBindings:
             )
         return self.session.report_item(bound.name, workspace=self.workspace)
 
+    def _workspace_of(self, bound: BoundTarget):
+        """The workspace a target is in: its own when it names one, as a
+        mirror's source in another workspace does."""
+
+        from dataclasses import replace
+
+        name = bound.workspace_name
+        if not name or name == self.workspace.workspace:
+            return self.workspace
+        return replace(self.workspace, workspace=name)
+
     def resolve_target(self, bound: BoundTarget) -> ResolvedTarget:
         # Resolve once so executors never derive paths or inherit a Lakehouse.
         item = ItemRef(bound.name)
+        workspace = self._workspace_of(bound)
         if bound.workspace_id is not None or bound.item_id != bound.name:
             resolved = self.session.resolve_item(
                 bound.name,
@@ -293,7 +305,7 @@ class MutationBindings:
                     "semanticmodel": "SemanticModel",
                     "report": "Report",
                 }[bound.kind],
-                workspace=self.workspace,
+                workspace=workspace,
             )
             if (
                 bound.workspace_id is not None
@@ -302,19 +314,21 @@ class MutationBindings:
                 raise InstallError(
                     f"{bound.display} has a different physical binding; regenerate the bundle"
                 )
+        resolver = self.session.resolver(workspace)
         return ResolvedTarget(
             bound=bound,
             lakehouse=item,
-            location=self._resolved(bound, item, "lakehouse_spark_location"),
-            destination=self._resolved(bound, item, "spark_destination"),
+            location=self._resolved(bound, item, "lakehouse_spark_location", resolver),
+            destination=self._resolved(bound, item, "spark_destination", resolver),
+            files_root=self._resolved(bound, item, "files_root", resolver),
         )
 
-    def _resolved(self, bound: BoundTarget, item: ItemRef, method: str):
+    def _resolved(self, bound: BoundTarget, item: ItemRef, method: str, resolver):
         """Resolve a Lakehouse address; Warehouse actions use TDS instead."""
 
         if bound.kind != "lakehouse":
             return None
-        resolve = getattr(self.resolver, method, None)
+        resolve = getattr(resolver, method, None)
         if resolve is None:
             return None
         return resolve(item)

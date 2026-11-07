@@ -16,11 +16,12 @@ function recordKind(node, task) { return node ? node.kind : task === "test" ? KI
 function targetItems(m) {
   if (m.targetItems) return m.targetItems;
   m.targetItems = new Map();
-  m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.type + "|" + it.target, it.label); });
+  m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.code + "|" + it.type + "|" + it.target, it.label); });
   return m.targetItems;
 }
 
-function targetItem(m, type, target) { return targetItems(m).get(type + "|" + target) || (type && target ? type + "/" + target : null); }
+/* The item a record's physical target belongs to, in the record's catalogue. */
+function targetItem(m, type, target, code) { return targetItems(m).get((code || "") + "|" + type + "|" + target) || (type && target ? owned(type + "/" + target, code) : null); }
 
 function perfRows(m, name) {
   return (m.tables[name] || []).filter(function (r) { return !isInternal(m, r.item, r.schema); }).map(function (r) {
@@ -34,7 +35,7 @@ function perfRows(m, name) {
 
 function testRows(m, name) {
   return (m.tables[name] || []).map(function (r) {
-    var item = targetItem(m, r.targettype, r.target);
+    var item = targetItem(m, r.targettype, r.target, r.catalogue);
     return { item: item, schema: r.schema, object: r.object, node: item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null,
       runs: num(r.runs) || 0, duration: num(r.duration), longest: num(r.longest), failed: num(r.failed) || 0, last: num(r.last) };
   }).filter(function (r) { return !(r.item && isInternal(m, r.item, r.schema)) && !(r.object && INTERNAL_SCHEMA.test(r.schema || "")); }).map(function (r) {
@@ -48,7 +49,7 @@ function testRows(m, name) {
 function runObjectRows(m) {
   if (m.runObjects) return m.runObjects;
   m.runObjects = (m.tables.runobjects || []).map(function (r) {
-    var item = targetItem(m, r.targettype, r.target), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
+    var item = targetItem(m, r.targettype, r.target, r.catalogue), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
     var started = num(r.started), completed = num(r.completed);
     return { workflow: r.workflow, task: r.task, item: item, schema: r.schema, object: r.object, node: node, result: r.result, message: r.message,
       started: started !== null ? started : completed, completed: completed !== null ? completed : started,
@@ -260,11 +261,17 @@ function runsOf(m) {
     if (completed === null) completed = started;
     if (started !== null) addTo(tasks, r.workflow, { task: r.task, started: started, completed: completed, records: num(r.records) || 0, failed: num(r.failed) || 0 });
   });
+  var touched = new Map();
+  (m.tables.runtargets || []).forEach(function (r) {
+    var item = targetItem(m, r.targettype, r.target, r.catalogue);
+    if (item) addTo(touched, r.workflow, item);
+  });
   m.runs = (m.tables.runs || []).map(function (r) {
     var started = num(r.started), completed = num(r.completed);
     if (started === null) started = completed;
     if (completed === null) completed = started;
-    return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [] };
+    return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [],
+      items: new Set(touched.get(r.workflow) || []) };
   }).filter(function (r) { return r.started !== null; });
   m.runs.sort(function (a, b) { return b.completed - a.completed || compare(a.id, b.id); });
   return m.runs;
@@ -394,7 +401,8 @@ function performancePage(body, m) {
   if (["all", "load", "test"].indexOf(s.task) < 0) s.task = "all";
   if (["fit", "day"].indexOf(s.axis) < 0) s.axis = "fit";
   if (s.deadline === undefined || s.deadline === null) s.deadline = "";
-  s.item = s.item || "all";
+  var shown = pageItems(m, "performance", ITEM_TYPES, true);
+  function chosenItem(item) { return shown.all || shown.set.has(item); }
   if (!s.card || typeof s.card.kind !== "string") s.card = null;
   var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
   /* The card follows the window, so it is drawn again whenever the page is. */
@@ -405,24 +413,29 @@ function performancePage(body, m) {
   }
   function pick(choice) { s.card = choice; card(); saveState(); }
   var host = el("div", { "class": "wd-overview-main" });
-  var allItems = Array.from(new Set(["perfmonth", "testmonth"].reduce(function (all, name) {
-    return all.concat((m.tables[name] || []).map(function (r) { return r.item || targetItem(m, r.targettype, r.target); }));
-  }, []).filter(Boolean))).filter(function (it) { return !isInternal(m, it); }).sort(compare);
   var deadlines = [el("option", { value: "", selected: s.deadline === "" ? "selected" : null, text: "No deadline" })];
   for (var h = 0; h < 24; h++) deadlines.push(el("option", { value: String(h), selected: s.deadline === String(h) ? "selected" : null, text: (h < 10 ? "0" : "") + h + ":00 " + zone }));
   body.appendChild(el("div", { "class": "wd-toolbar" }, [
+    shown.chooser,
     segmented("Window", ["day", "week", "month"], s.window, function (v) { s.window = v; render(); saveState(); }, function (v) { return { day: "Last 24 hours", week: "Last 7 days", month: "Last 30 days" }[v]; }),
     segmented("Task", ["all", "load", "test"], s.task, function (v) { s.task = v; render(); saveState(); }, function (v) { return { all: "All", load: "Load", test: "Test" }[v]; }),
     segmented("Axis", ["fit", "day"], s.axis, function (v) { s.axis = v; render(); saveState(); }, function (v) { return v === "fit" ? "Fit runs" : "24 hours"; }),
     el("select", { "class": "wd-select", "aria-label": "Deadline", onchange: function () { s.deadline = this.value; render(); saveState(); } }, deadlines),
-    el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () { s.item = this.value; render(); saveState(); } },
-      [el("option", { value: "all", text: "Every item" })].concat(allItems.map(function (it) { return el("option", { value: it, selected: it === s.item ? "selected" : null, text: it }); })))
   ]));
   body.appendChild(el("div", { "class": "wd-overview" }, [host, side]));
+  var keyed = false;
+  /* The first object table drawn carries the key. */
+  function keyFirst(children) {
+    if (keyed) return children;
+    keyed = true;
+    return [pageKey(m)].concat(children);
+  }
   function render() {
+    keyed = false;
     host.textContent = "";
     var from = m.at - WINDOW_DAYS[s.window] * DAY;
-    var views = runsOf(m).filter(function (r) { return r.completed >= from; }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
+    // A run shows when it touched an item chosen.
+    var views = runsOf(m).filter(function (r) { return r.completed >= from && (shown.all || Array.from(r.items).some(chosenItem)); }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
     if (!views.some(function (v) { return v.run.id === s.run; })) s.run = views.length ? views[0].run.id : null;
     var elapsed = views.map(function (v) { return v.elapsed; }), latest = views[0] || null;
     var longest = views.reduce(function (a, v) { return !a || v.elapsed > a.elapsed ? v : a; }, null);
@@ -457,41 +470,41 @@ function performancePage(body, m) {
 
     var picked = views.filter(function (v) { return v.run.id === s.run; })[0] || null;
     if (picked) host.appendChild(runObjects(picked));
-    function itemFilter(r) { return s.item === "all" || r.item === s.item; }
+    function itemFilter(r) { return chosenItem(r.item); }
     if (s.task !== "test") {
       var loads = perfRows(m, "perf" + s.window).filter(itemFilter);
-      host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
+      host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], keyFirst([dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "loads", title: "Loads", value: function (r) { return r.loads; }, numeric: true },
         { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
         { key: "reloads", title: "Reloads", value: function (r) { return r.reloads; }, numeric: true },
         { key: "last", title: "Last", value: function (r) { return r.last; }, render: function (r) { return ago(r.last, m.at); }, numeric: true }
-      ], loads, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "load", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No load statistic was recorded in this window." })]));
+      ], loads, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "load", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No load statistic was recorded in this window." })])));
     }
     if (s.task !== "load") {
       var tests = testRows(m, "test" + s.window).filter(itemFilter);
-      host.appendChild(section("Tests · " + fmt(tests.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
+      host.appendChild(section("Tests · " + fmt(tests.length) + " objects, " + WINDOW_LABEL[s.window], keyFirst([dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "test"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "runs", title: "Runs", value: function (r) { return r.runs; }, numeric: true },
         { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
         { key: "failed", title: "Failed", value: function (r) { return r.failed; }, render: function (r) { return r.failed ? chip("Failed", fmt(r.failed)) : "0"; }, numeric: true },
         { key: "last", title: "Last", value: function (r) { return r.last; }, render: function (r) { return ago(r.last, m.at); }, numeric: true }
-      ], tests, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "test", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No Test was recorded in this window." })]));
+      ], tests, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "test", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No Test was recorded in this window." })])));
     }
     if (s.task !== "test") {
       var largest = largestRows(m).filter(itemFilter);
-      host.appendChild(section("Largest changes, last 7 days", [dataTable([
+      host.appendChild(section("Largest changes, last 7 days", keyFirst([dataTable([
         { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-        { key: "item", title: "Item", value: function (r) { return r.item; } },
+        { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
         { key: "completed", title: "Processed", value: function (r) { return r.completed; }, render: function (r) { return stamp(r.completed); }, numeric: true },
         { key: "duration", title: "Time", value: function (r) { return r.duration; }, render: function (r) { return duration(r.duration); }, numeric: true },
         { key: "inserted", title: "Inserted", value: function (r) { return r.inserted; }, render: function (r) { return fmt(r.inserted); }, numeric: true },
         { key: "updated", title: "Updated", value: function (r) { return r.updated; }, render: function (r) { return fmt(r.updated); }, numeric: true },
         { key: "deleted", title: "Deleted", value: function (r) { return r.deleted; }, render: function (r) { return fmt(r.deleted); }, numeric: true },
         { key: "workflow", title: "Run", value: function (r) { return r.workflow; }, render: function (r) { return r.workflow ? String(r.workflow).slice(0, 8) : "—"; }, mono: true }
-      ], largest, { limit: 50, sort: "inserted", onRow: function (r) { pick({ kind: "change", id: r.id, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No recorded row change in the last 7 days." })]));
+      ], largest, { limit: 50, sort: "inserted", onRow: function (r) { pick({ kind: "change", id: r.id, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No recorded row change in the last 7 days." })])));
     }
     card();
   }
@@ -504,10 +517,10 @@ function performancePage(body, m) {
     var title = "Objects in the run of " + stamp(v.started).slice(0, 16);
     var carried = runObjectRows(m).filter(function (r) { return r.workflow === v.run.id; });
     if (!carried.length) return section(title, [empty("Objects are listed for the 8 latest runs. Select a newer run, or find this one in the Gantt.")]);
-    var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && (s.item === "all" || r.item === s.item); });
+    var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && chosenItem(r.item); });
     var columns = [
       { key: "label", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, r.task); } },
-      { key: "item", title: "Item", value: function (r) { return r.item; } },
+      { key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
       { key: "task", title: "Task", value: function (r) { return taskName(r.task); } },
       { key: "result", title: "Result", value: function (r) { return r.result; }, render: function (r) { return chip(r.result); } },
       { key: "started", title: "Started", value: function (r) { return r.started; }, render: function (r) { return stamp(r.started).slice(11); }, numeric: true },
@@ -515,8 +528,8 @@ function performancePage(body, m) {
       { key: "message", title: "Message", value: function (r) { return r.message || ""; } }
     ];
     var note = v.run.objects > carried.length ? el("div", { "class": "wd-banner wd-banner-warn", text: "The " + fmt(carried.length) + " longest of this run's " + fmt(v.run.objects) + " object records. The Gantt has them all." }) : null;
-    return section(title + " · " + fmt(rows.length), [note, dataTable(columns, rows, { limit: 200, sort: "duration", group: function (r) { return taskRank(r.task); },
-      onRow: function (r) { pick({ kind: "record", workflow: r.workflow, task: r.task, started: r.started, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No object record matches." })]);
+    return section(title + " · " + fmt(rows.length), keyFirst([note, dataTable(columns, rows, { limit: 200, sort: "duration", group: function (r) { return taskRank(r.task); },
+      onRow: function (r) { pick({ kind: "record", workflow: r.workflow, task: r.task, started: r.started, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No object record matches." })]));
   }
   render();
 }

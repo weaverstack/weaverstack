@@ -159,14 +159,22 @@ function busMatrixView(mo, s) {
 function semanticPage(body, m) {
   var s = pageState("semantic"), models = modelList(m);
   s.order = s.order || "authored"; s.dims = s.dims || "columns"; s.query = s.query || "";
-  if (!models.length) { body.appendChild(empty("No semantic model is recorded in the catalogue.")); return; }
-  if (!s.model || !models.some(function (mo) { return mo.item === s.model; })) s.model = models[0].item;
-  var mo = metadata(m).models.get(s.model);
-  var picker = el("select", { "class": "wd-select wd-select-strong", "aria-label": "Semantic model", onchange: function () { s.model = this.value; s.table = null; saveState(); redraw(); } },
-    models.map(function (x) { return el("option", { value: x.item, selected: x.item === s.model ? "selected" : null, text: x.name }); }));
-  var input = el("input", { "class": "wd-search", type: "search", value: s.query, placeholder: "Search this model's tables, columns and measures", "aria-label": "Search the model", autocomplete: "off", spellcheck: "false" });
-  body.appendChild(el("div", { "class": "wd-toolbar" }, [picker, el("div", { "class": "wd-searchbox" }, [input])]));
+  var pick = pageItems(m, "semantic", ["SemanticModel"], false);
+  var input = el("input", { "class": "wd-search", type: "search", value: s.query, placeholder: "Search the models' tables, columns and measures", "aria-label": "Search the models", autocomplete: "off", spellcheck: "false" });
+  body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser, el("div", { "class": "wd-searchbox" }, [input])]));
+  var shown = pick.items.map(function (label) { return metadata(m).models.get(label); }).filter(Boolean);
+  if (!shown.length) { body.appendChild(empty(models.length ? "The catalogue records no metadata for the models chosen." : "No semantic model is recorded in the catalogue.")); return; }
+  input.addEventListener("input", function () { s.query = input.value; });
+  shown.forEach(function (mo) {
+    var part = el("div", { "class": "wd-model-part" });
+    body.appendChild(part);
+    semanticModelView(part, m, s, mo, models, input);
+  });
+}
 
+/* One semantic model: what it is, how its tables relate, its tables, its
+   measures and the sources they read. */
+function semanticModelView(body, m, s, mo, models, input) {
   // What the model is.
   var refresh = mo.node ? effectiveLoad(mo.node) : null, it = m.items.get(mo.item), measureCount = 0, columnCount = 0;
   mo.tables.forEach(function (tb) { measureCount += tb.measures.length; columnCount += tb.columns.length; });
@@ -178,7 +186,7 @@ function semanticPage(body, m) {
   fact("Contents", fmt(mo.tables.size) + " tables · " + fmt(columnCount) + " columns · " + fmt(measureCount) + " measures · " + fmt(mo.relationships.length) + " relationships");
   var validations = it ? it.nodes.filter(isValidation) : [];
   body.appendChild(el("div", { "class": "wd-model-head" }, [
-    el("div", {}, [el("div", { "class": "wd-eyebrow", text: "Semantic model" }), el("h2", { "class": "wd-detail-title", text: mo.name }),
+    el("div", {}, [el("div", { "class": "wd-eyebrow", text: "Semantic model · " + (m.items.get(mo.item) ? m.items.get(mo.item).workspace || "" : "") }), el("h2", { "class": "wd-detail-title", text: mo.name }),
       el("p", { "class": mo.description ? "wd-desc" : "wd-desc wd-muted", text: mo.description || "No description." }), facts]),
     validations.length ? el("div", {}, [el("h3", { "class": "wd-h3", text: "Tests and Assumptions · " + validations.length }),
       el("ul", { "class": "wd-list" }, validations.map(function (v) {
@@ -242,7 +250,7 @@ function semanticPage(body, m) {
 
   // The managed sources the model's tables read, and which other models read them.
   body.appendChild(section("Sources", [sourceReuse(m, models, false, mo.item)]));
-  input.addEventListener("input", function () { s.query = input.value; renderTables(); renderMeasures(); });
+  input.addEventListener("input", function () { renderTables(); renderMeasures(); });
   renderBus(); renderTables(); renderMeasures();
 }
 
@@ -264,7 +272,7 @@ function sourceReuse(m, models, modelsAsRows, only) {
     .sort(function (a, b) { return compare(a.item, b.item) || compare(a.label, b.label); });
   if (!list.length) return empty("No table of this model records a managed source.");
   var rows = modelsAsRows ? models : list, cols = modelsAsRows ? list : models;
-  function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + itemName(x.item) })]; }
+  function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + shownName(x.item) })]; }
   function tables(row, col) { var src = modelsAsRows ? col : row, mo = modelsAsRows ? row : col; return src.by.get(mo.item); }
   return el("div", { "class": "wd-table-wrap wd-bus-wrap" }, [el("table", { "class": "wd-bus" }, [
     el("thead", {}, [el("tr", {}, [el("th", { "class": "wd-bus-corner", text: modelsAsRows ? "Model ↓   Source →" : "Source ↓   Model →" })].concat(cols.map(function (c) {

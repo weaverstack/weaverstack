@@ -537,19 +537,21 @@ def test_a_mirrored_estate_with_no_configured_source_is_refused():
 
 
 @weaver_test()
-def test_a_source_catalogue_in_another_workspace_is_refused():
-    """One workspace per run: the source is read where the command runs."""
+def test_a_source_catalogue_in_another_workspace_is_read_there():
+    """A mirror may be made across workspaces; its source state stays where it is."""
 
     workspace = given_workspace(mirror="Prod/Warehouse/Weaver")
     session = TestSession(workspace=workspace)
 
-    with pytest.raises(CommandError, match="another one"):
-        mirrored_source(
-            _forked("Customer"),
-            workspace=workspace,
-            session=session,
-            operation="health",
-            tables=SOURCE_TABLES,
-        )
+    source = mirrored_source(
+        _forked("Customer"),
+        workspace=workspace,
+        session=session,
+        operation="health",
+        tables=SOURCE_TABLES,
+    )
 
-    assert session.calls == []
+    assert source is not None
+    assert {(call.workspace, str(call.detail["target"])) for call in session.calls} == {
+        ("Prod", "Weaver")
+    }

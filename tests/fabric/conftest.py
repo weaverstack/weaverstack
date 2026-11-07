@@ -572,6 +572,59 @@ def joined_estate(fabric_workspace_item, fabric_client):
     )
 
 
+#: The catalogue in the spoke workspace a mirror of the suite's catalogue is
+#: built into. Its own, so the joined journey's spoke catalogue is never emptied.
+CROSS_WORKSPACE_MIRROR_ITEMS = {"spoke_fork_weaver": "PYTEST_SPOKE_FORK"}
+
+
+@dataclass(frozen=True)
+class CrossWorkspaceMirror:
+    """The spoke workspace and the fixed items a mirror across workspaces writes."""
+
+    workspace: str
+    catalogue: str
+    lakehouse: str
+
+
+@pytest.fixture(scope="session")
+def cross_workspace_mirror(fabric_client, fabric_target_lakehouse):
+    """The spoke's mirror catalogue and Lakehouse, found or created, never deleted.
+
+    The Lakehouse shares the source's name, as a development workspace's does.
+    """
+
+    from weaver.fabric import find_workspace
+    from weaver.fabric.resources import (
+        LAKEHOUSE,
+        WAREHOUSE,
+        create_lakehouse,
+        create_warehouse,
+        find_item,
+    )
+
+    spoke_name = os.environ.get(SPOKE_WORKSPACE_ENV, DEFAULT_SPOKE_WORKSPACE)
+    try:
+        spoke = find_workspace(spoke_name)
+    except Exception as exc:
+        pytest.skip(
+            f"cannot reach the spoke workspace {spoke_name!r}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+    catalogue = _fixed_name_from(CROSS_WORKSPACE_MIRROR_ITEMS, "spoke_fork_weaver")
+    lakehouse = fabric_target_lakehouse.name
+    for name, kind, create in (
+        (catalogue, WAREHOUSE, create_warehouse),
+        (lakehouse, LAKEHOUSE, create_lakehouse),
+    ):
+        try:
+            find_item(spoke, name, item_type=kind, client=fabric_client)
+        except Exception:
+            create(spoke, name, client=fabric_client)
+    return CrossWorkspaceMirror(
+        workspace=spoke.name, catalogue=catalogue, lakehouse=lakehouse
+    )
+
+
 @pytest.fixture(scope="session")
 def environment_name():
     return os.environ.get(ENVIRONMENT_ENV, DEFAULT_ENVIRONMENT)

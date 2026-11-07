@@ -350,3 +350,58 @@ body { background: #f7f7f6; }
 .wd-mini td { padding: 4px; border-top: 1px solid var(--line); text-align: right; }
 .wd-mini th:first-child, .wd-mini td:first-child { text-align: left; }
 .wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
+
+/* The mirror toggle sits in the toolbar. */
+/* As a mirror left an object: borrowed objects muted, changed and added ones marked. */
+.wd-borrowed { opacity: 0.6; }
+.wd-borrowed:hover, .wd-borrowed:focus-visible { opacity: 0.9; }
+tr.wd-changed > td:first-child, .wd-entry.wd-changed { box-shadow: inset 3px 0 0 var(--violet); }
+.wd-change-mark { display: inline-block; min-width: 13px; margin-left: 5px; padding: 0 2px; border-radius: 3px; background: var(--violet); color: var(--surface); font: 700 10px/13px var(--sans); text-align: center; }
+.wd-er-change { fill: var(--violet); font: 700 13px var(--sans); }
+.wd-key-swatch.wd-borrowed { background: var(--ink); opacity: 0.45; }
+.wd-key-change { width: 13px; height: 13px; border-radius: 3px; background: var(--violet); }
+.wd-key-change::before { content: "Δ"; display: block; color: var(--surface); font: 700 9px/13px var(--sans); text-align: center; }
+
+/* --- estate ------------------------------------------------------------------ */
+
+.wd-estate { margin: 12px 0 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.wd-estate-scroll { overflow: auto; max-height: 720px; }
+.wd-estate-svg { display: block; }
+.wd-estate-edge { fill: none; stroke: var(--line-strong); stroke-width: 1.6; }
+.wd-estate-edge.wd-lit { stroke: var(--blue); stroke-width: 2.4; }
+.wd-estate-arrowhead { fill: var(--line-strong); }
+.wd-estate-count { fill: var(--muted); font: 600 11px var(--mono); }
+.wd-estate-card { cursor: pointer; }
+.wd-estate-card rect:first-of-type { fill: var(--surface); stroke: var(--line-strong); }
+.wd-estate-card.wd-current rect:first-of-type { stroke: var(--blue); stroke-width: 2; }
+.wd-estate-card .wd-estate-tone { fill: var(--faint); stroke: none; }
+.wd-estate-card.wd-ok .wd-estate-tone { fill: var(--green); }
+.wd-estate-card.wd-warn .wd-estate-tone { fill: var(--amber); }
+.wd-estate-card.wd-bad .wd-estate-tone { fill: var(--red); }
+.wd-estate-eyebrow { fill: var(--blue); font: 700 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.wd-estate-title { fill: var(--ink); font: 700 15px var(--sans); }
+.wd-estate-line { fill: var(--muted); font: 12px var(--sans); }
+.wd-dim { opacity: .35; }
+
+/* --- choosing items ---------------------------------------------------------- */
+
+.wd-chooser { position: relative; display: inline-block; }
+.wd-chooser-button { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; padding: 3px 10px 3px 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.wd-chooser-button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.wd-chooser-caret { color: var(--muted); font-size: 10px; }
+.wd-chooser-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(460px, calc(100vw - 32px)); max-height: 460px; display: flex; flex-direction: column;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.wd-chooser-tools { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
+.wd-chooser-tools .wd-search { flex: 1 1 auto; min-width: 0; }
+.wd-chooser-list { overflow: auto; padding: 4px 0; }
+.wd-chooser-entry { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; }
+.wd-chooser-entry.wd-current { background: var(--blue-soft); }
+.wd-chooser-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+.wd-chooser-hint { padding: 6px 12px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.wd-ws-group { margin-bottom: 18px; }
+.wd-ws-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; }
+.wd-ws-head h3 { margin: 0; font-size: 15px; }
+.wd-model-part + .wd-model-part { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+.wd-chooser-whole .wd-chooser-name { font-weight: 700; }
+.wd-key-plain .wd-kind { filter: grayscale(1); opacity: 0.8; }
+.wd-page-key { margin: 0 0 14px; }

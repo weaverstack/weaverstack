@@ -32,6 +32,9 @@ class ResolvedTarget:
     lakehouse: ItemRef
     location: LakehouseSparkLocation | None = None
     destination: FabricSparkTarget | None = None
+    #: The Lakehouse's Files area as the store addresses it, in the target's
+    #: own workspace.
+    files_root: Any = None
 
 
 @dataclass(frozen=True)

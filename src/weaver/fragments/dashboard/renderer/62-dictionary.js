@@ -82,15 +82,15 @@ function dictionaryEntries(m) {
   var md = metadata(m), out = [];
   visibleItems(m).forEach(function (it) {
     if (!it.nodes.length && !it.target) return;
-    out.push({ kind: "Item", label: it.name, meta: it.type + (it.target && it.target !== it.name ? " · " + it.target : ""), desc: "", item: it.label, ref: it });
+    out.push({ kind: "Item", label: it.name, meta: it.type + (it.target && it.target !== it.name ? " · " + it.target : "") + (CATALOGUES.size > 1 && it.catalogue ? " · " + it.catalogue : ""), desc: "", item: it.label, ref: it });
   });
   m.nodes.forEach(function (n) {
-    out.push({ kind: n.kind, label: n.label, meta: n.kind + " · " + n.item, desc: n.desc, item: n.item, ref: n, qualified: qualified(n) });
+    out.push({ kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc, item: n.item, ref: n, qualified: qualified(n) });
   });
   md.columns.forEach(function (list, id) {
     var owner = m.byIdentity.get(id);
     list.forEach(function (c) {
-      out.push({ kind: "Column", label: c.column, meta: "Column · " + (owner ? owner.label : c.schema + "." + c.object) + " · " + c.item, desc: c.description || "", item: c.item, ref: c, owner: owner });
+      out.push({ kind: "Column", label: c.column, meta: "Column · " + (owner ? owner.label : c.schema + "." + c.object) + " · " + shownItem(c.item), desc: c.description || "", item: c.item, ref: c, owner: owner });
     });
   });
   md.models.forEach(function (mo) {
@@ -150,20 +150,16 @@ var SEMANTIC_TYPES = ["SemanticModel", "Report"];
    model page is its counterpart for models. */
 function entitiesPage(body, m) {
   var s = pageState("entities"), md = metadata(m);
-  s.item = s.item || "all"; s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
-  var items = visibleItems(m).filter(function (it) { return SEMANTIC_TYPES.indexOf(it.type) < 0 && (it.nodes.length || it.target); })
-    .sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
-  if (s.item !== "all" && !items.some(function (it) { return it.label === s.item; })) s.item = "all";
+  s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
+  var pick = pageItems(m, "entities", DETAIL_KINDS, false), chosen = pick.set;
   var entries = dictionaryEntries(m).filter(function (e) {
-    return ENTITY_KINDS.indexOf(e.kind) > 0 && SEMANTIC_TYPES.indexOf(itemType(e.item)) < 0 && (s.item === "all" || e.item === s.item);
+    return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
   });
   var counts = {};
   entries.forEach(function (e) { counts[e.kind] = (counts[e.kind] || 0) + 1; });
-  var picker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-    s.item = this.value; s.selected = null; s.er = { up: s.er.up, down: s.er.down, maximised: s.er.maximised }; saveState(); redraw();
-  } }, [el("option", { value: "all", text: "Every Lakehouse and Warehouse" })].concat(items.map(function (it) {
-    return el("option", { value: it.label, selected: it.label === s.item ? "selected" : null, text: it.type + " · " + it.name });
-  })));
+  // Columns are listed when asked for; the default list is of items and objects.
+  var browsed = entries.filter(function (e) { return e.kind !== "Column"; });
+  var picker = pick.chooser;
   var search = searchBox({
     placeholder: "Search " + fmt(entries.length) + " tables, views, folders and columns · * matches any text · Shift adds",
     find: function (q) {
@@ -173,7 +169,7 @@ function entitiesPage(body, m) {
     onPattern: function (q) { er.addPattern(q); }
   });
 
-  var er = erWorkspace(body, m, s.er, { item: s.item, tools: [search, picker], describe: renderSide,
+  var er = erWorkspace(body, m, s.er, { item: chosen, tools: [picker, search], describe: renderSide,
     // A wildcard term selects the objects it names; a column's table joins only by name.
     matches: function (q) { return searchEntries(entries, q, "All").filter(function (e) { return e.ref && e.ref.key; }).map(function (e) { return e.ref.id; }); },
     onPick: function (id) {
@@ -184,9 +180,9 @@ function entitiesPage(body, m) {
   } });
 
   var facets = el("div", { "class": "wd-facets", role: "radiogroup", "aria-label": "Entry kind" });
-  var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(entries.length) + " entries by name, kind or description · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
+  var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(browsed.length) + " entries by name, kind or description; choose Column for columns · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
   var list = el("div", { "class": "wd-entry-list", role: "listbox" }), detail = el("div", { "class": "wd-entry-detail" }), note = el("div", { "class": "wd-status-line" });
-  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, el("div", { "class": "wd-dictionary" }, [list, detail])]));
+  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, pageKey(m), el("div", { "class": "wd-dictionary" }, [list, detail])]));
   function tableEntry(id) { return entries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0] || null; }
   function tableOf(e) {
     if (e.ref && e.ref.key) return e.ref.id;
@@ -200,17 +196,18 @@ function entitiesPage(body, m) {
       if (k !== "All" && !counts[k]) return;
       facets.appendChild(el("button", { type: "button", role: "radio", "class": "wd-facet", "aria-checked": String(s.kind === k),
         onclick: function () { s.kind = k; renderFacets(); renderList(); saveState(); } },
-        [k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? entries.length : counts[k]) })]));
+        [k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? browsed.length : counts[k]) })]));
     });
   }
   function renderList() {
-    var found = searchEntries(entries, s.query, s.kind), shown = found.slice(0, 100);
+    var found = searchEntries(s.kind === "Column" ? entries : browsed, s.query, s.kind), shown = found.slice(0, 100);
     list.textContent = "";
     note.textContent = found.length > 100 ? "Showing the first 100 of " + fmt(found.length) + " matches. Refine the filter to narrow them." : fmt(found.length) + (found.length === 1 ? " match" : " matches");
     shown.forEach(function (e) {
-      list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry", "aria-selected": String(s.selected === entryId(e)),
+      var n = e.ref && e.ref.key ? e.ref : e.owner;
+      list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry" + changeClass(n), "aria-selected": String(s.selected === entryId(e)),
         onclick: function () { choose(e, false); } }, [
-        el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label]),
+        el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label, e.ref && e.ref.key ? changeMark(e.ref) : null]),
         el("span", { "class": "wd-entry-meta", text: e.meta }),
         e.desc ? el("span", { "class": "wd-entry-desc", text: e.desc }) : null
       ]));
@@ -223,7 +220,7 @@ function entitiesPage(body, m) {
     s.selected = entryId(e);
     var id = tableOf(e);
     if (id && er.has(id)) er.select(id, adding);
-    else if (id) er.say(e.label + " is not a declared table" + (s.item !== "all" ? " in " + itemName(s.item) : ""));
+    else if (id) er.say(e.label + " is not a declared table in the items shown");
     renderSide(); renderList(); renderDetail();
     saveState();
   }

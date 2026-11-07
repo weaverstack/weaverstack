@@ -239,6 +239,22 @@ def test_only_the_materialised_object_stops_being_borrowed(tmp_path):
 
 
 @weaver_test()
+def test_a_materialised_objects_row_stays_as_the_record_of_the_source(tmp_path):
+    """Marked deleted, the row still names the catalogue mirrored."""
+
+    _reconciled, bundle = _selective(tmp_path)
+
+    ((_number, _batch, action),) = [
+        each for each in bundle.plan.actions() if each[2].id == DEREGISTER_MIRROR_SLUG
+    ]
+    statements = batch_statements(bundle, action)
+
+    assert "set [Row delete datetime] = sysutcdatetime()" in statements
+    assert "delete [m]" not in statements.lower()
+    assert "delete from" not in statements.lower()
+
+
+@weaver_test()
 def test_the_row_goes_after_the_physical_work_and_before_publication(tmp_path):
     """The transition completes only once the build that owns the rows has run."""
 

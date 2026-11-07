@@ -117,7 +117,9 @@ the ones the catalogue already records, and an endpoint in no known workspace
 hashes its ID alone. Mirror re-keys forked lineage by the destination's
 installations in its final transaction (`fork.lineage_key_statements`), and
 marks what `_.Mirror` records as mirrored (`borrow.lineage_statement`). Build
-projects an item's lineage with the `_.Mirror` rows that stay after it. A
+projects an item's lineage with the `_.Mirror` rows that stay after it. A row
+whose object Build materialises stays, marked deleted, as the record of the
+catalogue mirrored; catalogue reads and lineage marking take only live rows. A
 lineage signature leaves out the keys and the mirror flags, which differ
 between catalogues holding one item and are compared as columns, so Mirror's
 in-place rewrite leaves signatures valid.
@@ -162,12 +164,43 @@ Spark work is sent to Fabric once, to the first catalogue with a requested
 Lakehouse. A catalogue that cannot be read refuses the run. A failed refresh or
 publication blocks its readers even in a fault-tolerant run.
 
-The Catalogue Dashboard observes a catalogue and is no part of its lifecycle.
+The Catalogue Dashboard observes catalogues and is no part of their lifecycle.
 `weaver catalogue-dashboard` (`operations.catalogue_dashboard`) writes the
 `dashboard` fragment as an ordinary Power BI project and builds it without a
-catalogue, with the source catalogue Warehouse as the configured target of
-`Warehouse/_weaver`, so the catalogue is read and never written. Initialise,
-Build, Wipe and Mirror know nothing of it, and no item name is reserved.
+catalogue in the invoking workspace; every catalogue given is read in its own
+workspace and never written. Initialise, Build, Wipe and Mirror know nothing of
+it, and no item name is reserved. `weaver.dashboard_model` generates the
+catalogue tables: up to ten catalogues read over Direct Lake on OneLake, one
+table per catalogue and relation, each table's source fixed in TMDL so Build
+binds nothing; `import_mode` imports one table per relation with a partition
+per catalogue, and is required for more. The measures are written once, over
+the `CATALOGUES` macro that each mode expands, so both modes share every
+measure, payload and Report binding, and a reduction such as the latest
+workflows runs once over every catalogue's rows. The columns the measures read
+are the catalogue's required schema. A Direct Lake model cannot refresh a
+calculated table over its Direct Lake tables without a fixed-identity
+connection, so the model calculates nothing from the catalogue tables. Every page
+carries all of its data, and the renderer chooses the items a detail page
+shows, the first it offers until others are chosen; a page whose data exceeds
+the measure budget says so instead. A page measure sums its sections' lengths
+and joins them only within the budget, because joining text past DAX's limit
+fails before it can be measured. The Filters pane narrows the data itself: a
+static `Scope` table, written from the catalogues at deployment, holds each
+object's workspace, item and object fields, and every `CATALOGUES` read keeps
+the rows of the items, and while an object field is selected the objects, that
+`Scope` selects. Without a selection every row stays, including any added
+since deployment; the catalogue's own item always stays. The renderer qualifies every item,
+node key and record ID with its catalogue's payload code, and joins physical
+`_.Shortcut` rows across catalogues as `weaver.catalogues.join` does. A
+catalogue holds `_.Mirror` only once it has been a mirror, so the model reads
+it where it exists; a mirrored object takes its source's state when the
+source's catalogue is among those read, and is unobserved otherwise. Beside a
+mirror, the model also carries each object's source signature. The renderer
+pairs a mirror's catalogue with the one it mirrors through its `_.Mirror` rows,
+including those of objects since built locally, and classes each object there
+as borrowed (drawn muted), changed or added (marked) by its signature, or
+rebuilt with the same code (drawn as usual); the source's copy of a borrowed or
+changed object takes that state.
 
 ## The core abstraction
 
@@ -943,6 +976,19 @@ tables, so the Warehouse waits until it sees every object it reads. The fork, th
 binding are one transaction, last, after every reconstruction. Until it commits
 the destination catalogue records no installation, so it never claims the
 source's items.
+
+The source catalogue may be in another workspace. A Warehouse names another
+Warehouse only within its workspace, so the source's rows are then read over TDS
+before the plan and written as literals in that transaction; within one
+workspace the copy stays server-side. Each item is read in the workspace its
+source Installation names. A Lakehouse item crosses, because its shortcuts and
+Spark views reach any workspace; a Warehouse item is refused, because its
+borrowed Views read only their own. A recreated shortcut to an item the run
+leaves behind names that item's workspace. An item the run leaves in another
+workspace is not claimed: the transaction removes its copied rows, as unbind
+would, and Build installs it here as a new item. A source and its destination
+may share a name, so the plan binds the source by its Fabric IDs. Load, Test
+and Health read the catalogue mirrored in its own workspace.
 
 The source may be any earlier Weaver version's catalogue, so a release is
 trialled in development before production is upgraded. The source is only read.

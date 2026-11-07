@@ -69,29 +69,36 @@ function pageState(name) { var s = state(); s[name] = s[name] || {}; return s[na
 function weaveMark() { return el("span", { "class": "wd-mark", "aria-hidden": "true" }, [el("i"), el("i"), el("i"), el("i")]); }
 
 var PAGE_TITLES = {
-  overview: "Overview", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
+  workspaces: "Workspaces", overview: "Items", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
   performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model"
 };
+/* The catalogues the header names before it counts the rest. */
+var HEADER_CATALOGUES = 3;
 
 /* The header every page shares: the catalogue's own name, where it lives, and
    the two times a reader needs apart, when this was queried and when work
    last processed. */
 function shell(mount, m) {
   var s = state();
-  var title = m.catalogue.name || "Weaver catalogue";
-  var context = [m.catalogue.workspace ? "Workspace " + m.catalogue.workspace : null,
-    m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
+  var several = m.catalogues && m.catalogues.length > 1;
+  // One catalogue is known by its workspace; several by how many they are.
+  var title = several ? fmt(m.catalogues.length) + " catalogues" : m.catalogue.workspace || m.catalogue.name || "Weaver catalogue";
+  var labels = several ? m.catalogues.map(function (c) { return c.label; }) : [];
+  var context = several ? labels.slice(0, HEADER_CATALOGUES).join(" · ") + (labels.length > HEADER_CATALOGUES ? " +" + fmt(labels.length - HEADER_CATALOGUES) + " more" : "") :
+    [m.catalogue.name ? "Catalogue " + m.catalogue.name : null,
+      m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
   var processed = latestProcessed(m);
   var head = el("header", { "class": "wd-top" }, [
     el("div", { "class": "wd-brand" }, [weaveMark(), el("div", {}, [
-      el("div", { "class": "wd-eyebrow", text: "Catalogue · " + (PAGE_TITLES[m.page] || m.page) }),
+      el("div", { "class": "wd-eyebrow", text: (several ? "Catalogues · " : "Catalogue · ") + (PAGE_TITLES[m.page] || m.page) }),
       el("h1", { text: title }),
-      context ? el("div", { "class": "wd-context", text: context }) : null
+      context ? el("div", { "class": "wd-context", text: context, title: several ? labels.join("\n") : null }) : null
     ])]),
     el("span", { "class": "wd-grow" }),
     zoneControl(m),
     el("dl", { "class": "wd-times" }, [
       el("dt", { text: "Queried" }), el("dd", { text: stamp(m.at) }),
+      m.imported ? el("dt", { text: "Imported" }) : null, m.imported ? el("dd", { text: stamp(m.imported) + " · " + ago(m.imported, m.at) }) : null,
       processed === undefined ? null : el("dt", { text: "Last processed" }),
       processed === undefined ? null : el("dd", { text: processed ? stamp(processed) + " · " + ago(processed, m.at) : "nothing has been processed" })
     ])
@@ -104,7 +111,7 @@ function shell(mount, m) {
     ]));
   }
   if (m.graphGaps && m.graphGaps.size) {
-    var gaps = Array.from(m.graphGaps.keys()).sort(compare);
+    var gaps = Array.from(m.graphGaps.keys()).sort(compare).map(shownItem);
     mount.appendChild(el("div", { "class": "wd-banner wd-banner-warn wd-banner-top" }, [
       el("b", { text: "Lineage may be out of date. " }),
       fmt(Array.from(m.graphGaps.values()).reduce(function (a, b) { return a + b; }, 0)) + " certified objects in " + gaps.join(", ") +
@@ -114,6 +121,142 @@ function shell(mount, m) {
   var body = el("main", { "class": "wd-body" });
   mount.appendChild(body);
   return body;
+}
+
+/* A page whose data would exceed what one measure can return. */
+function tooLargePage(body, m) {
+  var t = m.tooLarge;
+  body.appendChild(section("This page contains too much data to display", [
+    el("p", { text: "The selected data is " + fmt(num(t.size)) + " characters, over Power BI's limit of about " + fmt(num(t.budget)) + " for one measure." }),
+    el("p", { text: "Narrow the selection in the Filters pane on the right: Workspace, then Item type, Item name, Object type and Object name. The page recalculates over what remains." })
+  ]));
+}
+
+/* ---- choosing items --------------------------------------------------------- */
+
+function catalogueRank(code) { var n = Number(code); return isNaN(n) ? 0 : n; }
+
+/* The items of the given kinds, in the order a page offers them: catalogues in
+   the order given, then kind, then name. */
+function eligibleItems(m, kinds) {
+  return visibleItems(m).filter(function (it) { return kinds.indexOf(it.type) >= 0 && (it.nodes.length || it.target); })
+    .sort(function (a, b) {
+      return catalogueRank(a.code) - catalogueRank(b.code) || typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name) || compare(a.label, b.label);
+    });
+}
+
+/* An item as view state keeps it: by its catalogue's reference, which stays
+   with the catalogue whatever the order given. */
+function stableItem(label) { var c = CATALOGUES.get(ownerCode(label)); return (c ? c.reference : "") + "|" + bare(label); }
+
+/* An item as a chooser lists it. */
+function choiceLabel(it) { return shownItem(it.label); }
+
+/* The items a page shows. A workspace chosen brings every item it offers
+   there. Nothing chosen is every item on a page that shows the estate, and
+   the first item it offers on a page about one. */
+function chosenItems(s, eligible, everything) {
+  var byStable = new Map(eligible.map(function (it) { return [stableItem(it.label), it.label]; }));
+  var out = [];
+  (s.items || []).forEach(function (k) {
+    if (k.indexOf("workspace:") === 0) {
+      var w = k.slice(10);
+      eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w && out.indexOf(it.label) < 0) out.push(it.label); });
+    } else if (byStable.has(k) && out.indexOf(byStable.get(k)) < 0) out.push(byStable.get(k));
+  });
+  if (out.length) return out;
+  return everything ? eligible.map(function (it) { return it.label; }) : eligible.length ? [eligible[0].label] : [];
+}
+
+/* A chooser that stays open across the redraw a Ctrl, ⌘ or tick causes. */
+var OPEN_CHOOSER = null;
+
+/* One list, filtered by typing. A plain click shows that entry alone and
+   closes the list; Ctrl, ⌘ or the box adds or removes it and keeps the list
+   open. Choosing nothing returns to the page's default. */
+function chooser(options) {
+  var chosen = new Set(options.chosen), wrap = el("div", { "class": "wd-chooser" }), panel = el("div", { "class": "wd-chooser-panel", hidden: "hidden" });
+  var names = options.entries.filter(function (e) { return chosen.has(e.key); }).map(function (e) { return e.label; });
+  var summary = !names.length ? options.allLabel : names.length === 1 ? names[0] : fmt(names.length) + " chosen";
+  var button = el("button", { type: "button", "class": "wd-chooser-button", "aria-haspopup": "listbox", "aria-expanded": "false", title: names.join("\n") || options.allLabel }, [
+    el("span", { "class": "wd-seg-label", text: options.title }), el("b", { text: summary }), el("span", { "class": "wd-chooser-caret", text: "▾" })]);
+  var search = el("input", { "class": "wd-search", type: "search", placeholder: "Filter " + fmt(options.entries.length), "aria-label": "Filter " + options.title.toLowerCase(), autocomplete: "off", spellcheck: "false" });
+  var list = el("div", { "class": "wd-chooser-list", role: "listbox", "aria-multiselectable": "true" });
+  function keep() { OPEN_CHOOSER = { id: options.id, query: search.value, scroll: list.scrollTop }; }
+  function toggle(key) {
+    if (chosen.has(key)) chosen.delete(key); else chosen.add(key);
+    keep();
+    options.onChange(Array.from(chosen));
+  }
+  function render() {
+    var q = search.value.trim().toLowerCase();
+    list.textContent = "";
+    options.entries.forEach(function (e) {
+      if (q && e.label.toLowerCase().indexOf(q) < 0) return;
+      var on = chosen.has(e.key);
+      list.appendChild(el("label", { "class": "wd-chooser-entry" + (on ? " wd-current" : "") + (e.whole ? " wd-chooser-whole" : ""), role: "option", "aria-selected": String(on), title: e.label,
+        onclick: function (ev) {
+          if (ev.target.tagName === "INPUT") return;
+          ev.preventDefault();
+          if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggle(e.key);
+          else { OPEN_CHOOSER = null; options.onChange([e.key]); }
+        } }, [
+        el("input", { type: "checkbox", checked: on ? "checked" : null, onchange: function () { toggle(e.key); } }),
+        el("span", { "class": "wd-chooser-name", text: e.label })
+      ]));
+    });
+    if (!list.firstChild) list.appendChild(empty("Nothing matches."));
+  }
+  function open(on) {
+    panel.hidden = !on; button.setAttribute("aria-expanded", String(on));
+    if (on) render(); else if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) OPEN_CHOOSER = null;
+  }
+  button.addEventListener("click", function () { open(panel.hidden); if (!panel.hidden) search.focus(); });
+  search.addEventListener("input", render);
+  // A redraw leaves these listeners on a chooser no longer shown, and the
+  // click that caused it on an element no longer shown; neither closes the new one.
+  document.addEventListener("click", function (ev) {
+    if (!wrap.isConnected || !ev.target.isConnected) return;
+    if (!panel.hidden && !wrap.contains(ev.target)) open(false);
+  });
+  document.addEventListener("keydown", function (ev) { if (wrap.isConnected && ev.key === "Escape" && !panel.hidden) open(false); });
+  panel.appendChild(el("div", { "class": "wd-chooser-tools" }, [search,
+    el("button", { type: "button", "class": "wd-text-btn", onclick: function () { OPEN_CHOOSER = null; options.onChange([]); } }, [options.resetLabel])]));
+  panel.appendChild(list);
+  panel.appendChild(el("div", { "class": "wd-chooser-hint", text: "Click to show one · Ctrl, ⌘ or the box to add" }));
+  wrap.appendChild(button); wrap.appendChild(panel);
+  if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) {
+    var kept = OPEN_CHOOSER;
+    search.value = kept.query || "";
+    open(true);
+    list.scrollTop = kept.scroll || 0;
+  }
+  return wrap;
+}
+
+/* The chooser every page but Workspaces starts its toolbar with, and the items
+   it leaves the page showing. everything says whether choosing nothing shows
+   every item or only the first. */
+function pageItems(m, page, kinds, everything) {
+  var s = pageState(page), eligible = eligibleItems(m, kinds), shown = chosenItems(s, eligible, everything);
+  var workspaces = [];
+  eligible.forEach(function (it) { var w = it.workspace || it.catalogue; if (w && workspaces.indexOf(w) < 0) workspaces.push(w); });
+  var entries = [];
+  workspaces.forEach(function (w) {
+    if (workspaces.length > 1) entries.push({ key: "workspace:" + w, label: w, whole: true });
+    eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w) entries.push({ key: stableItem(it.label), label: choiceLabel(it) }); });
+  });
+  var keys = new Set(entries.map(function (e) { return e.key; }));
+  var chosen = (s.items || []).filter(function (k) { return keys.has(k); });
+  if (!chosen.length && !everything && shown.length) chosen = [stableItem(shown[0])];
+  return {
+    items: shown, set: new Set(shown), all: everything && !(s.items || []).some(function (k) { return keys.has(k); }),
+    chooser: chooser({
+      id: page, title: "Items", allLabel: everything ? "All items" : "No items", resetLabel: everything ? "All" : "First",
+      chosen: chosen, entries: entries,
+      onChange: function (picked) { s.items = picked; saveState(); redraw(); }
+    })
+  };
 }
 
 /* The latest processed load, test or workflow, or undefined when the page
@@ -191,7 +334,7 @@ function searchNodes(m, query, limit) {
   if (!terms.length) return [];
   var found = [];
   m.nodes.forEach(function (n) {
-    var label = n.label.toLowerCase(), item = n.item.toLowerCase(), desc = n.desc.toLowerCase(),
+    var label = n.label.toLowerCase(), item = shownItem(n.item).toLowerCase(), desc = n.desc.toLowerCase(),
       full = (n.schema + "." + n.object).toLowerCase(), score = 0;
     for (var i = 0; i < terms.length; i++) {
       var t = terms[i], s = 0, w = wildcard(t);
@@ -257,7 +400,7 @@ function nodeSearch(m, onPick, onPattern) {
   return searchBox({
     placeholder: "Search " + fmt(m.nodes.size) + " objects · * matches any text · Shift adds",
     find: function (q) {
-      return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + n.item, desc: n.desc }; });
+      return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc }; });
     },
     onPick: function (r, adding) { onPick(r.key, adding); },
     onPattern: onPattern
@@ -281,10 +424,40 @@ function depthLabel(d) { return d < 0 ? "Max" : String(d); }
 
 /* ---- object details ----------------------------------------------------------- */
 
-function nodeLink(m, key, onOpen) {
+/* The class that draws an object as a mirror left it: muted when borrowed,
+   marked when changed or added. */
+function changeClass(n) {
+  return !n || !n.change ? "" : n.change === CHANGE.BORROWED ? " wd-borrowed" : " wd-changed";
+}
+var CHANGE_TEXT = { changed: "Changed from its source", added: "Added; not in the catalogue mirrored" };
+function changeMark(n) {
+  if (!n || !CHANGE_TEXT[n.change]) return null;
+  return el("span", { "class": "wd-change-mark", title: CHANGE_TEXT[n.change], text: n.change === CHANGE.CHANGED ? "Δ" : "+" });
+}
+
+/* The marks a page draws for its objects: each kind present, and how a mirror
+   left an object when one is read. plain draws the kinds without their
+   colours, for a graph coloured by outcome. */
+function objectKey(m, plain) {
+  var present = new Set();
+  m.nodes.forEach(function (n) { present.add(n.kind); });
+  var keys = KIND_ORDER.filter(function (k) { return present.has(k); }).map(function (k) {
+    return el("span", { "class": "wd-key" + (plain ? " wd-key-plain" : "") }, [kindMark(k), k]);
+  });
+  if (m.changes) keys.push(
+    el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-swatch wd-borrowed" }), "Borrowed from the catalogue mirrored"]),
+    el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-change" }), "Changed (Δ) or added (+) in a mirror"]));
+  return keys;
+}
+
+/* The key above the first table or list of a page that draws object marks. */
+function pageKey(m) { return el("div", { "class": "wd-legend wd-page-key" }, objectKey(m)); }
+
+/* plain leaves the item out, for a table that shows it in a column of its own. */
+function nodeLink(m, key, onOpen, plain) {
   var n = m.nodes.get(key);
-  return el("button", { "class": "wd-link", type: "button", title: n.item + " · " + qualified(n), onclick: function () { onOpen(key); } },
-    [kindMark(n.kind), n.label, el("span", { "class": "wd-link-meta", text: itemName(n.item) })]);
+  return el("button", { "class": "wd-link" + changeClass(n), type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
+    [kindMark(n.kind), n.label, changeMark(n), plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 
 function details(panel, m, key, options) {
@@ -295,7 +468,7 @@ function details(panel, m, key, options) {
   var open = options.onOpen || function () {};
   panel.appendChild(el("div", { "class": "wd-eyebrow" }, [kindMark(n.kind), " " + n.kind]));
   panel.appendChild(el("h2", { "class": "wd-detail-title", text: n.label }));
-  panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: n.item + " · " + qualified(n) }));
+  panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(n.item) + " · " + qualified(n) }));
   if (options.describe !== false) panel.appendChild(el("p", { "class": n.desc ? "wd-desc" : "wd-desc wd-muted", text: n.desc || "No description is declared." }));
 
   var s = isValidation(n) ? n.test : effectiveLoad(n), carries = !!m.tables.loads;
@@ -314,6 +487,12 @@ function details(panel, m, key, options) {
     fact("Readiness", el("span", {}, [el("span", { "class": "wd-chip wd-" + readinessTone(ready.state), text: ready.state }),
       ready.waitingOn.length ? " waiting on " + ready.waitingOn.slice(0, 3).map(function (w) { return w.label; }).join(", ") + (ready.waitingOn.length > 3 ? " and " + (ready.waitingOn.length - 3) + " more" : "") : ""]));
   }
+  // The other side of a mirror: the source this copy came from, or the copies of this source.
+  var FROM = { borrowed: "Borrowed from", changed: "Changed from" }, IN = { borrowed: "Borrowed by", changed: "Changed in" };
+  if (n.original) fact(FROM[n.change] || "Same code as", nodeLink(m, n.original.key, open));
+  else if (n.change === CHANGE.BORROWED) fact("Borrowed from", el("span", { "class": "wd-muted", text: "Its source's catalogue is not read" }));
+  else if (n.change === CHANGE.ADDED) fact("Added", el("span", { "class": "wd-muted", text: "Not in the catalogue mirrored" }));
+  (n.copies || []).forEach(function (c) { fact(IN[c.change] || "Rebuilt in", nodeLink(m, c.key, open)); });
   if (n.built) fact("Built", stamp(n.built));
   if (n.isStatic) fact("Static", "Loaded once");
   panel.appendChild(facts);
@@ -381,7 +560,8 @@ function sortRows(columns, rows, sortBy, desc, group) {
   });
 }
 
-/* A table for a list of records, with optional sorting, grouping and a row limit. */
+/* A table for a list of records, with optional sorting, grouping and a row
+   limit. A row about an object is drawn as a mirror left it. */
 function dataTable(columns, rows, options) {
   options = options || {};
   var limit = options.limit || 200, sortBy = options.sort || null, desc = options.desc !== false;
@@ -398,7 +578,8 @@ function dataTable(columns, rows, options) {
           } }, [c.title])]);
       }))]),
       el("tbody", {}, sorted.slice(0, limit).map(function (row) {
-        return el("tr", { "class": options.onRow ? "wd-clickable" : null, onclick: options.onRow ? function () { options.onRow(row); } : null },
+        var n = row && (row.node || row.n);
+        return el("tr", { "class": ((options.onRow ? "wd-clickable" : "") + changeClass(n)).trim() || null, onclick: options.onRow ? function () { options.onRow(row); } : null },
           columns.map(function (c) {
             var v = c.render ? c.render(row) : c.value(row);
             return el("td", { "class": c.numeric ? "wd-num" : c.mono ? "wd-mono" : null }, [v === null || v === undefined ? "—" : typeof v === "object" ? v : String(v)]);

@@ -420,6 +420,48 @@ def _load_summary(arguments: list[str]) -> str:
     )
 
 
+#: Where a page measure's text begins: the element the renderer draws into
+#: and the element holding the page's data.
+PAGE_OPENING = (
+    '<div id="wd-app" class="wd"></div><script type="text/plain" id="wd-data">'
+)
+PAGE_CLOSING = "</script>"
+_FIELD, _ROW, _TABLE, _LESS = "\ue001", "\ue002", "\ue003", "\ue000"
+
+
+@dataclass(frozen=True)
+class PageMeasure:
+    """A page of the Dashboard and the data measures its measure joins."""
+
+    measure: str
+    page: str
+    sections: tuple[str, ...]
+
+
+def page_measures(text: str | None = None) -> tuple[PageMeasure, ...]:
+    """Every page measure in the fragment, with its data sections in order."""
+
+    pages = []
+    for line in (template() if text is None else text).split("\n"):
+        found = re.match(r"^\s*measure '([^']+)' = PAGE\(", line)
+        if not found:
+            continue
+        arguments, _ = _arguments(line, line.index("PAGE(") + 4)
+        sections = tuple(
+            part.strip().strip("[]") for part in _split_top(arguments[1], "&")
+        )
+        pages.append(PageMeasure(found.group(1), arguments[0].strip('"'), sections))
+    return tuple(pages)
+
+
+def page_text(page: str, sections: Sequence[str], renderer: str) -> str:
+    """A page measure's text, joined from its sections' values as DAX joins them."""
+
+    head = f"{_TABLE}page{_FIELD}name{_ROW}{page}"
+    data = (head + "".join(sections)).replace("<", _LESS)
+    return PAGE_OPENING + data + PAGE_CLOSING + renderer
+
+
 def page_expression(name: str, data: str) -> str:
     """A page measure: its data, or a small page saying it is too large.
 
@@ -769,6 +811,9 @@ __all__ = [
     "RELATIONS",
     "SCOPE",
     "SCOPE_FIELDS",
+    "PageMeasure",
+    "page_measures",
+    "page_text",
     "declared_columns",
     "model_text",
     "required_columns",

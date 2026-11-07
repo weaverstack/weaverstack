@@ -507,3 +507,209 @@ __all__ = [
     "deploy_catalogue_dashboard",
     "write_dashboard_project",
 ]
+
+
+# --- static export -------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ExportedPage(ReportAlias):
+    #: The page's name, as the Report names it.
+    page: str
+    title: str
+    file: str
+    #: The page file's length in characters.
+    characters: int
+
+    def to_mapping(self) -> dict:
+        return {
+            "page": self.page,
+            "title": self.title,
+            "file": self.file,
+            "characters": self.characters,
+        }
+
+
+@dataclass(frozen=True)
+class CatalogueDashboardExport(ReportAlias):
+    workspace: str
+    name: str
+    #: The folder written: a local path or a OneLake ``abfss://`` location.
+    path: str
+    pages: tuple[ExportedPage, ...] = ()
+
+    def to_mapping(self) -> dict:
+        return {
+            "workspace": self.workspace,
+            "name": self.name,
+            "path": self.path,
+            "pages": [page.to_mapping() for page in self.pages],
+        }
+
+
+def export_catalogue_dashboard(
+    path: str | Path,
+    *,
+    name: str | None = None,
+    workspace: str | None = None,
+    workspace_config: str | Path | None = None,
+    session=None,
+) -> CatalogueDashboardExport:
+    """Write the deployed Catalogue Dashboard's pages as static HTML files.
+
+    ``path`` is a local folder or a OneLake ``abfss://`` location; it receives
+    ``index.html`` and one file per page, linked to each other, which open
+    without Fabric. The data is read from the Dashboard model as it is now. Each
+    page is joined from its data sections here, so no page is limited by the
+    length of one DAX text value. ``name`` defaults to ``catalogue_dashboard:``.
+    """
+
+    from ..dashboard_model import page_measures
+    from ..locations import Location
+    from ..sessions.host import use_or_create_session
+    from ..store import FilesystemStore
+    from .workspace import operation_workspace
+
+    base = operation_workspace(
+        "catalogue-dashboard",
+        workspace=workspace,
+        workspace_config=workspace_config,
+        session=session,
+        needs_catalogue=False,
+    )
+    name = name or base.catalogue_dashboard
+    if not name:
+        raise CommandError(
+            "Name the Catalogue Dashboard: pass --name, or set catalogue_dashboard: "
+            "in workspace-config.yml."
+        )
+    pages = page_measures()
+    order, titles = _page_order()
+    pages = sorted(pages, key=lambda p: order.index(p.page) if p.page in order else 99)
+    destination = Location(str(path))
+    with use_or_create_session(session, workspace=base) as opened:
+        with opened.task("Export the Catalogue Dashboard", name):
+            with opened.step("Find the Dashboard model", name):
+                if _find(opened, base, name, "SemanticModel") is None:
+                    raise CommandError(
+                        f"{base.workspace} has no Catalogue Dashboard named {name}. "
+                        "Deploy it with weaver catalogue-dashboard first."
+                    )
+                model = opened.semantic_model(name, workspace=base)
+                renderer = _measure_value(opened, base, model, name, "Renderer")
+            values = {}
+            for section in dict.fromkeys(s for p in pages for s in p.sections):
+                with opened.step("Read the page data", section):
+                    values[section] = _measure_value(opened, base, model, name, section)
+            store = (
+                opened.transport_store(base)
+                if destination.is_url
+                else FilesystemStore()
+            )
+            written = []
+            with opened.step("Write the pages", str(destination.value)):
+                store.make_directory(destination)
+                for index, page in enumerate(pages):
+                    html = _static_page(
+                        name,
+                        page.page,
+                        [values[s] for s in page.sections],
+                        renderer,
+                        pages=[(p.page, titles.get(p.page, p.page)) for p in pages],
+                    )
+                    data = html.encode("utf-8")
+                    files = [f"{page.page}.html"] + (
+                        ["index.html"] if index == 0 else []
+                    )
+                    for file in files:
+                        store.write(destination.join(file), data)
+                    written.append(
+                        ExportedPage(
+                            page.page,
+                            titles.get(page.page, page.page),
+                            files[0],
+                            len(html),
+                        )
+                    )
+    return CatalogueDashboardExport(
+        workspace=base.workspace,
+        name=name,
+        path=destination.value,
+        pages=tuple(written),
+    )
+
+
+def _measure_value(opened, base, model, name: str, measure: str) -> str:
+    """One measure's text, or a refusal naming a model that is no Dashboard."""
+
+    from ..fabric.client import FabricError
+
+    quoted = measure.replace("]", "]]")
+    try:
+        rows = model.query_dax(f'EVALUATE ROW("v", [{quoted}])')
+    except FabricError:
+        if not _is_dashboard(
+            opened,
+            base,
+            opened.resolve_item(name, item_type="SemanticModel", workspace=base),
+        ):
+            raise CommandError(
+                f"SemanticModel {name} is not a Catalogue Dashboard."
+            ) from None
+        raise
+    value = rows[0].get("[v]") if rows else None
+    return "" if value is None else str(value)
+
+
+def _page_order() -> tuple[list[str], dict[str, str]]:
+    """The Report's page order and each page's title."""
+
+    import json
+
+    from ..catalogue_dashboard import DASHBOARD
+    from ..fragments import DASHBOARD as FRAGMENT
+    from ..fragments import fragment_files
+
+    files = fragment_files(FRAGMENT)
+    root = f"{DASHBOARD}.Report/definition/pages/"
+    order = json.loads(files[root + "pages.json"])["pageOrder"]
+    titles = {
+        page: json.loads(files[f"{root}{page}/page.json"])["displayName"]
+        for page in order
+    }
+    return order, titles
+
+
+_EXPORT_STYLE = (
+    "body{margin:0}"
+    ".wd-export{display:flex;flex-wrap:wrap;gap:2px;padding:8px 16px;"
+    "border-bottom:1px solid rgba(12,21,32,.13);background:#fff;"
+    "font:500 13px/1.4 system-ui,sans-serif}"
+    ".wd-export a{padding:4px 10px;border-radius:6px;color:#0c1520;text-decoration:none}"
+    ".wd-export a:hover{background:rgba(12,21,32,.06)}"
+    ".wd-export a[aria-current]{background:rgba(12,21,32,.1);font-weight:650}"
+)
+
+
+def _static_page(name, page, sections, renderer, *, pages) -> str:
+    """One page as a document of its own, with links to the others."""
+
+    from html import escape
+
+    from ..dashboard_model import page_text
+
+    current = ' aria-current="page"'
+    links = "".join(
+        f'<a href="{key}.html"{current if key == page else ""}>{escape(title)}</a>'
+        for key, title in pages
+    )
+    title = dict(pages).get(page, page)
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{escape(name)} · {escape(title)}</title>"
+        f"<style>{_EXPORT_STYLE}</style></head><body>"
+        f'<nav class="wd-export" aria-label="Pages">{links}</nav>'
+        + page_text(page, sections, renderer)
+        + "</body></html>\n"
+    )

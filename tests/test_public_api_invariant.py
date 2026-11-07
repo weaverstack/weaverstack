@@ -69,10 +69,12 @@ def test_the_top_level_is_the_ordinary_notebook_surface_only():
         "ExampleOutcome",
         "build",
         "BuildResult",
-        # The optional Catalogue Dashboard, deployed over one catalogue and
-        # outside the catalogue's own lifecycle.
+        # The optional Catalogue Dashboard, deployed over catalogues outside
+        # their lifecycle, and its pages exported as static HTML.
         "deploy_catalogue_dashboard",
         "CatalogueDashboardResult",
+        "export_catalogue_dashboard",
+        "CatalogueDashboardExport",
         # Forking an installed estate into this workspace's catalogue. The
         # pair is resolved once and proved before anything is emptied, so the
         # plan and the check are public alongside the operation.

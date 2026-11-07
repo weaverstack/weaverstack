@@ -966,20 +966,20 @@ test("a mirror borrows, rebuilds, changes or adds each object, and the source co
 });
 
 test("a mirror whose borrowed objects were all built locally still pairs with its source", () => {
-  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject", "live"];
+  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
   const nodes = table("nodes", NODE, [
     [O("hs", 1), O("Warehouse/Mart", 1), "MART", "Summary", "Table", "MART.Summary", 9, ""],
     [O("s", 2), O("Warehouse/Mart", 2), "MART", "Summary", "Table", "MART.Summary", 9, ""]]);
   const items = table("items", INSTALL, [
     [O("Warehouse/Mart", 1), "HUB", "HubMart_WH", "1", "w-hub", "i-hubmart"], [O("Warehouse/Mart", 2), "SPOKE", "Mart_WH", "1", "w-spoke", "i-mart"]]);
-  const mirrors = table("mirrors", MIRROR, [[O("Warehouse/Mart", 2), "MART", "Summary", "HUB", "HubMart_WH", "MART", "Summary", "0"]]);
+  const mirrors = table("mirrors", MIRROR, [[O("Warehouse/Mart", 2), "MART", "Summary", "HUB", "HubMart_WH", "MART", "Summary"]]);
   const signatures = table("signatures", ["item", "schema", "object", "kind", "signature"], [
     [O("Warehouse/Mart", 1), "MART", "Summary", "data", "s1"], [O("Warehouse/Mart", 2), "MART", "Summary", "data", "s2"]]);
   const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes + mirrors + signatures);
   const m = D.buildModel(p.tables, p.problems);
   assert.equal(m.nodes.get(O("s", 2)).change, "changed");
   assert.equal(m.nodes.get(O("hs", 1)).change, "changed");
-  // A row no longer live gives the object no source state.
+  // Lineage no longer marks it mirrored, so it takes no source state.
   assert.equal(m.nodes.get(O("s", 2)).mirror, undefined);
 });
 

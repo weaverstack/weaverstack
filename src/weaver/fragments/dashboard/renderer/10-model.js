@@ -227,13 +227,15 @@ function mirrorSources(m, rows) {
   m.items.forEach(function (it) {
     if (it.target) byTarget.set(String(it.workspace || "").toLowerCase() + "|" + String(it.target).toLowerCase(), it);
   });
-  // A row whose object was since built locally still names the catalogue mirrored.
+  // A row whose object was since built locally still names the catalogue
+  // mirrored. Lineage marks the objects still borrowed: a Warehouse records a
+  // live row's delete time past the latest datetime DAX can read.
   m.mirrored = new Map();
   rows.forEach(function (r) {
     var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
     if (source) m.mirrored.set(ownerCode(r.item), source.code);
-    var n = r.live === "0" ? null : m.byIdentity.get(identityKey(r.item, r.schema, r.object));
-    if (n && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+    var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+    if (n && n.isMirrored && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
   });
 }
 

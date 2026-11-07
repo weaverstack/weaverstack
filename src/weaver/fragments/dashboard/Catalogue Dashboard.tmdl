@@ -323,8 +323,7 @@ table 'Dashboard measures'
             "@workspace", 'Mirror'[Source workspace name],
             "@target", 'Mirror'[Source target name],
             "@sourceschema", 'Mirror'[Source schema name],
-            "@sourceobject", 'Mirror'[Source object name],
-            "@live", IF(YEAR('Mirror'[Row delete datetime]) = 9999, 1, 0)
+            "@sourceobject", 'Mirror'[Source object name]
         )
         VAR _signed = UNION(
             CATALOGUES(
@@ -345,14 +344,13 @@ table 'Dashboard measures'
             )
         )
         RETURN
-            _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject" & _f & "live"
+            _t & "mirrors" & _f & "item" & _f & "schema" & _f & "object" & _f & "workspace" & _f & "target" & _f & "sourceschema" & _f & "sourceobject"
             & CONCATENATEX(
                 _mirrors,
                 _r & [@item] & _q & [@code]
                     & _f & [@schema] & _f & [@object]
                     & _f & [@workspace] & _f & [@target]
-                    & _f & [@sourceschema] & _f & [@sourceobject]
-                    & _f & [@live],
+                    & _f & [@sourceschema] & _f & [@sourceobject],
                 ""
             )
             & IF(

@@ -863,3 +863,31 @@ def _given(monkeypatch, workspace: Workspace) -> None:
     import weaver.operations.workspace as module
 
     monkeypatch.setattr(module, "_operation_workspace", lambda **_kwargs: workspace)
+
+
+@weaver_test()
+def test_a_source_installation_is_verified_in_its_own_workspace(monkeypatch):
+    """Its recorded GUIDs are the source workspace's, not the destination's."""
+
+    from weaver.operations import mirror as operation
+
+    configured = _with_targets()
+    plan = _plan(
+        monkeypatch,
+        replace(configured, mirror="Production/Warehouse/Weaver"),
+        ["Lakehouse/Input"],
+    )
+    resolved = resolve_mirror(plan, _installed({"Lakehouse/Input": "Input"}))
+    checked = []
+    monkeypatch.setattr(
+        "weaver.catalogue.installation.verify_installations",
+        lambda rows, *, resolver: checked.append((resolver, len(rows))),
+    )
+
+    class _Session:
+        def resolver(self, workspace):
+            return workspace.workspace
+
+    operation._verify_source_identities(resolved, session=_Session())
+
+    assert checked == [("Production", 1)]

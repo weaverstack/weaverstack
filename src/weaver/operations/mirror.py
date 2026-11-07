@@ -264,9 +264,18 @@ def _verify_source_identities(resolved: "ResolvedMirror", *, session) -> None:
 
     from ..catalogue.installation import verify_installations
 
-    rows = tuple(resolved.installations.values())
-    if rows:
-        verify_installations(rows, resolver=session.resolver(resolved.workspace))
+    by_workspace: dict[str | None, list] = {}
+    for each in resolved.items:
+        row = resolved.installations.get(each.item)
+        if row is not None:
+            by_workspace.setdefault(each.source_workspace, []).append(row)
+    for workspace, rows in by_workspace.items():
+        where = (
+            resolved.workspace
+            if workspace is None
+            else replace(resolved.workspace, workspace=workspace)
+        )
+        verify_installations(rows, resolver=session.resolver(where))
 
 
 def _upgraded_identities(plan: MirrorPlan, fork, connection, *, session):

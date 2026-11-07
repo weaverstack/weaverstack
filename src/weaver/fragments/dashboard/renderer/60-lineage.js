@@ -150,7 +150,7 @@ function workspaceFrame(s, onResize) {
   f.mount = function (body, tools) {
     tools.forEach(function (t) { if (t) f.bar.appendChild(t); });
     f.host.appendChild(maximise);
-    [f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.host, f.legend]), f.side])]
+    [f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.legend, f.host]), f.side])]
       .forEach(function (c) { f.frame.appendChild(c); });
     body.appendChild(f.frame);
     set(!!s.maximised);

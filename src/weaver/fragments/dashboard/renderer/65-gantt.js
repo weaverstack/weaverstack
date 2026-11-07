@@ -116,8 +116,8 @@ function ganttPage(body, m) {
     shown.sort(function (a, b) { return a.started - b.started || compare(a.label, b.label) || compare(a.id, b.id); });
     if (!shown.length) { host.appendChild(empty("No object record has been processed for this workflow.")); return; }
     var chart = ganttChart(shown, sum, s, m, openRecord);
-    host.appendChild(chart);
     host.appendChild(el("div", { "class": "wd-legend" }, objectKey(m)));
+    host.appendChild(chart);
     host.repaint = chart.repaint;
     var kept = s.pick ? shown.filter(function (r) { return r.id === s.pick; })[0] : null;
     if (kept) openRecord(kept); else { s.pick = null; side.hidden = true; }

@@ -827,11 +827,14 @@ def _lakehouse(
     # The ``_`` surface reads the destination catalogue's tables.
     create("surface", surface, (*after, catalogue_built))
 
+    # Bound by its IDs: a source in another workspace may share the
+    # destination's name, and a name alone cannot tell the two apart.
     source = BoundTarget(
         id=f"source-lakehouse-{each.source_target}",
         kind="lakehouse",
-        item_id=each.source_target,
-        item_name=each.source_target,
+        item_id=source_item.id,
+        item_name=source_item.name,
+        workspace_id=source_item.workspace_id,
         workspace_name=each.source_workspace or compiling.workspace,
     )
     destination_spark = resolver.spark_destination(ItemRef(each.destination))

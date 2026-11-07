@@ -353,6 +353,43 @@ def test_a_lakehouse_mirrored_from_another_workspace_reads_its_source_there(
 
 
 @weaver_test()
+def test_a_source_in_another_workspace_may_share_the_destinations_name(tmp_path):
+    """The source's load tree is protected by its IDs, not by its name."""
+
+    from dataclasses import replace
+
+    load = tmp_path / "Input" / "Files" / "_" / "Load" / "Tables"
+    load.mkdir(parents=True)
+    (load / "Sales__Customer.py").write_text("runtime", encoding="utf-8")
+    resolved = _resolved("Input", "Lakehouse")
+    logical = resolved.items[0].item
+    resolved = replace(
+        resolved,
+        plan=replace(
+            resolved.plan,
+            source=CatalogueRef(workspace="Production", name="Weaver"),
+            items=("Lakehouse/Input=Lakehouse/Input",),
+        ),
+        items=(
+            replace(
+                resolved.items[0], destination="Input", source_workspace="Production"
+            ),
+        ),
+        bindings={logical: "Input"},
+        copied_rows={},
+    )
+    session = _Session(resolver=_ElsewhereResolver(tmp_path), store=FilesystemStore())
+
+    plan, _payloads, _summary = mirror_mutation_plan(resolved, session=session)
+
+    source = next(t for t in plan.targets if t.id == "source-lakehouse-Input")
+    destination = next(t for t in plan.targets if t.id == "lakehouse-Input")
+    assert source.workspace_id == "Production"
+    assert source.item_id != destination.item_id
+    assert "mirror-load-tree-lakehouse-Input" in _actions(plan)
+
+
+@weaver_test()
 def test_a_shortcut_into_another_mirrored_item_reads_what_this_plan_builds(tmp_path):
     """The producer's destination is empty until this plan fills it."""
 

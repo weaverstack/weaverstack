@@ -275,3 +275,9 @@ def test_a_target_in_another_workspace_is_resolved_there(tmp_path):
     )
 
     assert resolved.destination.workspace == "Production"
+    assert resolved.files_root == resolvers["Production"].files_root(
+        ItemRef("Sales_LH")
+    )
+    assert resolved.files_root != resolvers[workspace.workspace].files_root(
+        ItemRef("Sales_LH")
+    )

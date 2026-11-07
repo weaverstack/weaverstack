@@ -320,6 +320,7 @@ class MutationBindings:
             lakehouse=item,
             location=self._resolved(bound, item, "lakehouse_spark_location", resolver),
             destination=self._resolved(bound, item, "spark_destination", resolver),
+            files_root=self._resolved(bound, item, "files_root", resolver),
         )
 
     def _resolved(self, bound: BoundTarget, item: ItemRef, method: str, resolver):

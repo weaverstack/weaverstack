@@ -273,7 +273,9 @@ def _observe(run, wanted=EVERYTHING) -> Estate:
         borrowed, installed = run.catalogue_sql.query_result_sets(
             "select [Schema name], [Object name], [Physical type] from "
             f"[{CATALOGUE_SCHEMA}].[{MIRROR_TABLE.name}] "
-            "where [Item type] = N'Lakehouse';\n"
+            # A materialised object's row stays, marked deleted.
+            "where [Item type] = N'Lakehouse' "
+            "and year([Row delete datetime]) = 9999;\n"
             "select [Item name], [Target name] from "
             f"[{CATALOGUE_SCHEMA}].[Installation] where [Item type] = N'Lakehouse';"
         )

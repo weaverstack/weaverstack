@@ -246,3 +246,32 @@ def test_a_bound_target_carries_no_resolved_root():
     assert "tables_root" not in mapping
     assert "files_root" not in mapping
     assert mapping["item_id"] == "Sales_LH"
+
+
+@weaver_test()
+def test_a_target_in_another_workspace_is_resolved_there(tmp_path):
+    """A mirror reads its source from another workspace, which its target names."""
+
+    from support.sessions import given_installer
+
+    from weaver.build_bundle.targets import BoundTarget
+
+    workspace = given_workspace(catalogue="Warehouse/Weaver")
+    resolvers = {
+        name: given_resolver(workspace=name, lakehouses=("Sales_LH",))
+        for name in (workspace.workspace, "Production")
+    }
+    installer = given_installer(workspace=workspace).bind(workspace)
+    installer.session.resolver = lambda where: resolvers[where.workspace]
+
+    resolved = installer.resolve_target(
+        BoundTarget(
+            id="source-lakehouse-Sales_LH",
+            kind="lakehouse",
+            item_id="Sales_LH",
+            item_name="Sales_LH",
+            workspace_name="Production",
+        )
+    )
+
+    assert resolved.destination.workspace == "Production"

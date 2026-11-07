@@ -190,9 +190,10 @@ it where it exists; a mirrored object takes its source's state when the
 source's catalogue is among those read, and is unobserved otherwise. Beside a
 mirror, the model also carries each object's source signature. The renderer
 pairs a mirror's catalogue with the one it mirrors through its `_.Mirror` rows,
-including those of objects since built locally, and classes each object there as borrowed (drawn muted), changed or
-added (marked) by its signature, or rebuilt with the same code (drawn as
-usual); the source's copy of a borrowed or changed object takes that state.
+including those of objects since built locally, and classes each object there
+as borrowed (drawn muted), changed or added (marked) by its signature, or
+rebuilt with the same code (drawn as usual); the source's copy of a borrowed or
+changed object takes that state.
 
 ## The core abstraction
 
@@ -968,6 +969,16 @@ tables, so the Warehouse waits until it sees every object it reads. The fork, th
 binding are one transaction, last, after every reconstruction. Until it commits
 the destination catalogue records no installation, so it never claims the
 source's items.
+
+The source catalogue may be in another workspace. A Warehouse names another
+Warehouse only within its workspace, so the source's rows are then read over TDS
+before the plan and written as literals in that transaction; within one
+workspace the copy stays server-side. Each item is read in the workspace its
+source Installation names. A Lakehouse item crosses, because its shortcuts and
+Spark views reach any workspace; a Warehouse item is refused, because its
+borrowed Views read only their own. A recreated shortcut to an item the run
+leaves behind names that item's workspace. Load, Test and Health read the
+catalogue mirrored in its own workspace.
 
 The source may be any earlier Weaver version's catalogue, so a release is
 trialled in development before production is upgraded. The source is only read.

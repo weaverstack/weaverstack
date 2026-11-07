@@ -178,6 +178,76 @@ def fork_statements(
 
 # --- an older source ----------------------------------------------------------
 
+#: Rows in one ``VALUES`` list; T-SQL allows no more.
+COPIED_ROWS = 1000
+
+
+def read_copied_rows(connection, source: ForkSource, *, graphed: bool = True) -> dict:
+    """Read the rows :func:`copy_statements` would copy, from the source catalogue.
+
+    For a source in another workspace, which a Warehouse cannot name. Each row
+    maps the destination's public column names to the source's values.
+    """
+
+    tables = [
+        table
+        for table in copied_tables(borrowed=source.borrowed, graphed=graphed)
+        if source.columns.get(table.name) is not None
+    ]
+    statements = [_copied_query(table, source.columns[table.name]) for table in tables]
+    row_sets = getattr(connection, "row_sets", None)
+    sets = (
+        row_sets(statements)
+        if row_sets is not None
+        else [connection.rows(statement) for statement in statements]
+    )
+    return {
+        table.name: tuple(dict(row) for row in rows)
+        for table, rows in zip(tables, sets)
+    }
+
+
+def _copied_query(table, columns: Mapping[str, str]) -> str:
+    pairs = _pairs(table, columns)
+    projected = ", ".join(
+        f"{identifier(source)} as {identifier(public)}" for public, source in pairs
+    )
+    return (
+        f"select {projected}\n  from {local_relation(table)}\n"
+        f" where {_excluding_builtin(table, columns)}"
+    )
+
+
+def insert_statements(rows: Mapping[str, Sequence[Mapping]]) -> tuple[str, ...]:
+    """Write rows :func:`read_copied_rows` read, in copy order."""
+
+    by_name = {table.name: table for table in CATALOGUE_TABLES}
+    statements = []
+    for name, table_rows in rows.items():
+        if not table_rows:
+            continue
+        table = by_name[name]
+        columns = list(table_rows[0])
+        named = ", ".join(identifier(column) for column in columns)
+        for start in range(0, len(table_rows), COPIED_ROWS):
+            values = ",\n       ".join(
+                "(" + ", ".join(_copied_value(row[c]) for c in columns) + ")"
+                for row in table_rows[start : start + COPIED_ROWS]
+            )
+            statements.append(
+                f"insert into {local_relation(table)} ({named})\nvalues {values};"
+            )
+    return tuple(statements)
+
+
+def _copied_value(value) -> str:
+    from decimal import Decimal
+
+    if isinstance(value, Decimal):
+        return str(value)
+    return literal(value)
+
+
 #: Installation columns an older source lacks. Preflight resolves them from Fabric.
 IDENTITY_COLUMNS = ("workspace_name", "workspace_id", "target_name", "item_id")
 
@@ -317,6 +387,8 @@ def _every_declared_table_is_accounted_for() -> bool:
 
 __all__: Sequence[str] = [
     "FORKED_TABLES",
+    "insert_statements",
+    "read_copied_rows",
     "OPTIONAL_TABLES",
     "ForkSource",
     "copied_tables",

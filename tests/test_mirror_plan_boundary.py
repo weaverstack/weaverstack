@@ -293,6 +293,65 @@ def test_a_lakehouse_mirror_resolves_case_exact_sources_and_awaits_its_shortcuts
     assert summary["Lakehouse/Input"]["views"] == 1
 
 
+class _ElsewhereResolver(_Resolver):
+    """Resolves items in workspace Production as well as this one."""
+
+    def external_item(self, name, *, item_type, workspace=None):
+        from dataclasses import replace
+
+        item = super().external_item(name, item_type=item_type)
+        return item if workspace is None else replace(item, workspace_id=workspace)
+
+
+@weaver_test()
+def test_a_lakehouse_mirrored_from_another_workspace_reads_its_source_there(
+    tmp_path,
+):
+    """Shortcuts and Spark names reach another workspace; a Warehouse cannot."""
+
+    from dataclasses import replace
+
+    (tmp_path / "Input" / "Tables" / "Sales" / "customer").mkdir(parents=True)
+    pointer = Borrowed(
+        WeaverDocumentId.parse("Lakehouse/Input/Tables/Sales.Customer"),
+        "table",
+        "table",
+    )
+    view = Borrowed(
+        WeaverDocumentId.parse("Lakehouse/Input/Tables/Sales.Active"), "view", "view"
+    )
+    resolved = _resolved("Input", "Lakehouse", relations=(pointer, view))
+    resolved = replace(
+        resolved,
+        plan=replace(
+            resolved.plan, source=CatalogueRef(workspace="Production", name="Weaver")
+        ),
+        items=(replace(resolved.items[0], source_workspace="Production"),),
+        copied_rows={
+            "Registry": (
+                {"Item type": "Lakehouse", "Item name": "Input", "Signature": "s"},
+            )
+        },
+    )
+    session = _Session(resolver=_ElsewhereResolver(tmp_path), store=FilesystemStore())
+
+    plan, payloads, _summary = mirror_mutation_plan(resolved, session=session)
+
+    actions = _actions(plan)
+    pointers = json.loads(
+        payloads[actions["mirror-pointers-lakehouse-Input_Dev"].payload]
+    )
+    assert pointers["shortcuts"][0]["source_workspace_id"] == "Production"
+    views = payloads[actions["mirror-views-lakehouse-Input_Dev-000"].payload].decode()
+    assert "Production" in views
+    script = payloads[actions[PUBLISH].payload].decode()
+    assert (
+        "insert into [_].[Registry] ([Item type], [Item name], [Signature])" in script
+    )
+    assert "[Weaver].[_]" not in script
+    assert "N'Production'" in script[script.index("[_].[Mirror]") :]
+
+
 @weaver_test()
 def test_a_shortcut_into_another_mirrored_item_reads_what_this_plan_builds(tmp_path):
     """The producer's destination is empty until this plan fills it."""

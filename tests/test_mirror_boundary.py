@@ -9,6 +9,8 @@ A fork has two sides and one vocabulary for them. ``mirror`` is read from,
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from support.weaver_test import weaver_test
 
@@ -207,17 +209,42 @@ def test_a_workspace_naming_neither_side_says_what_to_set(monkeypatch):
 
 
 @weaver_test()
-def test_a_source_in_another_workspace_is_refused(monkeypatch):
-    """A Fabric Warehouse reaches its own workspace and no further.
+def test_a_source_in_another_workspace_is_planned_where_it_is(monkeypatch):
+    plan = _plan(monkeypatch, _workspace(mirror="Production/Warehouse/Weaver"))
 
-    Refused rather than attempted, because the step after this empties the
-    destination Warehouse.
-    """
+    assert plan.source == CatalogueRef(workspace="Production", name="Weaver")
+    assert plan.remote
 
-    _given(monkeypatch, _workspace(mirror="Production/Warehouse/Weaver"))
 
-    with pytest.raises(CommandError, match="Source catalogue .* must be in workspace"):
-        weaver.plan_mirror(no_item=True, session=_never())
+@weaver_test()
+def test_a_lakehouse_mirrored_across_workspaces_is_read_from_its_own(monkeypatch):
+    configured = _with_targets()
+    plan = _plan(
+        monkeypatch,
+        replace(configured, mirror="Production/Warehouse/Weaver"),
+        ["Lakehouse/Input"],
+    )
+
+    (each,) = resolve_mirror(plan, _installed({"Lakehouse/Input": "Input"})).items
+
+    assert each.source_workspace == "Production"
+
+
+@weaver_test()
+def test_a_warehouse_mirrored_across_workspaces_is_refused(monkeypatch):
+    """A mirrored Warehouse borrows through Views, which read one workspace."""
+
+    configured = _with_targets()
+    plan = _plan(
+        monkeypatch,
+        replace(configured, mirror="Production/Warehouse/Weaver"),
+        ["Warehouse/Model"],
+    )
+
+    with pytest.raises(
+        CommandError, match="Warehouse/Model is in workspace Production"
+    ):
+        resolve_mirror(plan, _installed({"Warehouse/Model": "Model"}))
 
 
 @weaver_test()

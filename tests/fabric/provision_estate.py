@@ -33,7 +33,8 @@ Optional environment variables:
     WEAVER_FABRIC_WORKSPACE_SPOKE
     WEAVER_PYTEST_HUB_WEAVER, WEAVER_PYTEST_HUB_WAREHOUSE
     WEAVER_PYTEST_SPOKE_WEAVER, WEAVER_PYTEST_SPOKE_LAKEHOUSE,
-    WEAVER_PYTEST_SPOKE_WAREHOUSE
+    WEAVER_PYTEST_SPOKE_WAREHOUSE, WEAVER_PYTEST_SPOKE_FORK_WEAVER,
+    WEAVER_PYTEST_SPOKE_MIRROR_LAKEHOUSE
 """
 
 from __future__ import annotations
@@ -341,10 +342,14 @@ def create_semantic_model(workspace, name, *, client):
 
 #: The downstream workspace's items, by role, and its Warehouse roles in this
 #: workspace. Their catalogues are their own; see tests/fabric/conftest.py.
-SPOKE_LAKEHOUSE_ROLES = {"spoke_lakehouse": "PYTEST_SPOKE_LH"}
+SPOKE_LAKEHOUSE_ROLES = {
+    "spoke_lakehouse": "PYTEST_SPOKE_LH",
+    "spoke_mirror_lakehouse": "PYTEST_SPOKE_MIRROR_LH",
+}
 SPOKE_WAREHOUSE_ROLES = {
     "spoke_weaver": "PYTEST_SPOKE_WEAVER",
     "spoke_warehouse": "PYTEST_SPOKE_WH",
+    "spoke_fork_weaver": "PYTEST_SPOKE_FORK",
 }
 WAREHOUSE_ROLES.update(
     {"hub_weaver": "PYTEST_HUB_WEAVER", "hub_warehouse": "PYTEST_HUB_WH"}

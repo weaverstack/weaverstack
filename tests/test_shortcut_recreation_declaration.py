@@ -134,6 +134,33 @@ def test_another_items_pointers_are_not_this_ones():
 
 
 @weaver_test()
+def test_a_pointer_at_an_item_left_in_another_workspace_names_that_workspace():
+    """A mirror across workspaces moves some items; the rest stay where they are.
+
+    A logical target the run leaves behind is in its installation's workspace,
+    and a physical target recorded without one is in the source item's.
+    """
+
+    raw = _physical(
+        _document(LANDING, "Sales", "Raw", is_files=True),
+        shortcut_type="folder",
+        schema="Sales/Raw",
+    )
+
+    (logical,) = recreatable(
+        [DELTA], item=CURATED, bindings=BINDINGS, homes={LANDING: "Production"}
+    )
+    (physical,) = recreatable(
+        [raw], item=LANDING, bindings=BINDINGS, origin="Production"
+    )
+    (moved,) = recreatable([DELTA], item=CURATED, bindings=BINDINGS)
+
+    assert logical.target_workspace == "Production"
+    assert physical.target_workspace == "Production"
+    assert moved.target_workspace is None
+
+
+@weaver_test()
 def test_a_logical_pointer_follows_the_forks_own_bindings():
     """The logical relationship moves with the fork.
 

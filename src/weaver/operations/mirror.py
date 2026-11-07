@@ -38,6 +38,12 @@ class MirrorPlan:
     def mapping(self) -> tuple[str, str]:
         return self.target, str(self.source)
 
+    @property
+    def remote(self) -> bool:
+        """Whether the source catalogue is in another workspace."""
+
+        return not self.source.is_local_to(self.workspace.workspace)
+
     def __str__(self) -> str:
         return f"{self.source} into {self.destination}"
 
@@ -51,6 +57,8 @@ class MirrorItem:
     programmables: tuple = ()
     #: Recorded ``_.Shortcut`` rows that Weaver recreates in the destination.
     shortcuts: tuple = ()
+    #: The workspace the source item is in; ``None`` is the destination's.
+    source_workspace: str | None = None
 
     @property
     def kind(self) -> str:
@@ -85,10 +93,23 @@ class ResolvedMirror:
     installations: Mapping[object, Mapping] = field(default_factory=dict)
     #: The source catalogue mapped onto this version's; ``None`` is this version's.
     fork: ForkSource | None = None
+    #: The workspace of each unselected item a shortcut may read, where it is
+    #: not the destination's.
+    homes: Mapping[object, str] = field(default_factory=dict)
+    #: The source catalogue's rows, by table, when it is in another workspace.
+    #: Fabric names another Warehouse only within a workspace, so these are
+    #: read before the plan and written as literals.
+    copied_rows: Mapping[str, tuple] | None = None
 
     @property
     def workspace(self) -> Workspace:
         return self.plan.workspace
+
+    @property
+    def remote(self) -> bool:
+        """Whether the source catalogue is in another workspace."""
+
+        return self.plan.remote
 
     @property
     def source(self) -> CatalogueRef:
@@ -182,7 +203,11 @@ def plan_mirror(
     )
     source, destination = _resolved_pair(base, catalogue=catalogue, mirror=mirror)
     _refuse_unusable_pair(source, destination, base)
-    source, destination = source.local, destination.local
+    if source.is_local_to(base.workspace):
+        source = source.local
+    else:
+        source = CatalogueRef(workspace=source.owner(base.workspace), name=source.name)
+    destination = destination.local
     resolved = replace(
         base, catalogue=f"{CATALOGUE_KIND}/{destination.name}", mirror=source
     )
@@ -213,11 +238,21 @@ def check_mirror(plan: MirrorPlan, *, session=None) -> ResolvedMirror:
         resolved = resolve_mirror(
             plan, catalogue, borrowed=fork.borrowed, graphed=graphed
         )
+        if fork.legacy_installation and plan.remote:
+            raise CommandError(
+                f"The catalogue in {plan.source} records no Fabric item IDs. "
+                f"Build an item into it with this Weaver version, then mirror it."
+            )
         if fork.legacy_installation:
             fork = _upgraded_identities(plan, fork, connection, session=opened)
         else:
             _verify_source_identities(resolved, session=opened)
-        return replace(resolved, fork=fork)
+        if not plan.remote:
+            return replace(resolved, fork=fork)
+        from ..catalogue.fork import read_copied_rows
+
+        rows = read_copied_rows(connection, fork, graphed=graphed)
+        return replace(resolved, fork=fork, copied_rows=rows)
 
 
 def _verify_source_identities(resolved: "ResolvedMirror", *, session) -> None:
@@ -272,9 +307,26 @@ def resolve_mirror(
         items=items,
         bindings=_final_bindings(plan, catalogue, items),
         installations=_installations(catalogue, items),
+        homes=_unselected_homes(plan, catalogue, items),
     )
     _refuse_unsafe(resolved)
     return resolved
+
+
+def _unselected_homes(plan: MirrorPlan, catalogue, items) -> dict:
+    """The workspace of each item this run does not move, where not the destination's."""
+
+    from ..catalogue.tables import INSTALLATION
+    from ..declaration.model import WeaverItemId
+
+    if catalogue is None:
+        return {}
+    moved = {(each.item.item_type, each.item.item_name) for each in items}
+    return {
+        WeaverItemId(*key): workspace
+        for key, workspace in _homes(plan, catalogue.table_rows(INSTALLATION)).items()
+        if key not in moved
+    }
 
 
 def _installations(catalogue, items) -> dict:
@@ -452,12 +504,10 @@ def _local_destination(catalogue: str, base: Workspace) -> CatalogueRef:
 def _refuse_unusable_pair(
     source: CatalogueRef, destination: CatalogueRef, base: Workspace
 ) -> None:
-    if not source.is_local_to(base.workspace):
-        raise CommandError(
-            f"Source catalogue {source} must be in workspace {base.workspace}. "
-            f"Use a catalogue in {base.workspace}."
-        )
-    if source.name.casefold() == destination.name.casefold():
+    if (
+        source.is_local_to(base.workspace)
+        and source.name.casefold() == destination.name.casefold()
+    ):
         raise CommandError(
             f"{destination} is both the source and destination catalogue. mirror "
             "empties the destination before copying catalogue state. Use a "
@@ -493,7 +543,11 @@ def _prove_source(plan: MirrorPlan, connection):
 
 
 def _source_workspace(plan: MirrorPlan) -> Workspace:
-    return replace(plan.workspace, catalogue=f"{CATALOGUE_KIND}/{plan.source.name}")
+    return replace(
+        plan.workspace,
+        workspace=plan.source.owner(plan.workspace.workspace),
+        catalogue=f"{CATALOGUE_KIND}/{plan.source.name}",
+    )
 
 
 def _resolved_items(plan: MirrorPlan, catalogue) -> tuple[MirrorItem, ...]:
@@ -502,14 +556,17 @@ def _resolved_items(plan: MirrorPlan, catalogue) -> tuple[MirrorItem, ...]:
     from ..build_bundle.targets import parse_build_item
     from ..catalogue.borrow import borrowable, executable
     from ..catalogue.tables import INSTALLATION
+    from ..declaration.model import LAKEHOUSE
     from ..installed import installed_shortcuts
 
+    rows = catalogue.table_rows(INSTALLATION)
     installed = {
         (str(row.get("item_type")), str(row.get("item_name"))): str(
             row.get("target_name") or ""
         )
-        for row in catalogue.table_rows(INSTALLATION)
+        for row in rows
     }
+    homes = _homes(plan, rows)
     recorded = installed_shortcuts(catalogue)
     resolved = []
     for written in plan.items:
@@ -520,9 +577,18 @@ def _resolved_items(plan: MirrorPlan, catalogue) -> tuple[MirrorItem, ...]:
             for identity, document in catalogue.registered.items()
             if identity.item == item
         }
+        source_workspace = homes.get((item.item_type, item.item_name))
+        if source_workspace is not None and item.item_type != LAKEHOUSE:
+            raise CommandError(
+                f"{item} is in workspace {source_workspace}. A mirrored "
+                f"{item.item_type} borrows through Views, which read only their "
+                f"own workspace. Mirror {item} in workspace {source_workspace}, "
+                "or select only Lakehouse items."
+            )
         resolved.append(
             MirrorItem(
                 item=item,
+                source_workspace=source_workspace,
                 source_target=_installed_target(installed, item),
                 destination=binding.target.item.name,
                 relations=borrowable(registered, kind=item.item_type),
@@ -536,6 +602,22 @@ def _resolved_items(plan: MirrorPlan, catalogue) -> tuple[MirrorItem, ...]:
         )
     _refuse_repeated_items(resolved)
     return _in_producer_order(resolved, recorded)
+
+
+def _homes(plan: MirrorPlan, rows) -> dict[tuple[str, str], str]:
+    """Each installed item's workspace, where it is not the destination's.
+
+    An Installation that names no workspace is in the source catalogue's.
+    """
+
+    origin = plan.source.owner(plan.workspace.workspace)
+    here = plan.workspace.workspace.casefold()
+    homes = {}
+    for row in rows:
+        workspace = str(row.get("workspace_name") or "") or origin
+        if workspace.casefold() != here:
+            homes[(str(row.get("item_type")), str(row.get("item_name")))] = workspace
+    return homes
 
 
 def _refuse_repeated_items(items: Sequence[MirrorItem]) -> None:
@@ -606,7 +688,7 @@ def _refuse_unsafe(resolved: ResolvedMirror) -> None:
 
     _refuse_mirrored_source(resolved)
     for each in resolved.items:
-        _recreatable(each, bindings=resolved.bindings)
+        _recreatable(each, bindings=resolved.bindings, homes=resolved.homes)
 
     # Physical identity is kind plus name; different item kinds may share a name.
     # The destination catalogue is also an output and must remain distinct.
@@ -634,9 +716,15 @@ def _refuse_unsafe(resolved: ResolvedMirror) -> None:
         emptied[key] = label
         whose[key] = claimant
 
-    read = {(CATALOGUE_KIND, resolved.source.name.casefold()): str(resolved.source)}
+    # Only a source in this workspace can be the same item as a destination.
+    read = (
+        {}
+        if resolved.remote
+        else {(CATALOGUE_KIND, resolved.source.name.casefold()): str(resolved.source)}
+    )
     for each in resolved.items:
-        read.setdefault((each.kind, each.source_target.casefold()), each.source)
+        if each.source_workspace is None:
+            read.setdefault((each.kind, each.source_target.casefold()), each.source)
 
     collision = sorted(set(read) & set(emptied))
     if collision:
@@ -661,13 +749,23 @@ def _count_statement(*, borrowed: bool, graphed: bool = True) -> str:
     )
 
 
-def _recreatable(each: MirrorItem, *, bindings) -> tuple:
-    """Resolve shortcuts and reject unsupported forms before physical writes."""
+def _recreatable(each: MirrorItem, *, bindings, homes=None) -> tuple:
+    """Resolve shortcuts and reject unsupported forms before physical writes.
+
+    ``homes`` gives the workspace of each item this run does not move, where it
+    is not the destination's.
+    """
 
     from ..catalogue.shortcuts import UnresolvedShortcut, recreatable, unsupported
 
     try:
-        found = recreatable(each.shortcuts, item=each.item, bindings=bindings)
+        found = recreatable(
+            each.shortcuts,
+            item=each.item,
+            bindings=bindings,
+            homes=homes or {},
+            origin=each.source_workspace,
+        )
     except UnresolvedShortcut as exc:
         raise CommandError(
             f"mirror cannot reconstruct shortcuts in {each.target}: {exc}. Mirror "
@@ -700,13 +798,6 @@ def mirrored_source(
             f"{operation} needs the source catalogue for mirrored objects. Set "
             f"mirror: {CATALOGUE_KIND}/<name> in workspace configuration."
         )
-    if not workspace.mirror.is_local_to(workspace.workspace):
-        raise CommandError(
-            f"{operation} reads the mirrored catalogue in the workspace it runs "
-            f"against, and mirror: names {workspace.mirror} in another one. Run "
-            f"{operation} against workspace {workspace.mirror.owner(workspace.workspace)}, "
-            "or name a catalogue in this workspace."
-        )
     return catalogue_for(
         session,
         _mirrored_workspace(workspace),
@@ -716,4 +807,8 @@ def mirrored_source(
 
 
 def _mirrored_workspace(workspace: Workspace) -> Workspace:
-    return replace(workspace, catalogue=f"{CATALOGUE_KIND}/{workspace.mirror.name}")
+    return replace(
+        workspace,
+        workspace=workspace.mirror.owner(workspace.workspace),
+        catalogue=f"{CATALOGUE_KIND}/{workspace.mirror.name}",
+    )

@@ -117,6 +117,7 @@ function ganttPage(body, m) {
     if (!shown.length) { host.appendChild(empty("No object record has been processed for this workflow.")); return; }
     var chart = ganttChart(shown, sum, s, m, openRecord);
     host.appendChild(chart);
+    host.appendChild(el("div", { "class": "wd-legend" }, objectKey(m)));
     host.repaint = chart.repaint;
     var kept = s.pick ? shown.filter(function (r) { return r.id === s.pick; })[0] : null;
     if (kept) openRecord(kept); else { s.pick = null; side.hidden = true; }

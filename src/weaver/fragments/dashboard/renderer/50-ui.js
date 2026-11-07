@@ -434,6 +434,21 @@ function changeMark(n) {
   return el("span", { "class": "wd-change-mark", title: CHANGE_TEXT[n.change], text: n.change === CHANGE.CHANGED ? "Δ" : "+" });
 }
 
+/* The marks a page draws for its objects: each kind present, and how a mirror
+   left an object when one is read. plain draws the kinds without their
+   colours, for a graph coloured by outcome. */
+function objectKey(m, plain) {
+  var present = new Set();
+  m.nodes.forEach(function (n) { present.add(n.kind); });
+  var keys = KIND_ORDER.filter(function (k) { return present.has(k); }).map(function (k) {
+    return el("span", { "class": "wd-key" + (plain ? " wd-key-plain" : "") }, [kindMark(k), k]);
+  });
+  if (m.changes) keys.push(
+    el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-swatch wd-borrowed" }), "Borrowed from the catalogue mirrored"]),
+    el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-change" }), "Changed (Δ) or added (+) in a mirror"]));
+  return keys;
+}
+
 /* plain leaves the item out, for a table that shows it in a column of its own. */
 function nodeLink(m, key, onOpen, plain) {
   var n = m.nodes.get(key);

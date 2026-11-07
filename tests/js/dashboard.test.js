@@ -223,6 +223,10 @@ test("the budget keeps the nearest lineage and every cut neighbour becomes a mar
   assert.equal(win.more.get("hub").down.length, 701 - D.BUDGET.NODES);
   const expanded = D.focusWindow(m, "hub", 1, 1, win.more.get("hub").down.slice(0, 40));
   assert.equal(expanded.shown.size, D.BUDGET.NODES + 40);
+  // A chosen item's objects are shown whole, as the estate drawing shows them.
+  const whole = D.focusWindow(m, "hub", 1, 1, [], null, true);
+  assert.equal(whole.shown.size, 701);
+  assert.ok(!whole.truncated && !whole.hidden && !whole.edgesDropped);
 });
 
 // --- readiness and Health ---------------------------------------------------------

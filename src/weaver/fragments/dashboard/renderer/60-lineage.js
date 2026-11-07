@@ -63,7 +63,7 @@ function graphWorkspace(body, m, options) {
   }
   function moved(key, p) { s.moved[key] = { x: p.x, y: p.y }; saveState(); }
   function apply(refit) {
-    var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null) : null;
+    var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null, !s.selection.length && !s.patterns.length) : null;
     var lay = win ? layoutEstate(subModel(m, win.shown), WINDOW_GEOMETRY) : layoutEstate(m);
     Object.keys(s.moved).forEach(function (k) { var p = lay.pos.get(k); if (p) { p.x = s.moved[k].x; p.y = s.moved[k].y; } });
     view.setWindow(win, lay);
@@ -186,15 +186,10 @@ function legend(mode, m) {
   var entries = mode === "load" ? [
     ["swatch wd-ok", "Last load succeeded"], ["swatch wd-bad", "Failed, error or blocked"], ["swatch wd-warn", "Rejected rows or pending"],
     ["swatch wd-none", "Nothing processed, or loaded elsewhere"], ["ring wd-next", "Ready: dependencies processed"], ["ring wd-wait", "Waiting on a dependency"]
-  ] : [
-    ["kind wd-kind wd-kind-table", "Table"], ["kind wd-kind wd-kind-view", "View"], ["kind wd-kind wd-kind-folder", "Folder"], ["kind wd-kind wd-kind-shortcut", "Shortcut"],
-    ["kind wd-kind wd-kind-test", "Test"], ["kind wd-kind wd-kind-assumption", "Assumption"], ["kind wd-kind wd-kind-semantic-model", "Semantic model"], ["kind wd-kind wd-kind-report", "Report"],
-    ["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]
-  ];
-  if (m && m.changes) entries.push(["swatch wd-borrowed", "Borrowed from the catalogue mirrored"], ["change", "Changed (Δ) or added (+) in a mirror"]);
-  return el("div", { "class": "wd-legend" }, entries.map(function (e) {
+  ] : [["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]];
+  return el("div", { "class": "wd-legend" }, objectKey(m, mode === "load").concat(entries.map(function (e) {
     return el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-" + e[0] }), e[1]]);
-  }).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
+  })).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
 }
 
 /* The kinds of item the Orchestration and Entity dictionary pages offer. */

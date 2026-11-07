@@ -403,3 +403,5 @@ tr.wd-changed > td:first-child, .wd-entry.wd-changed { box-shadow: inset 3px 0 0
 .wd-ws-head h3 { margin: 0; font-size: 15px; }
 .wd-model-part + .wd-model-part { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
 .wd-chooser-whole .wd-chooser-name { font-weight: 700; }
+.wd-key-plain .wd-kind { filter: grayscale(1); opacity: 0.8; }
+.wd-page-key { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--line); }

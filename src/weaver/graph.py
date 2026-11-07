@@ -1,4 +1,4 @@
-"""Deterministic directed-acyclic-graph operations."""
+"""Deterministic directed-graph operations."""
 
 from __future__ import annotations
 
@@ -21,7 +21,13 @@ class Edge:
 
 
 class Graph:
-    """A directed acyclic graph over named nodes."""
+    """A directed graph over named nodes, ordered upstream first.
+
+    A cycle is tolerated. Its members are ordered as if the edges closing it
+    were absent: those are :attr:`cycle_edges`, and a consumer at the end of one
+    reads what its producer last left. A caller whose order is physical, where
+    an action cannot wait on itself, calls :meth:`require_acyclic`.
+    """
 
     def __init__(
         self, nodes: Iterable[str], edges: Iterable[tuple[str, str]] = ()
@@ -54,8 +60,21 @@ class Graph:
             self._downstream[edge.upstream].append(edge.downstream)
             self._upstream[edge.downstream].append(edge.upstream)
 
-        # Construction rejects cycles, so every held graph is orderable.
+        self._component = self._strong_components()
+        self._cycles = tuple(
+            sorted(
+                {members for members in self._component.values() if len(members) > 1}
+            )
+        )
         self._order = self._topological_order()
+        self._cycle_edges = self._against(self._order)
+        closing = set(self._cycle_edges)
+        self._forward_downstream: Mapping[str, list[str]] = defaultdict(list)
+        self._forward_upstream: Mapping[str, list[str]] = defaultdict(list)
+        for edge in self._edges:
+            if edge not in closing:
+                self._forward_downstream[edge.upstream].append(edge.downstream)
+                self._forward_upstream[edge.downstream].append(edge.upstream)
 
     @property
     def nodes(self) -> tuple[str, ...]:
@@ -64,6 +83,48 @@ class Graph:
     @property
     def edges(self) -> tuple[Edge, ...]:
         return self._edges
+
+    @property
+    def cycles(self) -> tuple[tuple[str, ...], ...]:
+        """Each set of nodes that reach one another, members sorted."""
+
+        return self._cycles
+
+    @property
+    def cycle_edges(self) -> tuple[Edge, ...]:
+        """The edges that close a cycle in :meth:`order`, in edge order."""
+
+        return self._cycle_edges
+
+    def component(self, node: str) -> tuple[str, ...]:
+        """The nodes in a cycle with ``node``, itself included."""
+
+        self._require(node)
+        return self._component[node]
+
+    def acyclic(self, key=None) -> "Graph":
+        """This graph without the edges that close a cycle in ``order(key)``."""
+
+        if not self._cycles:
+            return self
+        position = {node: index for index, node in enumerate(self.order(key))}
+        return Graph(
+            self._nodes,
+            [
+                (edge.upstream, edge.downstream)
+                for edge in self._edges
+                if position[edge.upstream] < position[edge.downstream]
+            ],
+        )
+
+    def require_acyclic(self) -> None:
+        """Refuse a cycle, naming one."""
+
+        if not self._cycles:
+            return
+        placed = set(self._plain_order())
+        cycle = self._find_cycle(set(self._nodes) - placed)
+        raise GraphError("dependency cycle: " + " -> ".join(cycle))
 
     def __len__(self) -> int:
         return len(self._nodes)
@@ -106,7 +167,7 @@ class Graph:
 
         height: dict[str, int] = {}
         for node in reversed(self._order):
-            below = self._downstream[node]
+            below = self._forward_downstream[node]
             height[node] = 1 + max((height[child] for child in below), default=0)
         return height
 
@@ -119,7 +180,7 @@ class Graph:
 
         depth: dict[str, int] = {}
         for node in self._order:
-            parents = self._upstream[node]
+            parents = self._forward_upstream[node]
             depth[node] = max((depth[parent] + 1 for parent in parents), default=0)
 
         grouped: dict[int, list[str]] = defaultdict(list)
@@ -128,7 +189,42 @@ class Graph:
         return tuple(tuple(sorted(grouped[level])) for level in sorted(grouped))
 
     def _topological_order(self, key=None) -> tuple[str, ...]:
-        """Take ready nodes in a settled order for reproducible plans and logs."""
+        """Take ready nodes in a settled order for reproducible plans and logs.
+
+        Without a cycle this is the plain order. With one, each cycle is taken
+        as a unit when everything upstream of it is placed, ranked by its first
+        member.
+        """
+
+        if not self._cycles:
+            return self._plain_order(key)
+        rank = (lambda node: node) if key is None else key
+        component = self._component
+
+        def first(members):
+            return min(rank(member) for member in members)
+
+        waiting = {members: 0 for members in set(component.values())}
+        below: dict[tuple[str, ...], set[tuple[str, ...]]] = defaultdict(set)
+        for edge in self._edges:
+            source, target = component[edge.upstream], component[edge.downstream]
+            if source != target and target not in below[source]:
+                below[source].add(target)
+                waiting[target] += 1
+        ready = sorted((m for m, count in waiting.items() if count == 0), key=first)
+        ordered: list[str] = []
+        while ready:
+            members = ready.pop(0)
+            ordered.extend(self._order_within(members, rank))
+            for target in below[members]:
+                waiting[target] -= 1
+                if waiting[target] == 0:
+                    ready.append(target)
+            ready.sort(key=first)
+        return tuple(ordered)
+
+    def _plain_order(self, key=None) -> tuple[str, ...]:
+        """Kahn's order, leaving out whatever a cycle prevents placing."""
 
         rank = (lambda node: node) if key is None else key
         remaining = {node: len(self._upstream[node]) for node in self._nodes}
@@ -145,11 +241,100 @@ class Graph:
                 if remaining[child] == 0:
                     ready.append(child)
             ready.sort(key=rank)
-
-        if len(ordered) != len(self._nodes):
-            cycle = self._find_cycle(set(self._nodes) - set(ordered))
-            raise GraphError("dependency cycle: " + " -> ".join(cycle))
         return tuple(ordered)
+
+    def _order_within(self, members: tuple[str, ...], rank) -> list[str]:
+        """One cycle's members: ready ones first, else the first by ``rank``.
+
+        Taking the first unplaced member when none is ready is what cuts the
+        cycle; the edges into it from members still waiting close it.
+        """
+
+        inside = set(members)
+        waiting = {
+            node: sum(1 for parent in self._upstream[node] if parent in inside)
+            for node in members
+        }
+        placed: list[str] = []
+        done: set[str] = set()
+        ready: list[str] = []
+        while len(placed) < len(members):
+            if not ready:
+                ready = [min((n for n in members if n not in done), key=rank)]
+            node = ready.pop(0)
+            if node in done:
+                continue
+            placed.append(node)
+            done.add(node)
+            for child in sorted(self._downstream[node]):
+                if child in inside and child not in done:
+                    waiting[child] -= 1
+                    if waiting[child] <= 0 and child not in ready:
+                        ready.append(child)
+            ready.sort(key=rank)
+        return placed
+
+    def _against(self, order: tuple[str, ...]) -> tuple[Edge, ...]:
+        position = {node: index for index, node in enumerate(order)}
+        return tuple(
+            edge
+            for edge in self._edges
+            if position[edge.upstream] > position[edge.downstream]
+        )
+
+    def _strong_components(self) -> dict[str, tuple[str, ...]]:
+        """Each node's strongly connected component, by Tarjan's algorithm.
+
+        Iterative, because a component can be deeper than the interpreter's
+        stack.
+        """
+
+        index: dict[str, int] = {}
+        low: dict[str, int] = {}
+        on_stack: set[str] = set()
+        stack: list[str] = []
+        found: dict[str, tuple[str, ...]] = {}
+        counter = 0
+        for start in self._nodes:
+            if start in index:
+                continue
+            work = [(start, iter(sorted(self._downstream[start])))]
+            index[start] = low[start] = counter
+            counter += 1
+            stack.append(start)
+            on_stack.add(start)
+            while work:
+                node, children = work[-1]
+                advanced = False
+                for child in children:
+                    if child not in index:
+                        index[child] = low[child] = counter
+                        counter += 1
+                        stack.append(child)
+                        on_stack.add(child)
+                        work.append((child, iter(sorted(self._downstream[child]))))
+                        advanced = True
+                        break
+                    if child in on_stack:
+                        low[node] = min(low[node], index[child])
+                if advanced:
+                    continue
+                work.pop()
+                if work:
+                    parent = work[-1][0]
+                    low[parent] = min(low[parent], low[node])
+                if low[node] == index[node]:
+                    members = []
+                    while True:
+                        member = stack.pop()
+                        on_stack.discard(member)
+                        members.append(member)
+                        if member == node:
+                            break
+                    component = tuple(sorted(members))
+                    for member in component:
+                        found[member] = component
+        return found
 
     def _find_cycle(self, candidates: set[str]) -> list[str]:
         """One cycle among the nodes ordering could not place.
@@ -227,6 +412,7 @@ class Graph:
                 continue
             found.add(current)
             pending.extend(adjacency[current])
+        found.discard(node)
         return tuple(candidate for candidate in self._order if candidate in found)
 
     def subgraph(

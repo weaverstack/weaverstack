@@ -23,7 +23,7 @@ import weaver
 from weaver.catalogue.state import Catalogue
 from weaver.declaration import parse_item_repository
 from weaver.declaration.model import WeaverDocumentId, WeaverItemId
-from weaver.errors import CommandError, GraphError, LoadError
+from weaver.errors import CommandError, LoadError
 from weaver.load_plan import ENDPOINT_REFRESH, ONELAKE_PUBLICATION, LoadDag
 from weaver.load_report import BLOCKED, FAILED, PENDING, SUCCEEDED, LoadResult
 from weaver.locations import Location
@@ -444,9 +444,8 @@ def test_empty_or_stale_identity_seed_selection_remains_empty(tmp_path, selected
 
 
 @weaver_test()
-def test_cycle_refuses_expansion_before_execution(tmp_path, monkeypatch):
+def test_a_cycle_loads_each_node_once_and_is_reported(tmp_path):
     catalogue = installed(tmp_path / "repository", {"Source": (), "Final": ("Source",)})
-    session, calls, requests = prepare(monkeypatch, catalogue)
     rows = catalogue.to_mapping()
     tables = next(entry["tables"] for entry in rows["items"] if entry["item"] == ITEM)
     dependency = dict(tables["Dependency"][0])
@@ -457,16 +456,23 @@ def test_cycle_refuses_expansion_before_execution(tmp_path, monkeypatch):
     )
     tables["Dependency"].append(dependency)
     cyclic = Catalogue.from_mapping(rows)
-    from weaver.run import state
+    request = RunRequest.load(
+        (WeaverItemId.parse(ITEM),),
+        selected=(WeaverDocumentId.parse(f"{ITEM}/Sales.Final"),),
+        ancestors=True,
+    )
+    from weaver.runtime.load_result import LoadResult
 
-    monkeypatch.setattr(state, "read_installed_catalogue", lambda **asked: cyclic)
+    calls = []
 
-    with pytest.raises(GraphError, match="dependency cycle"):
-        weaver.load(ITEM, names="Sales.Final", ancestors=True, session=session)
+    def dispatch(node, **asked):
+        calls.append(node.node_id)
+        return LoadResult(succeeded=True)
 
-    assert calls == []
-    assert requests == []
-    assert not session.calls
+    result = Runner(RunState(cyclic), request).run(dispatch=dispatch)
+
+    assert len(calls) == len(set(calls)) == 2
+    assert any(message.code == "dag_cycle" for message in result.messages)
 
 
 def crossing_catalogue(root, *, reverse=False, shared=False, hop=False):

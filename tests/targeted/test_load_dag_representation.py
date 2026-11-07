@@ -36,7 +36,7 @@ from support.weaver_test import weaver_test
 from weaver.catalogue.state import Catalogue
 from weaver.declaration import parse_item_repository
 from weaver.declaration.model import WeaverDocumentId, WeaverItemId
-from weaver.errors import CatalogueStateError, GraphError, LoadError
+from weaver.errors import CatalogueStateError, LoadError
 from weaver.installed import (
     PYTHON_FOLDER,
     PYTHON_TABLE,
@@ -895,8 +895,7 @@ def test_load_dag_rejects_cycles():
             )
         }
     )
-    with pytest.raises(GraphError, match="dependency cycle"):
-        catalogue.dag()
+    assert len(catalogue.dag().graph.cycles) == 1
 
 
 @weaver_test()

@@ -79,6 +79,23 @@ function firstAncestor(m, key, test) {
   return found[0] || null;
 }
 
+/* The unprocessed ancestor named as the cause: a failed load before a Pending one. */
+var CAUSES = ["Failed", "Error", "Blocked"];
+function causeRank(p) { var s = effectiveLoad(p), i = s ? CAUSES.indexOf(s.result) : -1; return i < 0 ? CAUSES.length : i; }
+function firstCause(m, key) {
+  var found = ancestorsOf(m, key).filter(function (a) { return participates(a) && establishedAt(a) === null; });
+  found.sort(function (a, b) { return causeRank(a) - causeRank(b) || compare(a.id, b.id); });
+  return found[0] || null;
+}
+function unestablished(p) {
+  if (!p) return "an upstream object has not been processed since it was built";
+  var s = effectiveLoad(p), result = s ? s.result : "Pending";
+  if (result === "Failed") return "the last load of " + p.label + " failed";
+  if (result === "Error") return "the last load of " + p.label + " raised an error";
+  if (result === "Blocked") return "the last load of " + p.label + " was blocked";
+  return p.label + " has not been processed since it was built";
+}
+
 function finding(area, code, severity, node, result, message, s) {
   return { area: area, code: code, severity: severity, node: node, result: result, message: message,
     workflow: s ? s.workflow : null, completed: s ? s.completed : null, unobserved: false };
@@ -138,9 +155,8 @@ function loadFindings(m, n, anc, asOf) {
   if (s.completed !== null && s.completed < asOf) out.push(finding("load", "load_stale_time", AMBER, n, s.result, "last loaded " + stamp(s.completed), s));
   var a = anc.get(n.key);
   if (a.unprocessed) {
-    var behind = firstAncestor(m, n.key, function (p) { return establishedAt(p) === null; });
-    out.push(finding("load", "load_ancestor_unestablished", AMBER, n, s.result,
-      (behind ? behind.label : "an upstream object") + " has not been processed since it was built", s));
+    var behind = firstCause(m, n.key);
+    out.push(finding("load", "load_ancestor_unestablished", AMBER, n, s.result, unestablished(behind), s));
   }
   var loaded = establishedAt(n);
   if (loaded !== null && a.latest !== null && a.latest > loaded) {

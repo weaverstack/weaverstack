@@ -207,6 +207,8 @@ def validate_mutation_plan(plan: MutationPlan) -> None:
             (a.id for a in actions),
             ((dep, a.id) for a in actions for dep in a.depends_on),
         )
+        # An action cannot wait on itself, so a physical plan stays acyclic.
+        ordering.require_acyclic()
     except GraphError as exc:
         raise BuildError(str(exc)) from exc
 

@@ -17,7 +17,7 @@ from .declaration.model import (
     WeaverDocumentId,
     WeaverItemId,
 )
-from .errors import GraphError, LoadError
+from .errors import LoadError
 from .graph import Graph
 from .installed import (
     PYTHON_FOLDER,
@@ -28,7 +28,7 @@ from .installed import (
     InstalledNode,
     refuse_uncertified_models,
 )
-from .load_report import DEPENDENCY_EXTERNAL, LoadMessage, info
+from .load_report import DAG_CYCLE, DEPENDENCY_EXTERNAL, LoadMessage, info
 from .selection import name_patterns
 from .targets import PhysicalObjectRef, PhysicalTargetRef
 
@@ -147,13 +147,13 @@ class LoadDag:
 
     @cached_property
     def topology(self) -> Graph:
-        try:
-            return Graph((node.node_id for node in self.nodes), self.edges)
-        except GraphError as exc:
-            raise LoadError(
-                f"Installed load dependencies contain a cycle: {exc}. Remove one "
-                "dependency from the cycle and rebuild."
-            ) from None
+        """The dispatch graph. An edge that closes a cycle is left out, so its
+        consumer reads what its producer last loaded."""
+
+        found = self.by_id
+        return Graph((node.node_id for node in self.nodes), self.edges).acyclic(
+            key=lambda node: found[node].sort_key
+        )
 
     def upstream(self, node_id: str) -> frozenset[str]:
         return frozenset(self.topology.upstream_of(node_id))
@@ -164,7 +164,7 @@ class LoadDag:
         return frozenset(self.topology.descendants(node_id))
 
     def order(self) -> tuple[LoadNode, ...]:
-        """The deterministic topological order, or a refusal if there is a cycle.
+        """The deterministic topological order.
 
         Ties break on :attr:`LoadNode.sort_key`, so a plan reads target by
         target.
@@ -256,16 +256,24 @@ class _Planner:
             for node in seeds:
                 self._select(node, visited, allowed_items=allowed_items)
             self._order_untraced_models_last()
-        dag = LoadDag(
+        self._report_cycles()
+        return LoadDag(
             nodes=tuple(sorted(self.nodes.values(), key=lambda node: node.sort_key)),
             edges=tuple(sorted(self.edges)),
             items=requested,
             messages=tuple(self.messages),
         )
-        # Ordering is what proves acyclicity, so it is done here rather than left
-        # to whoever consumes the graph.
-        dag.order()
-        return dag
+
+    def _report_cycles(self) -> None:
+        for members in Graph(self.nodes, self.edges).cycles:
+            self.messages.append(
+                info(
+                    DAG_CYCLE,
+                    "These loads read one another, so each loads once and the "
+                    "first reads what the last loaded before: " + ", ".join(members),
+                    source="load_plan",
+                )
+            )
 
     def _expand(
         self,

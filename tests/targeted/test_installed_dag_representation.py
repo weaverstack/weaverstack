@@ -33,7 +33,7 @@ from weaver.catalogue.tables import (
     TEST_DICTIONARY,
 )
 from weaver.declaration.model import WeaverDocumentId, WeaverItemId
-from weaver.errors import CatalogueStateError, GraphError
+from weaver.errors import CatalogueStateError
 from weaver.etl import validation_artefact_id
 from weaver.installed import PYTHON_TABLE, WAREHOUSE_PROCEDURE
 from weaver.targets import PhysicalTargetRef
@@ -635,7 +635,7 @@ def test_a_filtered_subgraph_keeps_the_edges_between_what_it_kept():
 
 
 @weaver_test()
-def test_a_managed_cycle_is_refused_when_the_graph_is_built():
+def test_a_managed_cycle_is_recorded_when_the_graph_is_built():
     estate = (
         _Estate()
         .object(f"{RAW}/Tables/Sales.A")
@@ -644,8 +644,9 @@ def test_a_managed_cycle_is_refused_when_the_graph_is_built():
         .reads(f"{RAW}/Tables/Sales.B", "Sales.A")
     )
 
-    with pytest.raises(GraphError, match="dependency cycle"):
-        estate.dag()
+    dag = estate.dag()
+
+    assert dag.graph.cycles == ((f"{RAW}/Tables/Sales.A", f"{RAW}/Tables/Sales.B"),)
 
 
 @weaver_test()

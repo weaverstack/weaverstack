@@ -147,13 +147,15 @@ def test_the_order_is_deterministic_rather_than_incidental():
 
 
 @weaver_test()
-def test_a_cycle_is_refused_rather_than_ordered():
-    from weaver.run.result import RunError
-
+def test_a_cycle_is_ordered_and_each_node_runs_once():
+    dispatch = controlled({})
     made = runner(nodes=[node("a"), node("b")], edges=[("a", "b"), ("b", "a")])
 
-    with pytest.raises(RunError, match="cycle"):
-        made.graph.order()
+    assert [one.node_id for one in made.graph.order()] == ["a", "b"]
+    result = made.run(dispatch=dispatch)
+
+    assert dispatch.seen == ["a", "b"]
+    assert result.status == RUN_SUCCEEDED
 
 
 # --- the ordinary path --------------------------------------------------------

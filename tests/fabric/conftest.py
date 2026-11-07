@@ -572,12 +572,9 @@ def joined_estate(fabric_workspace_item, fabric_client):
     )
 
 
-#: Items in the spoke workspace a mirror of the suite's catalogue is built into.
-#: Their own, so the joined journey's spoke catalogue is never emptied.
-CROSS_WORKSPACE_MIRROR_ITEMS = {
-    "spoke_fork_weaver": "PYTEST_SPOKE_FORK",
-    "spoke_mirror_lakehouse": "PYTEST_SPOKE_MIRROR_LH",
-}
+#: The catalogue in the spoke workspace a mirror of the suite's catalogue is
+#: built into. Its own, so the joined journey's spoke catalogue is never emptied.
+CROSS_WORKSPACE_MIRROR_ITEMS = {"spoke_fork_weaver": "PYTEST_SPOKE_FORK"}
 
 
 @dataclass(frozen=True)
@@ -590,8 +587,11 @@ class CrossWorkspaceMirror:
 
 
 @pytest.fixture(scope="session")
-def cross_workspace_mirror(fabric_client):
-    """The spoke's mirror catalogue and Lakehouse, found or created, never deleted."""
+def cross_workspace_mirror(fabric_client, fabric_target_lakehouse):
+    """The spoke's mirror catalogue and Lakehouse, found or created, never deleted.
+
+    The Lakehouse shares the source's name, as a development workspace's does.
+    """
 
     from weaver.fabric import find_workspace
     from weaver.fabric.resources import (
@@ -610,22 +610,18 @@ def cross_workspace_mirror(fabric_client):
             f"cannot reach the spoke workspace {spoke_name!r}: "
             f"{type(exc).__name__}: {exc}"
         )
-    names = {
-        role: _fixed_name_from(CROSS_WORKSPACE_MIRROR_ITEMS, role)
-        for role in CROSS_WORKSPACE_MIRROR_ITEMS
-    }
-    for role, kind, create in (
-        ("spoke_fork_weaver", WAREHOUSE, create_warehouse),
-        ("spoke_mirror_lakehouse", LAKEHOUSE, create_lakehouse),
+    catalogue = _fixed_name_from(CROSS_WORKSPACE_MIRROR_ITEMS, "spoke_fork_weaver")
+    lakehouse = fabric_target_lakehouse.name
+    for name, kind, create in (
+        (catalogue, WAREHOUSE, create_warehouse),
+        (lakehouse, LAKEHOUSE, create_lakehouse),
     ):
         try:
-            find_item(spoke, names[role], item_type=kind, client=fabric_client)
+            find_item(spoke, name, item_type=kind, client=fabric_client)
         except Exception:
-            create(spoke, names[role], client=fabric_client)
+            create(spoke, name, client=fabric_client)
     return CrossWorkspaceMirror(
-        workspace=spoke.name,
-        catalogue=names["spoke_fork_weaver"],
-        lakehouse=names["spoke_mirror_lakehouse"],
+        workspace=spoke.name, catalogue=catalogue, lakehouse=lakehouse
     )
 
 

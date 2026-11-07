@@ -1,7 +1,8 @@
 """One Lakehouse item mirrored from a catalogue in another workspace.
 
 The source item and its catalogue are in the suite's workspace. The mirror's
-catalogue and Lakehouse are in the spoke workspace. Build and load the source,
+catalogue and Lakehouse are in the spoke workspace, the Lakehouse under the
+source's name, as a development workspace's is. Build and load the source,
 mirror the item across, report health, run its validations, then change one
 declaration and build it into the mirror.
 
@@ -49,6 +50,8 @@ class Estate:
     registry: tuple[int, int] | None = None
     #: Rows the source table holds.
     source_rows: int | None = None
+    #: ``Type/Name`` to the workspace each installation in the mirror names.
+    installed: dict[str, str] | None = None
 
 
 @pytest.fixture(scope="module")
@@ -165,12 +168,14 @@ def _observe(run) -> Estate:
     mirror_sql = run.session.sql_executor(
         WarehouseTarget(ItemRef(run.catalogue_name)), workspace=run.spoke
     )
-    rows, counted = mirror_sql.query_result_sets(
+    rows, counted, installations = mirror_sql.query_result_sets(
         "select [Schema name], [Object name], [Source workspace name], "
         "year([Row delete datetime]) as [Deleted year] "
         f"from [{CATALOGUE_SCHEMA}].[{MIRROR_TABLE.name}] "
         "where [Item type] = N'Lakehouse';\n"
-        f"select count(*) as [Rows] from [{CATALOGUE_SCHEMA}].[Registry];"
+        f"select count(*) as [Rows] from [{CATALOGUE_SCHEMA}].[Registry];\n"
+        "select [Item type], [Item name], [Workspace name] "
+        f"from [{CATALOGUE_SCHEMA}].[Installation];"
     )
     (source,) = run.session.sql_executor(
         WarehouseTarget(ItemRef(run.source_catalogue_name)), workspace=run.workspace
@@ -205,6 +210,10 @@ def _observe(run) -> Estate:
         },
         registry=(int(source["Rows"]), int(counted[0]["Rows"])),
         source_rows=int(counted_rows["n"]),
+        installed={
+            f"{row['Item type']}/{row['Item name']}": str(row["Workspace name"])
+            for row in installations
+        },
     )
 
 
@@ -239,6 +248,17 @@ def test_the_catalogue_crosses_the_workspaces_whole(journey):
     assert source > 0
     # The destination adds its own ``_weaver`` rows, built where it is.
     assert mirrored >= source
+
+
+@weaver_test(remote=True)
+def test_the_mirror_claims_only_items_in_its_own_workspace(journey):
+    """An item the run left in the source's workspace is not the mirror's."""
+
+    journey.require("mirror")
+    installed = journey["mirror"].observation.installed
+
+    assert installed[ITEM] == journey.spoke.workspace
+    assert set(installed.values()) == {journey.spoke.workspace}
 
 
 @weaver_test(remote=True, resources={"livy"})

@@ -36,8 +36,10 @@ from .objects import (
 )
 from .operations.build import BuildResult, build
 from .operations.catalogue_dashboard import (
+    CatalogueDashboardExport,
     CatalogueDashboardResult,
     deploy_catalogue_dashboard,
+    export_catalogue_dashboard,
 )
 from .operations.execute import ExecuteResult, execute
 from .operations.health import health
@@ -88,6 +90,8 @@ __all__ = [
     "BuildResult",
     "deploy_catalogue_dashboard",
     "CatalogueDashboardResult",
+    "export_catalogue_dashboard",
+    "CatalogueDashboardExport",
     "mirror",
     "MirrorResult",
     "plan_mirror",

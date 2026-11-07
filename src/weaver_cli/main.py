@@ -795,6 +795,36 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.set_defaults(
         handler=handle_catalogue_dashboard, requires=_requires_catalogue_dashboard
     )
+    dashboard_actions = dashboard.add_subparsers(dest="dashboard_action")
+    export = dashboard_actions.add_parser(
+        "export",
+        help="Write the deployed Dashboard's pages as static HTML.",
+        description=(
+            "Write the deployed Catalogue Dashboard's pages as static HTML files "
+            "that open without Fabric or the HTML Content visual. The data is the "
+            "Dashboard's as it is now, and a page is not limited to the 2 million "
+            "characters one Power BI measure returns."
+        ),
+    )
+    _add_workspace_args(export, include_catalogue=False, include_environment=False)
+    export.add_argument(
+        "--path",
+        required=True,
+        help="Folder to write, local or a OneLake abfss:// location.",
+    )
+    export.add_argument(
+        "--name",
+        help=(
+            "The Dashboard to export. Defaults to catalogue_dashboard: in "
+            "workspace configuration."
+        ),
+    )
+    export.add_argument("--json", action="store_true", help="Emit the result as JSON.")
+    add_non_interactive(export)
+    export.set_defaults(
+        handler=handle_catalogue_dashboard_export,
+        requires=_requires_catalogue_dashboard,
+    )
 
     execute = subcommands.add_parser(
         "execute",
@@ -2023,6 +2053,35 @@ def handle_catalogue_dashboard(args: argparse.Namespace) -> int:
     else:
         print(render_catalogue_dashboard(result))
     return 0 if result.succeeded else 1
+
+
+def handle_catalogue_dashboard_export(args: argparse.Namespace) -> int:
+    import json
+
+    workspace = _resolve_workspace(args)
+    with _running_session(args, workspace) as opened:
+        result = weaver.export_catalogue_dashboard(
+            args.path, name=args.name, session=opened
+        )
+    if args.json:
+        print(json.dumps(result.to_mapping(), indent=2))
+    else:
+        print(render_catalogue_dashboard_export(result))
+    return 0
+
+
+def render_catalogue_dashboard_export(result) -> str:
+    width = max((len(page.file) for page in result.pages), default=0)
+    lines = [
+        f"Catalogue Dashboard  {result.name}  in {result.workspace}",
+        f"  Exported to {result.path}",
+        *(
+            f"    {page.file:<{width}}  {page.title}  {page.characters:,} characters"
+            for page in result.pages
+        ),
+        f"  Open {result.path.rstrip('/')}/index.html",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def render_catalogue_dashboard(result) -> str:

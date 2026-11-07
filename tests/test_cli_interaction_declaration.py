@@ -31,6 +31,7 @@ EXECUTABLE_COMMANDS = (
     ["test"],
     ["health"],
     ["catalogue-dashboard"],
+    ["catalogue-dashboard", "export", "--path", "out"],
     ["execute", "tsql", "Warehouse/Curated", "--command", "select 1"],
     ["wipe"],
     ["unbind", "Lakehouse/Sales"],

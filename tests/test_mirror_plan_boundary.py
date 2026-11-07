@@ -353,6 +353,55 @@ def test_a_lakehouse_mirrored_from_another_workspace_reads_its_source_there(
 
 
 @weaver_test()
+def test_a_mirror_does_not_claim_an_unmirrored_item_in_another_workspace(tmp_path):
+    """Build installs that item here as new; an item here keeps its claims."""
+
+    from dataclasses import replace
+
+    resolved = _resolved("Input", "Lakehouse")
+    here = _ElsewhereResolver(tmp_path).workspace.id
+
+    def installed(kind, name, workspace_id):
+        return {"Item type": kind, "Item name": name, "Workspace GUID": workspace_id}
+
+    resolved = replace(
+        resolved,
+        plan=replace(
+            resolved.plan, source=CatalogueRef(workspace="Production", name="Weaver")
+        ),
+        items=(replace(resolved.items[0], source_workspace="Production"),),
+        copied_rows={
+            "Installation": (
+                installed("Lakehouse", "Input", "production-guid"),
+                installed("Warehouse", "Mart", "production-guid"),
+                installed("Warehouse", "Local", here),
+            )
+        },
+    )
+    session = _Session(resolver=_ElsewhereResolver(tmp_path), store=FilesystemStore())
+
+    plan, payloads, _summary = mirror_mutation_plan(resolved, session=session)
+
+    script = payloads[_actions(plan)[PUBLISH].payload].decode()
+
+    def released(name):
+        return f"WHERE [Item type] = N'Warehouse' AND [Item name] = N'{name}'"
+
+    statements = script.split(";")
+    for table in ("Registry", "Installation"):
+        assert any(
+            f"DELETE FROM [_].[{table}]" in s and released("Mart") in s
+            for s in statements
+        )
+    assert released("Local") not in script
+    assert "[Item name] = N'Input'" not in script.split("MERGE INTO")[0]
+    # Removed after the copy, in the same transaction.
+    assert script.index("insert into [_].[Installation]") < script.index(
+        released("Mart")
+    )
+
+
+@weaver_test()
 def test_a_source_in_another_workspace_may_share_the_destinations_name(tmp_path):
     """The source's load tree is protected by its IDs, not by its name."""
 

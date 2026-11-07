@@ -977,8 +977,11 @@ workspace the copy stays server-side. Each item is read in the workspace its
 source Installation names. A Lakehouse item crosses, because its shortcuts and
 Spark views reach any workspace; a Warehouse item is refused, because its
 borrowed Views read only their own. A recreated shortcut to an item the run
-leaves behind names that item's workspace. Load, Test and Health read the
-catalogue mirrored in its own workspace.
+leaves behind names that item's workspace. An item the run leaves in another
+workspace is not claimed: the transaction removes its copied rows, as unbind
+would, and Build installs it here as a new item. A source and its destination
+may share a name, so the plan binds the source by its Fabric IDs. Load, Test
+and Health read the catalogue mirrored in its own workspace.
 
 The source may be any earlier Weaver version's catalogue, so a release is
 trialled in development before production is upgraded. The source is only read.

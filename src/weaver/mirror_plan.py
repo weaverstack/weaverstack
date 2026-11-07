@@ -981,6 +981,7 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
             source=resolved.fork,
         )
     )
+    released = _released(resolved, workspace_id=resolver.workspace.id)
     created = [create_statement(MIRROR)] if resolved.borrowed or recorded else []
     # The forked lineage was projected where nothing was borrowed.
     marked = [lineage_statement()] if created else []
@@ -989,7 +990,14 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
         transaction_script(
             created,
             # Lineage is keyed by workspace once each item's binding is merged.
-            [*forked, *recorded, *marked, *merges, *lineage_key_statements()],
+            [
+                *forked,
+                *released,
+                *recorded,
+                *marked,
+                *merges,
+                *lineage_key_statements(),
+            ],
         ).encode("utf-8"),
     )
     published = _action(
@@ -1003,6 +1011,33 @@ def _publish(compiling, resolved, catalogue, *, after, session) -> None:
         resources=(f"warehouse:{catalogue.item_id}",),
     )
     compiling.stage("publish the mirrored catalogue", catalogue, [published])
+
+
+def _released(resolved, *, workspace_id: str) -> tuple[str, ...]:
+    """Remove the copied claims of unmirrored items in another workspace.
+
+    Nothing in this workspace can reach such an item, and a mirror never claims
+    the source's items, so Build installs it here as a new item.
+    """
+
+    from .catalogue.reconcile import prune_installation
+    from .catalogue.render import InstallationScope, InstallationScopes
+    from .catalogue.tables import INSTALLATION
+
+    if resolved.copied_rows is None:
+        return ()
+    mirrored = {(each.item.item_type, each.item.item_name) for each in resolved.items}
+    scopes = sorted(
+        {
+            InstallationScope(str(row["Item type"]), str(row["Item name"]))
+            for row in resolved.copied_rows.get(INSTALLATION.name, ())
+            if (row["Item type"], row["Item name"]) not in mirrored
+            and str(row.get("Workspace GUID") or "").casefold()
+            != workspace_id.casefold()
+        },
+        key=str,
+    )
+    return prune_installation(InstallationScopes(tuple(scopes))) if scopes else ()
 
 
 def _installation_target(resolver, reference, *, kind):

@@ -32,6 +32,8 @@ def node_label(node) -> str:
     from .resolution import ENDPOINT_REFRESH, ONELAKE_PUBLICATION
 
     target = getattr(node, "physical_target", None)
+    if getattr(node, "owner", None):
+        target = f"{node.owner}: {target}"
     if node.primitive_kind == ENDPOINT_REFRESH:
         return f"Refresh {target} SQL endpoint"
     if node.primitive_kind == ONELAKE_PUBLICATION:
@@ -44,6 +46,8 @@ def node_label(node) -> str:
     what = node.logical_id
     if what is None:
         return node.node_id
+    if getattr(node, "owner", None):
+        what = f"{node.owner}: {what}"
     # Validations use their Test or Assumption kind in the display label.
     verb = "Load" if node.role == LOAD else "Test"
     return f"{verb} {what}"
@@ -153,15 +157,18 @@ class RunRequest:
     @classmethod
     def from_mapping(cls, payload) -> "RunRequest":
         from ..declaration.model import WeaverDocumentId, WeaverItemId
+        from ..joined_dag import parse_owned
 
         selected = payload.get("selected")
         return cls(
             kind=payload["kind"],
-            items=tuple(WeaverItemId.parse(one) for one in payload["items"]),
+            items=tuple(
+                parse_owned(one, WeaverItemId.parse) for one in payload["items"]
+            ),
             names=tuple(payload.get("names") or ()),
             selected=None
             if selected is None
-            else tuple(WeaverDocumentId.parse(one) for one in selected),
+            else tuple(parse_owned(one, WeaverDocumentId.parse) for one in selected),
             fault_tolerant=bool(payload.get("fault_tolerant")),
             dry_run=bool(payload.get("dry_run")),
             reload=bool(payload.get("reload")),
@@ -216,13 +223,20 @@ class Lanes:
         run = workspace.execution.run
         return cls(spark=run.spark_concurrency, warehouse=run.warehouse_concurrency)
 
-    def of(self, node) -> tuple:
+    def of(self, node, workspace: str | None = None) -> tuple:
+        """The lane a node takes. ``workspace`` names the workspace of a node
+        in a run across catalogues: a Warehouse name is unique only within one,
+        and two catalogues there share its Warehouses."""
+
         from .resolution import SPARK_KINDS, WAREHOUSE_PROCEDURE
 
         if node.primitive_kind in SPARK_KINDS:
             return ("spark",)
         if node.primitive_kind == WAREHOUSE_PROCEDURE:
-            return ("warehouse", getattr(node.physical_target, "name", ""))
+            name = getattr(node.physical_target, "name", "")
+            if workspace is None:
+                return ("warehouse", name)
+            return ("warehouse", workspace.casefold(), name.casefold())
         return ("other",)
 
     def limit(self, lane: tuple) -> int:
@@ -270,7 +284,8 @@ class Runner:
         self.can_refresh = can_refresh
         self._graph: RunGraph | None = graph
         self._events: list[dict] = []
-        self._runtime_scope = None
+        #: One deployed-module scope per catalogue, opened when first needed.
+        self._runtime_scopes: dict = {}
         self._publication = None
         #: Node id to the error naming an installation Fabric no longer matches.
         self._identity: dict = {}
@@ -302,21 +317,32 @@ class Runner:
             return replace(resolved, messages=(*resolved.messages, *refused))
         return resolved
 
-    def runtime_scope(self, session=None):
-        """Open the deployed-module scope only when a node imports from it."""
+    def workspace_for(self, node):
+        """The Workspace a node runs in: its catalogue's, or the run's."""
 
-        if self._runtime_scope is None:
+        return self.state.workspace_for(getattr(node, "owner", None), self.workspace)
+
+    def runtime_scope(self, session=None, owner: str | None = None):
+        """Open the deployed-module scope only when a node imports from it.
+
+        Each catalogue's modules import against its own workspace and catalogue.
+        """
+
+        scope = self._runtime_scopes.get(owner)
+        if scope is None:
             from .runtime_boundary import LazyRunScope, open_runtime_scope
 
-            self._runtime_scope = LazyRunScope(
+            workspace = self.state.workspace_for(owner, self.workspace)
+            catalogue = self.state.catalogue_for(owner)
+            scope = self._runtime_scopes[owner] = LazyRunScope(
                 lambda: open_runtime_scope(
                     session,
-                    workspace=self.workspace,
+                    workspace=workspace,
                     # Read once for the run, handed to whatever imports a module.
-                    catalogue=self.state.catalogue,
+                    catalogue=catalogue,
                 )
             )
-        return self._runtime_scope
+        return scope
 
     @property
     def publication(self):
@@ -336,8 +362,8 @@ class Runner:
 
     def _close_runtime(self) -> None:
 
-        holder, self._runtime_scope = self._runtime_scope, None
-        if holder is not None:
+        holders, self._runtime_scopes = self._runtime_scopes, {}
+        for holder in holders.values():
             holder.close()
 
     def run(
@@ -367,15 +393,22 @@ class Runner:
             return self._result(self._dry_run(ordered), started=started)
 
         # With no catalogue each installation was just resolved from Fabric.
-        if session is not None and getattr(self.workspace, "catalogue", None):
+        # A joined run's places each have one, whatever the working workspace.
+        if session is not None and (
+            self.state.places or getattr(self.workspace, "catalogue", None)
+        ):
             from .identity import identity_messages
 
-            self._identity = identity_messages(
-                self.state.catalogue,
-                ordered,
-                session=session,
-                workspace=self.workspace,
-            )
+            owners = dict.fromkeys(getattr(node, "owner", None) for node in ordered)
+            for owner in owners:
+                self._identity.update(
+                    identity_messages(
+                        self.state.catalogue_for(owner),
+                        [node for node in ordered if node.owner == owner],
+                        session=session,
+                        workspace=self.state.workspace_for(owner, self.workspace),
+                    )
+                )
 
         if dispatch is None:
             from .dispatch import dispatch_primitive
@@ -500,7 +533,8 @@ class Runner:
 
         # Made here, once, rather than by whichever worker first asks.
         self.publication
-        self.runtime_scope(session)
+        for owner in dict.fromkeys(node.owner for node in ordered):
+            self.runtime_scope(session, owner)
         heights = self.graph.topology.heights()
         waiting = sorted(ordered, key=lambda node: -heights[node.node_id])
         decided: set[str] = set()
@@ -585,7 +619,10 @@ class Runner:
 
         def admit(pool) -> None:
             for node, resolved in runnable():
-                lane = lanes.of(node)
+                lane = lanes.of(
+                    node,
+                    None if node.owner is None else self.workspace_for(node).workspace,
+                )
                 if (
                     self.request.concurrency is not None
                     and len(running) >= self.request.concurrency
@@ -700,8 +737,8 @@ class Runner:
                     ignore_stability_threshold=(
                         self.request.ignore_stability_threshold
                     ),
-                    open_runtime=self.runtime_scope(session),
-                    workspace=self.workspace,
+                    open_runtime=self.runtime_scope(session, node.owner),
+                    workspace=self.workspace_for(node),
                     publication=self.publication,
                     isolated=isolated,
                 )
@@ -727,16 +764,33 @@ class Runner:
     _SATISFIED = (SUCCEEDED, SUCCEEDED_WITH_REJECTS, SKIPPED, VALIDATED)
 
     def _blocking(self, node, statuses) -> tuple[str, ...]:
-        satisfied = (
-            (*self._SATISFIED, FAILED)
-            if self.request.fault_tolerant
-            else self._SATISFIED
-        )
+        """The upstream nodes that keep this one from running.
+
+        Fault tolerance continues through a failed load, never through a
+        failed endpoint refresh or publication wait: the reader would read data
+        that is not there yet.
+        """
+
+        from .resolution import ENDPOINT_REFRESH, ONELAKE_PUBLICATION
+
+        tolerated = (*self._SATISFIED, FAILED)
+        found = self.graph.by_id
+
+        def satisfied(upstream) -> bool:
+            status = statuses.get(upstream)
+            barrier = found[upstream].primitive_kind in (
+                ENDPOINT_REFRESH,
+                ONELAKE_PUBLICATION,
+            )
+            if self.request.fault_tolerant and not barrier:
+                return status in tolerated
+            return status in self._SATISFIED
+
         return tuple(
             sorted(
                 upstream
                 for upstream in self.graph.upstream(node.node_id)
-                if statuses.get(upstream) not in satisfied
+                if not satisfied(upstream)
             )
         )
 
@@ -785,6 +839,7 @@ class Runner:
             target_name=target_name,
             schema_name=stored[0],
             object_name=stored[1],
+            catalogue=getattr(node, "owner", None),
         )
 
     def _result(self, nodes, *, started: str) -> RunResult:
@@ -809,6 +864,7 @@ class Runner:
                 if self.workspace is None
                 else str(getattr(self.workspace, "workspace", self.workspace))
             ),
+            catalogues=tuple(place.reference for place in self.state.places),
         )
 
 

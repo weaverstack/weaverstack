@@ -302,6 +302,39 @@ class RunRecord:
             ) from exc
 
 
+class RunRecords:
+    """A run's records, one per catalogue it reads, under one workflow ID.
+
+    A node is recorded in the catalogue its ``catalogue`` label names; a
+    single-catalogue run keys its one record by ``None``.
+    """
+
+    def __init__(self, records: dict) -> None:
+        self._records = records
+
+    @property
+    def workflow_id(self) -> str:
+        return next(iter(self._records.values())).workflow_id
+
+    def settled(self, node) -> None:
+        self._records[getattr(node, "catalogue", None)].settled(node)
+
+    def reset(self, node) -> None:
+        self._records[getattr(node, "owner", None)].reset(node.logical_id)
+
+    def flush(self) -> None:
+        """Flush every record, then raise the first failure."""
+
+        failures = []
+        for record in self._records.values():
+            try:
+                record.flush()
+            except RunError as exc:
+                failures.append(exc)
+        if failures:
+            raise failures[0]
+
+
 # --- a standalone call, presented as the settled unit of work it is ------------
 
 
@@ -492,6 +525,7 @@ __all__ = [
     "LOAD_TASK",
     "RESULT_FOR_STATUS",
     "RunRecord",
+    "RunRecords",
     "TEST_TASK",
     "load_statistic_row",
     "load_status_row",

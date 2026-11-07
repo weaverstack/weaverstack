@@ -383,6 +383,14 @@ class InstalledDag:
     def children(self, node) -> tuple[InstalledNode, ...]:
         return self._nodes_for(self.graph.downstream_of(str(node)))
 
+    def shortcut_sources(self, node) -> tuple[tuple[InstalledNode, None], ...]:
+        """What a shortcut destination reads, and the readiness each read needs.
+
+        Within one catalogue a shortcut reads its installed source directly.
+        """
+
+        return tuple((parent, None) for parent in self.parents(node.node_id))
+
     def ancestors(self, node) -> tuple[InstalledNode, ...]:
         return self._nodes_for(self.graph.ancestors(str(node)))
 

@@ -36,18 +36,16 @@ class NotebookSession(Session):
         self._given_resolver = resolver
 
     def _new_scope(self, workspace: Workspace) -> "NotebookScope":
-        if workspace.workspace != self.workspace.workspace:
-            raise CommandError(
-                f"This notebook is attached to {self.workspace.workspace} and cannot "
-                f"execute against {getattr(workspace, 'workspace', workspace)}."
-            )
+        # Another workspace, as a run across catalogues reaches, shares this
+        # Spark and store and resolves its own items.
+        attached = workspace.workspace == self.workspace.workspace
         return NotebookScope(
             workspace,
             telemetry=self.telemetry,
             executor=self._executor,
             spark=self._spark,
             store=self._given_store,
-            resolver=self._given_resolver,
+            resolver=self._given_resolver if attached else None,
         )
 
     # --- position -----------------------------------------------------------

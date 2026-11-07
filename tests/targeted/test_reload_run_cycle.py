@@ -41,7 +41,7 @@ from weaver.declaration.model import WeaverItemId
 from weaver.errors import CommandError
 from weaver.operations.load import _refuse_unsupported_reload, _reset_before
 from weaver.run import Runner, RunRequest, RunState
-from weaver.run.record import RunRecord
+from weaver.run.record import RunRecord, RunRecords
 from weaver.runtime.load_result import LoadResult
 
 RAW = WeaverItemId.parse("Lakehouse/Raw")
@@ -76,10 +76,14 @@ def _record():
     """A recorder over a catalogue that keeps what it was given."""
 
     writer = Recording()
-    return RunRecord(
-        workflow_id="workflow",
-        task_type="load",
-        catalogue=Catalogue(rows={}, writer=writer),
+    return RunRecords(
+        {
+            None: RunRecord(
+                workflow_id="workflow",
+                task_type="load",
+                catalogue=Catalogue(rows={}, writer=writer),
+            )
+        }
     ), writer
 
 

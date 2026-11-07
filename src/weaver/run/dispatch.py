@@ -96,7 +96,7 @@ def dispatch_primitive(
     if kind == ENDPOINT_REFRESH:
         return _endpoint_refresh(node, session, workspace)
     if kind == ONELAKE_PUBLICATION:
-        return _onelake_publication(node, session, workspace, publication)
+        return _onelake_publication(node, session, workspace, publication, state)
     raise RunError(
         f"Cannot run {node.node_id}: deployed object type {kind!r} is unsupported"
     )
@@ -218,14 +218,39 @@ def _refuse_outdated_procedure(node, sql, procedure: str, inputs, exc) -> None:
     ) from exc
 
 
-def _onelake_publication(node, session, workspace, publication):
-    """Wait for this Warehouse load to become readable by its consumers."""
+def _onelake_publication(node, session, workspace, publication, state=None):
+    """Wait for this Warehouse load to become readable by its consumers.
+
+    A consumer in another catalogue's workspace opens its path from there.
+    """
 
     from ..runtime.load_result import LoadResult
-    from .publication import await_publication
+    from .publication import await_publication, commits_before, last_load
 
+    where = (
+        None
+        if state is None
+        else lambda readiness: state.workspace_for(
+            getattr(readiness, "owner", None), workspace
+        )
+    )
     producer = node.produced_by
-    if publication is None or producer is None:
+    if producer is None:
+        # The table's last load ran before this run: its catalogue says when,
+        # and whether it wrote anything to publish.
+        started = last_load(node, session, workspace)
+        if started is None:
+            return LoadResult(succeeded=True)
+        await_publication(
+            node,
+            session,
+            workspace,
+            before=commits_before(node, session, workspace, started),
+            readiness=tuple(node.publication_targets),
+            where=where,
+        )
+        return LoadResult(succeeded=True)
+    if publication is None:
         raise RunError(
             f"{node.node_id} waits on a publication and this run recorded none"
         )
@@ -238,6 +263,7 @@ def _onelake_publication(node, session, workspace, publication):
         workspace,
         before=publication.baseline(producer),
         readiness=tuple(node.publication_targets),
+        where=where,
     )
     return LoadResult(succeeded=True)
 

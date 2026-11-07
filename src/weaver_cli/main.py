@@ -180,7 +180,7 @@ def _requires_run(args) -> frozenset[str]:
     )
 
     items = run_items(args)
-    if not items:
+    if not items or len(getattr(args, "catalogues", None) or ()) > 1:
         return requirements(AUTH, RESOLVER, ONELAKE, LIVY, TDS)
     return requirements(AUTH, RESOLVER, TDS, *_kind_requirements(items))
 
@@ -658,7 +658,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     load.add_argument("--json", action="store_true", help="Emit the report as JSON.")
     add_non_interactive(load)
-    _add_workspace_args(load)
+    _add_workspace_args(load, include_catalogue=False)
+    _add_catalogues(
+        load,
+        "Repeat as Workspace/Warehouse/Name to plan one load across several "
+        "catalogues. Items still decide what runs; Workspace/Kind/Name names an "
+        "item in another catalogue, and a workspace name all of its items.",
+    )
     load.set_defaults(handler=handle_load, requires=_requires_run)
 
     validate = subcommands.add_parser(
@@ -730,7 +736,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="Emit the report as JSON."
     )
     add_non_interactive(validate)
-    _add_workspace_args(validate)
+    _add_workspace_args(validate, include_catalogue=False)
+    _add_catalogues(
+        validate,
+        "Repeat as Workspace/Warehouse/Name to test across several catalogues. "
+        "Items still decide what runs, and --stale counts a load in any of them.",
+    )
     validate.set_defaults(handler=handle_test, requires=_requires_run)
 
     dashboard = subcommands.add_parser(
@@ -837,16 +848,10 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--json", action="store_true", help="Emit the report as JSON.")
     add_non_interactive(report)
     _add_workspace_args(report, include_environment=False, include_catalogue=False)
-    report.add_argument(
-        "--catalogue",
-        dest="catalogues",
-        action="append",
-        metavar="CATALOGUE",
-        help=(
-            "Where the Weaver catalogue lives, for example Warehouse/Weaver. "
-            "Repeat as Workspace/Warehouse/Name to report on several catalogues "
-            "together, joined where one's shortcuts read another's objects."
-        ),
+    _add_catalogues(
+        report,
+        "Repeat as Workspace/Warehouse/Name to report on several catalogues "
+        "together, joined where one's shortcuts read another's objects.",
     )
     # Health reads Lakehouses through storage, not Spark.
     report.set_defaults(handler=handle_health, requires=_requires_health)
@@ -1445,11 +1450,18 @@ def _with_command_overrides(workspace, args: argparse.Namespace):
 
 
 def _command_context(
-    workspace, *, environment: bool = True, catalogue: bool = True
+    workspace, *, environment: bool = True, catalogue: bool = True, catalogues=()
 ) -> dict:
-    """Pass command-level catalogue and Environment names to an operation."""
+    """Pass command-level catalogue and Environment names to an operation.
 
-    context = {"catalogue": workspace.catalogue or None} if catalogue else {}
+    ``catalogues`` are several catalogues given together, passed as they are.
+    """
+
+    context = (
+        {"catalogue": list(catalogues) if catalogues else workspace.catalogue or None}
+        if catalogue
+        else {}
+    )
     if environment:
         context["environment"] = (
             str(workspace.environment) if workspace.environment else None
@@ -1544,6 +1556,7 @@ def _load_once(args: argparse.Namespace) -> int:
 
     from weaver.errors import LoadError
 
+    catalogues = _catalogues_given(args)
     workspace = _resolve_workspace(args)
     try:
         with _running_session(args, workspace) as opened:
@@ -1562,6 +1575,7 @@ def _load_once(args: argparse.Namespace) -> int:
                 as_of=args.as_of,
                 concurrency=args.concurrency,
                 session=opened,
+                catalogues=catalogues,
             )
     except LoadError as exc:
         # Preserve the partial report carried by an intolerant failure.
@@ -1605,6 +1619,7 @@ def _run_load(
     as_of=None,
     concurrency=None,
     session=None,
+    catalogues=(),
 ):
 
     from weaver.sessions.host import use_or_create_session
@@ -1624,7 +1639,7 @@ def _run_load(
             as_of=as_of,
             concurrency=concurrency,
             session=opened,
-            **_command_context(workspace),
+            **_command_context(workspace, catalogues=catalogues),
         )
 
 
@@ -1649,7 +1664,8 @@ def _print_load(report) -> None:
         counts = f"  ({moved})" if moved else ""
         status = f"{node.status:<24}"
         print(
-            f"  {_style(mark, colour)} {_style(status, colour)} {node.node_id}{counts}"
+            f"  {_style(mark, colour)} {_style(status, colour)} "
+            f"{_qualified(node.node_id)}{counts}"
         )
         if report.dry_run and waits_for.get(node.node_id):
             after = f"after {_first_few(waits_for[node.node_id])}"
@@ -1668,6 +1684,12 @@ def _print_load(report) -> None:
             print(f"\n{prefix} {message.message}")
     if report.workflow_id:
         print(f"\n  Workflow: {_style(report.workflow_id, _DIM)}")
+
+
+def _qualified(node_id: str) -> str:
+    """A node of a run across catalogues, named with its catalogue."""
+
+    return node_id.replace("::", ": ", 1)
 
 
 def _waits_for(report) -> dict[str, list[str]]:
@@ -1793,6 +1815,7 @@ def _test_once(args: argparse.Namespace) -> int:
 
     from weaver.test_report import FAILED, INVALID
 
+    catalogues = _catalogues_given(args)
     workspace = _resolve_workspace(args)
     with _running_session(args, workspace) as opened:
         report = _run_test(
@@ -1805,6 +1828,7 @@ def _test_once(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             stale=args.stale,
             session=opened,
+            catalogues=catalogues,
         )
 
     if args.json:
@@ -1829,6 +1853,7 @@ def _run_test(
     stale: bool = False,
     concurrency=None,
     session=None,
+    catalogues=(),
 ):
     """Dispatch Warehouse validations over TDS and Lakehouse modules in-session."""
 
@@ -1844,7 +1869,7 @@ def _run_test(
             dry_run=dry_run,
             stale=stale,
             session=opened,
-            **_command_context(workspace),
+            **_command_context(workspace, catalogues=catalogues),
         )
 
 
@@ -1865,7 +1890,7 @@ def _print_test(report) -> None:
         status = f"{node.status:<10}"
         print(
             f"  {_style(status, _status_colour(node.status))} "
-            f"{node.kind:<11} {node.logical_id}{found}"
+            f"{node.kind:<11} {_qualified(node.key)}{found}"
         )
         for message in node.messages:
             print(f"      {message}")
@@ -2007,11 +2032,8 @@ def handle_health(args: argparse.Namespace) -> int:
 
     import json
 
-    catalogues = list(getattr(args, "catalogues", None) or ())
-    joined = len(catalogues) > 1
-    args.catalogue = None if joined else next(iter(catalogues), None)
-    if joined:
-        _home_from_catalogue(args, catalogues[0])
+    catalogues = _catalogues_given(args)
+    joined = bool(catalogues)
     workspace = _resolve_workspace(args)
     with _running_session(args, workspace) as opened:
         report = weaver.health(
@@ -2019,11 +2041,7 @@ def handle_health(args: argparse.Namespace) -> int:
             as_of=args.as_of,
             inventories=not args.no_inventory,
             session=opened,
-            **(
-                {"catalogue": catalogues}
-                if joined
-                else _command_context(workspace, environment=False)
-            ),
+            **_command_context(workspace, environment=False, catalogues=catalogues),
         )
     if args.json:
         print(json.dumps(report.to_mapping(), indent=2))
@@ -2032,6 +2050,36 @@ def handle_health(args: argparse.Namespace) -> int:
     else:
         print(render_health(report))
     return 0 if report.is_healthy else 1
+
+
+class _Catalogues(argparse.Action):
+    """Collect ``--catalogue`` values; ``catalogue`` keeps a single one."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        given = [*(getattr(namespace, "catalogues", None) or ()), values]
+        namespace.catalogues = given
+        namespace.catalogue = given[0] if len(given) == 1 else None
+
+
+def _add_catalogues(parser: argparse.ArgumentParser, repeated: str) -> None:
+    parser.add_argument(
+        "--catalogue",
+        action=_Catalogues,
+        metavar="CATALOGUE",
+        help=f"Where the Weaver catalogue lives, for example Warehouse/Weaver. {repeated}",
+    )
+    parser.set_defaults(catalogue=None, catalogues=None)
+
+
+def _catalogues_given(args: argparse.Namespace) -> list[str]:
+    """The catalogues given, when more than one. One stays ``args.catalogue``."""
+
+    catalogues = list(getattr(args, "catalogues", None) or ())
+    joined = len(catalogues) > 1
+    args.catalogue = None if joined else next(iter(catalogues), None)
+    if joined:
+        _home_from_catalogue(args, catalogues[0])
+    return catalogues if joined else []
 
 
 def _home_from_catalogue(args: argparse.Namespace, first: str) -> None:

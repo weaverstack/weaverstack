@@ -93,6 +93,9 @@ class LoadNodeReport(ReportAlias):
     result: LoadResult | SemanticRefreshResult | None = None
     started_at: str | None = None
     finished_at: str | None = None
+    #: The label of the catalogue that recorded this node, when several are
+    #: joined. Its identities are local to that catalogue.
+    catalogue: str | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -100,6 +103,7 @@ class LoadNodeReport(ReportAlias):
 
     def to_mapping(self) -> dict[str, Any]:
         return {
+            **({"catalogue": self.catalogue} if self.catalogue else {}),
             "node_id": self.node_id,
             "logical_id": self.logical_id,
             "physical_target": self.physical_target,
@@ -137,6 +141,7 @@ class LoadNodeReport(ReportAlias):
             result=None if rows is None else result_type.from_row(rows),
             started_at=payload.get("started_at"),
             finished_at=payload.get("finished_at"),
+            catalogue=payload.get("catalogue"),
         )
 
 
@@ -162,6 +167,9 @@ class LoadRunReport(ReportAlias):
     started_at: str | None = None
     finished_at: str | None = None
     workspace: str | None = None
+    #: The catalogues a run across several read, in the order given. Each node
+    #: names the one that recorded it.
+    catalogues: tuple[str, ...] = ()
 
     @property
     def succeeded(self) -> bool:
@@ -180,6 +188,7 @@ class LoadRunReport(ReportAlias):
             "reload": self.reload,
             "ignore_stability_threshold": self.ignore_stability_threshold,
             "workspace": self.workspace,
+            **({"catalogues": list(self.catalogues)} if self.catalogues else {}),
             "workflow_id": self.workflow_id,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
@@ -212,6 +221,7 @@ class LoadRunReport(ReportAlias):
             started_at=payload.get("started_at"),
             finished_at=payload.get("finished_at"),
             workspace=payload.get("workspace"),
+            catalogues=tuple(payload.get("catalogues") or ()),
         )
 
 

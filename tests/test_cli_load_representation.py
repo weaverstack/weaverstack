@@ -1330,3 +1330,134 @@ def test_a_refused_json_run_is_one_document_carrying_the_same_evidence(
     assert node["rows"]["is_refusal"] is True
     assert REFUSAL in node["messages"][0]["message"]
     assert captured.err == ""
+
+
+# --- several catalogues -------------------------------------------------------
+
+
+@weaver_test()
+def test_every_option_reaches_a_load_across_catalogues(recorded):
+    assert (
+        main(
+            [
+                "load",
+                "Sales/Warehouse/Mart",
+                "--workspace",
+                "Sales",
+                "--catalogue",
+                "Central/Warehouse/Weaver",
+                "--catalogue",
+                "Sales/Warehouse/Weaver",
+                "--name",
+                "MART.Summary",
+                "--ancestors",
+                "--descendants",
+                "--fault-tolerant",
+                "--dry-run",
+                "--reload",
+                "--ignore-stability-threshold",
+                "--concurrency",
+                "3",
+                "--environment",
+                "Shared/Weaver",
+            ]
+        )
+        == 0
+    )
+
+    (call,) = recorded
+    assert list(call["items"]) == ["Sales/Warehouse/Mart"]
+    assert call["catalogue"] == [
+        "Central/Warehouse/Weaver",
+        "Sales/Warehouse/Weaver",
+    ]
+    assert call["names"] == ["MART.Summary"]
+    assert call["ancestors"] and call["descendants"]
+    assert call["fault_tolerant"] and call["dry_run"] and call["reload"]
+    assert call["ignore_stability_threshold"]
+    assert call["concurrency"] == 3
+    assert call["environment"] == "Shared/Weaver"
+
+
+@weaver_test()
+def test_stale_and_as_of_reach_a_load_across_catalogues(recorded):
+    main(
+        [
+            "load",
+            "--workspace",
+            "Sales",
+            "--catalogue",
+            "Central/Warehouse/Weaver",
+            "--catalogue",
+            "Sales/Warehouse/Weaver",
+            "--stale",
+            "--as-of",
+            "2026-11-05T00:00:00Z",
+        ]
+    )
+
+    (call,) = recorded
+    assert call["stale"] and call["as_of"] == "2026-11-05T00:00:00Z"
+    assert call["items"] is None
+
+
+@weaver_test()
+def test_an_invalid_combination_across_catalogues_fails_before_any_work(
+    desktop_credential, capsys
+):
+    assert (
+        main(
+            [
+                "load",
+                "--workspace",
+                "Sales",
+                "--catalogue",
+                "Central/Warehouse/Weaver",
+                "--catalogue",
+                "Sales/Warehouse/Weaver",
+                "--stale",
+                "--reload",
+                "--non-interactive",
+            ]
+        )
+        == 1
+    )
+    assert "--reload and --stale" in capsys.readouterr().err
+
+
+@weaver_test()
+def test_a_load_across_catalogues_prints_each_node_with_its_catalogue(
+    recorded, monkeypatch, capsys
+):
+    report = _report(
+        node_status="failed",
+        status="partially_succeeded",
+        nodes=(
+            LoadNodeReport(
+                node_id="Sales::load:Warehouse/Mart_WH/MART.Summary",
+                logical_id="Warehouse/Mart/MART.Summary",
+                physical_target="Warehouse/Mart_WH",
+                primitive_kind="warehouse_procedure",
+                dispatch_location=None,
+                status="failed",
+                catalogue="Sales",
+            ),
+        ),
+        catalogues=("Central/Warehouse/Weaver", "Sales/Warehouse/Weaver"),
+    )
+    monkeypatch.setattr(weaver, "load", lambda items, **kwargs: report)
+
+    main(
+        [
+            "load",
+            "--workspace",
+            "Sales",
+            "--catalogue",
+            "Central/Warehouse/Weaver",
+            "--catalogue",
+            "Sales/Warehouse/Weaver",
+            "--fault-tolerant",
+        ]
+    )
+
+    assert "Sales: load:Warehouse/Mart_WH/MART.Summary" in capsys.readouterr().out

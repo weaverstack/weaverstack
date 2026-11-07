@@ -86,6 +86,8 @@ class ForeignAncestor:
     established_at: datetime | None
     result: str
     in_cycle: bool = False
+    #: When a build last certified it.
+    built_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -178,7 +180,7 @@ class Across:
         """Ancestors reached only through another catalogue."""
 
         from .catalogue.tables import PENDING
-        from .health import established, participates_in_load_state
+        from .health import _instant, established, participates_in_load_state
 
         qualified = qualify(self._member.label, node.node_id)
         if qualified not in self._crossed:
@@ -197,12 +199,17 @@ class Across:
             if not participates_in_load_state(other):
                 continue
             status = self._statuses.get(each)
+            owner, _ = self._joined.locate(each)
+            registered = owner.catalogue.registered.get(other.identity)
             found.append(
                 ForeignAncestor(
                     name=self._joined.display(each),
                     established_at=established(status),
                     result=PENDING if status is None else status.result,
                     in_cycle=each in cycle,
+                    built_at=None
+                    if registered is None
+                    else _instant(registered.build_datetime),
                 )
             )
         return tuple(found)

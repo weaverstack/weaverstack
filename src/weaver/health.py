@@ -936,6 +936,7 @@ def assess_load(
     items: Sequence[WeaverItemId] | None = None,
     targets: Sequence[PhysicalTargetRef] | None = None,
     source=None,
+    across=None,
 ) -> LoadAssessment:
     """Every object holding rows in scope, assessed once.
 
@@ -944,7 +945,8 @@ def assess_load(
     is behind its sources is a question about the whole graph.
 
     A mirrored object is a subject: its source's load is what its rows are.
-    ``source`` is the catalogue that load is recorded in.
+    ``source`` is the catalogue that load is recorded in. ``across`` carries
+    ancestry through other catalogues read with this one.
     """
 
     dag = catalogue.dag()
@@ -957,7 +959,12 @@ def assess_load(
         and (chosen is None or node.item in chosen)
         and (where is None or node.target in where)
     )
-    return load_health(catalogue, as_of=as_of, source=source).assess(subjects)
+    return _LoadHealth(
+        dag,
+        statuses=effective_load_state(catalogue, source=source).statuses,
+        as_of=as_of,
+        across=across,
+    ).assess(subjects)
 
 
 def resolve_as_of(value, *, started: datetime) -> datetime:
@@ -1052,12 +1059,14 @@ def assess_validations(
     *,
     items: Sequence[WeaverItemId] | None = None,
     source: Catalogue | None = None,
+    across=None,
 ) -> ValidationAssessment:
     """Every validation of ``items`` assessed against its recorded result.
 
     Not Green: never run, Pending, failed, errored or blocked, or passed before
     an ancestor was loaded or built. Time alone does not make a result stale.
-    ``source`` is the catalogue a mirrored ancestor's load is recorded in.
+    ``source`` is the catalogue a mirrored ancestor's load is recorded in, and
+    ``across`` carries ancestry through other catalogues read with this one.
     """
 
     dag = catalogue.dag()
@@ -1070,7 +1079,9 @@ def assess_validations(
         dag,
         catalogue=catalogue,
         statuses=test_statuses(catalogue),
-        load_health=_LoadHealth(dag, statuses=effective.statuses, as_of=None),
+        load_health=_LoadHealth(
+            dag, statuses=effective.statuses, as_of=None, across=across
+        ),
     ).assess(subjects)
 
 
@@ -1165,6 +1176,11 @@ class _ValidationHealth:
                 moved.append((ancestor.node_id, "loaded"))
             elif (self._built_at(ancestor.identity) or at) > at:
                 moved.append((ancestor.node_id, "built"))
+        for ancestor in self.load_health._foreign_ancestors(node):
+            if (ancestor.established_at or at) > at:
+                moved.append((ancestor.name, "loaded"))
+            elif (ancestor.built_at or at) > at:
+                moved.append((ancestor.name, "built"))
         return min(moved) if moved else None
 
     def _built_at(self, identity) -> datetime | None:

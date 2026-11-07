@@ -40,7 +40,7 @@ def test(
     files: str | Path | Sequence[str | Path] | None = None,
     source=None,
     workspace: str | None = None,
-    catalogue: str | None = None,
+    catalogue: str | Sequence[str] | None = None,
     environment: str | None = None,
     workspace_config: str | Path | None = None,
     dry_run: bool = False,
@@ -77,15 +77,45 @@ def test(
     current estate selects nothing, which succeeds. Stale selection reads
     recorded results, so it needs catalogue mode.
 
+    ``catalogue`` names one catalogue, or several as ``Workspace/Warehouse/Name``.
+    Several run as one test run: the catalogues supply context, ``items`` decide
+    what runs as they do for ``weaver load``, each validation runs in its own
+    workspace and is recorded in its own catalogue, and ``stale`` counts a load
+    in any catalogue given. Validations from ``files`` run against one
+    catalogue.
+
     A completed run returns its report whatever the validations found. The
     report distinguishes findings from validations that could not be evaluated.
     """
 
     from ..concurrency import validate_concurrency
+    from .joined import is_joined
 
     validate_concurrency(concurrency)
     selected_names = tuple(text for text, _ in name_patterns(names, error=CommandError))
     selected_files = _files(files)
+    if is_joined(catalogue):
+        if selected_files:
+            raise CommandError(
+                "files run validations from one project folder against one "
+                "catalogue. With several catalogues, select installed validations "
+                "by item and name."
+            )
+        return _joined_test(
+            items,
+            tuple(catalogue),
+            source=source,
+            names=selected_names,
+            workspace=workspace,
+            environment=environment,
+            workspace_config=workspace_config,
+            dry_run=dry_run,
+            stale=stale,
+            concurrency=concurrency,
+            session=session,
+        )
+    if not isinstance(catalogue, (str, type(None))):
+        catalogue = next(iter(catalogue), None)
     resolved = operation_workspace(
         "test",
         workspace=workspace,
@@ -139,6 +169,161 @@ def test(
                 )
             frame.failed = not report.succeeded
             return report
+
+
+def _joined_test(
+    items,
+    catalogues,
+    *,
+    source=None,
+    names,
+    workspace,
+    environment,
+    workspace_config,
+    dry_run: bool,
+    stale: bool,
+    concurrency,
+    session,
+) -> ValidationRunReport:
+    from ..sessions.host import use_or_create_session
+    from .joined import default_request, requested_by_label, resolve_places
+
+    home, places = resolve_places(
+        "test",
+        catalogues,
+        workspace=workspace,
+        workspace_config=workspace_config,
+        environment=environment,
+        session=session,
+    )
+    requested = (
+        requested_by_label("test", items, places, home, project=Project(source, home))
+        if items
+        else default_request("test", places, home)
+    )
+    with use_or_create_session(session, workspace=home) as opened:
+        with opened.task(
+            "Test (dry run)" if dry_run else "Test", f"{len(places)} catalogues"
+        ) as frame:
+            report = run_joined_test(
+                opened,
+                home=home,
+                places=places,
+                requested=requested,
+                names=names,
+                dry_run=dry_run,
+                stale=stale,
+                concurrency=concurrency,
+            )
+            frame.failed = not report.succeeded
+            return report
+
+
+def run_joined_test(
+    session,
+    *,
+    home,
+    places,
+    requested,
+    names=(),
+    dry_run: bool = False,
+    stale: bool = False,
+    concurrency: int | None = None,
+) -> ValidationRunReport:
+    """One test run across several catalogues, read once and run together."""
+
+    from ..run import RunRequest, RunState
+    from ..run.entry import run_test_in_fabric
+    from ..run.runner import needs_spark
+    from ..sessions.program import FabricRun
+    from .joined import (
+        context_lines,
+        offer_spark_homes,
+        owned_items,
+        places_mapping,
+        read_run_places,
+    )
+
+    with session.step(f"Read {len(places)} catalogues"):
+        state = RunState.joined(
+            read_run_places(
+                session,
+                places,
+                tables=(*READABLE_TABLES, TEST_STATUS, LOAD_STATUS) if stale else None,
+            )
+        )
+    items = owned_items(state, requested, what="test")
+    session.report(context_lines(state, items))
+    selected = _stale_validations_across(session, state, items) if stale else None
+    spark_workspace = offer_spark_homes(session, state, items)
+    started = datetime.now(timezone.utc)
+    request = RunRequest.test(
+        items,
+        names=names,
+        selected=selected,
+        dry_run=dry_run,
+        # Validations are independent; a finding does not block the rest.
+        fault_tolerant=True,
+        concurrency=concurrency,
+    )
+    with session.step("Build run graph"):
+        runner = validation_runner(home, state, request)
+    targets = tuple(
+        place.catalogue.dag().installations[item.value]
+        for place in state.places
+        for item in items
+        if item.owner == place.label
+    )
+    _require_lakehouse_environment(
+        session,
+        workspace=home,
+        targets=targets,
+        dry_run=dry_run or not needs_spark(runner.graph),
+    )
+    run = FabricRun(
+        name="test",
+        needs_spark=not dry_run and needs_spark(runner.graph),
+        call=lambda here: execute_test(
+            here, workspace=home, runner=runner, started=started
+        ),
+        entry=run_test_in_fabric,
+        arguments=lambda: {
+            "catalogue": state.catalogue.to_mapping(),
+            "places": places_mapping(state),
+            "request": request.to_mapping(),
+            "started": started.isoformat(),
+        },
+        decode=_decoded,
+    )
+    return session.execute_run(run, workspace=spark_workspace)
+
+
+def _stale_validations_across(session, state, items) -> tuple:
+    """The requested validations not green, a load or build in any catalogue
+    counting."""
+
+    from ..health import assess_validations
+    from ..joined_dag import Owned
+    from .load import stale_context
+
+    members, joined, statuses = stale_context(
+        session, state, items, operation="test --stale"
+    )
+    selected = []
+    for member in members:
+        chosen = [item.value for item in items if item.owner == member.label]
+        if not chosen:
+            continue
+        selected.extend(
+            Owned(member.label, identity)
+            for identity in assess_validations(
+                member.catalogue,
+                items=chosen,
+                source=member.source,
+                across=joined.across(member, statuses),
+            ).unsettled_identities()
+        )
+    return tuple(selected)
 
 
 def _files(files) -> tuple[str, ...]:
@@ -364,17 +549,14 @@ def validation_runner(workspace, state, request):
 def execute_test(session, *, workspace, runner, started) -> ValidationRunReport:
     """Execute a planned test run and record what it found, where ``session`` runs."""
 
-    from ..run import open_run_record
     from ..run.runner import Lanes
+    from .load import open_run_records
 
     record = (
         None
         if runner.request.dry_run
-        else open_run_record(
-            runner.state.catalogue,
-            workspace=workspace,
-            task_type=TASK_TYPE,
-            session=session,
+        else open_run_records(
+            runner.state, workspace, task_type=TASK_TYPE, session=session
         )
     )
     with session.step("Execute"):
@@ -394,6 +576,7 @@ def execute_test(session, *, workspace, runner, started) -> ValidationRunReport:
         nodes=tuple(_as_validation_node(node) for node in result.nodes),
         started=started,
         workflow_id=None if record is None else record.workflow_id,
+        catalogues=result.catalogues,
     )
 
 
@@ -407,8 +590,8 @@ def _decoded(carried: dict) -> ValidationRunReport:
     return replace(
         report,
         nodes=tuple(
-            replace(node, diagnostics=tuple(diagnostics[node.logical_id]))
-            if node.logical_id in diagnostics
+            replace(node, diagnostics=tuple(diagnostics[node.key]))
+            if node.key in diagnostics
             else node
             for node in report.nodes
         ),
@@ -476,6 +659,7 @@ def _as_validation_node(node) -> ValidationNodeReport:
         diagnostics=getattr(node.result, "diagnostics", None),
         started_at=node.started_at,
         finished_at=node.finished_at,
+        catalogue=getattr(node, "catalogue", None),
     )
 
 
@@ -501,6 +685,7 @@ def _reported(
     nodes: Sequence[ValidationNodeReport],
     started: datetime,
     workflow_id: str | None,
+    catalogues: tuple[str, ...] = (),
 ) -> ValidationRunReport:
     return ValidationRunReport(
         status=run_status(nodes),
@@ -508,7 +693,8 @@ def _reported(
         workflow_id=workflow_id,
         started_at=started.isoformat(),
         finished_at=datetime.now(timezone.utc).isoformat(),
+        catalogues=catalogues,
     )
 
 
-__all__ = ["TASK_TYPE", "run_source_test", "run_test", "test"]
+__all__ = ["TASK_TYPE", "run_joined_test", "run_source_test", "run_test", "test"]

@@ -757,7 +757,7 @@ def test_an_interrupted_run_still_closes_its_runtime_scope():
             closed.append(True)
 
     made = runner(nodes=[node("a"), node("b")])
-    made._runtime_scope = Scope()
+    made._runtime_scopes = {None: Scope()}
 
     def interrupted(node, **asked):
         raise KeyboardInterrupt

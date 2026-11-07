@@ -39,10 +39,23 @@ class ValidationNodeReport(ReportAlias):
     #: The rows, when a caller asked for one validation by name or by file.
     #: Excluded from :meth:`to_mapping`; diagnostics are not durable report data.
     diagnostics: Any = field(default=None, compare=False, repr=False)
+    #: The label of the catalogue that recorded this validation, when several
+    #: are joined. ``logical_id`` is local to it.
+    catalogue: str | None = None
 
     @property
     def succeeded(self) -> bool:
         return self.status in (PASSED, PLANNED)
+
+    @property
+    def key(self) -> str:
+        """``logical_id``, qualified by its catalogue where several are joined."""
+
+        return (
+            f"{self.catalogue}::{self.logical_id}"
+            if self.catalogue
+            else self.logical_id
+        )
 
     @classmethod
     def from_mapping(cls, payload: dict[str, Any]) -> "ValidationNodeReport":
@@ -75,10 +88,12 @@ class ValidationNodeReport(ReportAlias):
             result=result,
             started_at=payload.get("started_at"),
             finished_at=payload.get("finished_at"),
+            catalogue=payload.get("catalogue"),
         )
 
     def to_mapping(self) -> dict[str, Any]:
         mapping: dict[str, Any] = {
+            **({"catalogue": self.catalogue} if self.catalogue else {}),
             "logical_id": self.logical_id,
             "kind": self.kind.casefold(),
             "physical_target": self.physical_target,
@@ -104,6 +119,8 @@ class ValidationRunReport(ReportAlias):
     workflow_id: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
+    #: The catalogues a run across several read, in the order given.
+    catalogues: tuple[str, ...] = ()
 
     @property
     def succeeded(self) -> bool:
@@ -161,10 +178,12 @@ class ValidationRunReport(ReportAlias):
             workflow_id=payload.get("workflow_id"),
             started_at=payload.get("started_at"),
             finished_at=payload.get("finished_at"),
+            catalogues=tuple(payload.get("catalogues") or ()),
         )
 
     def to_mapping(self) -> dict[str, Any]:
         return {
+            **({"catalogues": list(self.catalogues)} if self.catalogues else {}),
             "status": self.status,
             "nodes": [node.to_mapping() for node in self.nodes],
             "totals": self.totals(),

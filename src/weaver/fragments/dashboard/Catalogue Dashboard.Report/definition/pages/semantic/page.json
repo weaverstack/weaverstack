@@ -4,5 +4,51 @@
   "displayName": "Semantic model",
   "displayOption": "FitToPage",
   "height": 1080,
-  "width": 1920
+  "width": 1920,
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "scopeWorkspace",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Workspace"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeItemtype",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Item type"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeItemname",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Item name"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
 }

@@ -54,6 +54,18 @@ RELATIONS = {
 #: catalogue that has never been a mirror has no ``_.Mirror``.
 OPTIONAL = frozenset({"Mirror"})
 
+#: The table behind the Filters pane: one row per installed object, and per
+#: item with none, as deployment read the catalogues.
+SCOPE = "Scope"
+#: Its fields, in the order they narrow, and the hidden columns that key
+#: catalogue rows to them.
+SCOPE_FIELDS = ("Workspace", "Item type", "Item name", "Object type", "Object name")
+SCOPE_KEYS = ("Catalogue code", "Target", "Schema key", "Object key")
+#: The fields that select objects rather than items.
+OBJECT_FIELDS = ("Object type", "Object name")
+#: Relations whose rows name their item by its physical target, not its name.
+TARGET_KEYED = {"Log": ("Target type", "Target name")}
+
 
 @dataclass(frozen=True)
 class DashboardSource:
@@ -72,6 +84,9 @@ class DashboardSource:
     server: str | None = None
     #: Each catalogue table's columns and their SQL types.
     columns: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    #: ``Scope`` rows: workspace, item type, item name, target, object type,
+    #: object label, schema name and object name, as deployment read them.
+    scope: tuple[tuple[str, ...], ...] = ()
 
     @property
     def alias(self) -> str:
@@ -91,6 +106,21 @@ def declared_columns(table: str) -> dict[str, str]:
     return {name: types.get(name, "datetime2(6)") for name in declared.public_columns}
 
 
+def scope_keys(relation: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The columns that key a relation's rows to an item, and to an object.
+
+    Empty when the relation has none, and its rows are not narrowed.
+    """
+
+    declared = declared_columns(relation)
+    item = TARGET_KEYED.get(relation, ("Item type", "Item name"))
+    if not all(name in declared for name in item):
+        return (), ()
+    objects = ("Schema name", "Object name")
+    held = all(name in declared for name in objects)
+    return item, (item + objects if held else ())
+
+
 def template() -> str:
     from .catalogue_dashboard import DASHBOARD
     from .fragments import DASHBOARD as FRAGMENT
@@ -103,7 +133,8 @@ _REFERENCE = re.compile(r"'((?:[^']|'')+)'\[([^\]]+)\]")
 
 
 def required_columns(text: str | None = None) -> dict[str, tuple[str, ...]]:
-    """Each catalogue table's columns the measures read, by catalogue table."""
+    """Each catalogue table's columns the measures read, by catalogue table,
+    with the columns that key its rows to the Filters pane."""
 
     text = template() if text is None else text
     found: dict[str, set[str]] = {}
@@ -111,6 +142,9 @@ def required_columns(text: str | None = None) -> dict[str, tuple[str, ...]]:
         table = table.replace("''", "'")
         if table in RELATIONS:
             found.setdefault(RELATIONS[table], set()).add(column)
+    for relation in found:
+        item, objects = scope_keys(relation)
+        found[relation].update(item, objects)
     return {table: tuple(sorted(columns)) for table, columns in sorted(found.items())}
 
 
@@ -234,7 +268,8 @@ class _Expander:
                 f'SELECTCOLUMNS({quoted}, "@catalogue", {quoted}[Catalogue], '
                 f'"@code", {quoted}[Catalogue code], {projected})'
             )
-            return f"CALCULATETABLE({body}, {', '.join(filters)})" if filters else body
+            kept = [*filters, *scope_filters(RELATIONS[table], quoted)]
+            return f"CALCULATETABLE({body}, {', '.join(kept)})" if kept else body
         branches = []
         for code, source in holders:
             named = "'" + self.table_name(table, source).replace("'", "''") + "'"
@@ -242,9 +277,12 @@ class _Expander:
                 f'SELECTCOLUMNS({named}, "@catalogue", {_dax_string(source.label)}, '
                 f'"@code", "{code}", {self.rename(projected, table, source)})'
             )
-            if filters:
-                renamed = ", ".join(self.rename(f, table, source) for f in filters)
-                body = f"CALCULATETABLE({body}, {renamed})"
+            kept = [
+                *(self.rename(f, table, source) for f in filters),
+                *scope_filters(RELATIONS[table], named, code=str(code)),
+            ]
+            if kept:
+                body = f"CALCULATETABLE({body}, {', '.join(kept)})"
             branches.append(body)
         return branches[0] if len(branches) == 1 else f"UNION({', '.join(branches)})"
 
@@ -284,6 +322,53 @@ class _Expander:
             text = (
                 text[: found.start()] + macros[found.group(1)](arguments) + text[end:]
             )
+
+
+def scope_filters(relation: str, table: str, *, code: str | None = None) -> list[str]:
+    """Filters keeping a relation's rows to what the Filters pane selects.
+
+    Rows are kept by item, and by object while an object field is filtered.
+    Without a selection every row is kept, including any added since the
+    Dashboard was deployed. The catalogue's own item is always kept: the page
+    header names the catalogue from it. ``code`` names the catalogue a Direct Lake table
+    holds; an Import table carries it as a column.
+    """
+
+    item, objects = scope_keys(relation)
+    if not item:
+        return []
+    scope = f"'{SCOPE}'"
+    named = list(item if code is not None else ("Catalogue code", *item))
+    from_scope = ["Item type", "Target" if relation in TARGET_KEYED else "Item name"]
+    from_scope = from_scope if code is not None else ["Catalogue code", *from_scope]
+    rows = f'FILTER({scope}, {scope}[Catalogue code] = "{code}")' if code else scope
+    object_filtered = " || ".join(f"ISFILTERED({scope}[{f}])" for f in OBJECT_FIELDS)
+
+    def kept(columns, keys, filtered):
+        selected = ", ".join(
+            f'"@{i}", {scope}[{key}]' for i, key in enumerate(keys, start=1)
+        )
+        held = ", ".join(f"{table}[{c}]" for c in columns)
+        return (
+            f"TREATAS(UNION(SELECTCOLUMNS({rows}, {selected}), "
+            f"FILTER(SUMMARIZE({table}, {held}), {filtered})), {held})"
+        )
+
+    own = (
+        ""
+        if relation in TARGET_KEYED
+        else f' || {table}[Item type] = "Warehouse" && {table}[Item name] = "_weaver"'
+    )
+    out = [kept(named, from_scope, f"NOT ISFILTERED({scope}){own}")]
+    if objects:
+        out.append(
+            kept(
+                [*named, "Schema name", "Object name"],
+                [*from_scope, "Schema key", "Object key"],
+                f"NOT ({object_filtered})",
+            )
+        )
+    return out
 
 
 def _epoch(value: str) -> str:
@@ -336,17 +421,26 @@ def _load_summary(arguments: list[str]) -> str:
 
 
 def page_expression(name: str, data: str) -> str:
-    """A page measure: its data, or a small page saying it is too large."""
+    """A page measure: its data, or a small page saying it is too large.
+
+    The size is the sum of the sections' lengths, and the page is joined only
+    when it fits: joining text past DAX's limit fails before it can be measured.
+    """
 
     f, r, t, less = (f"UNICHAR({n})" for n in (57345, 57346, 57347, 57344))
+    head = f'{t} & "page" & {f} & "name" & {r} & "{name}"'
+    parts = [part.strip() for part in _split_top(data, "&")]
+    sections = [f"VAR _s{i} = {part}" for i, part in enumerate(parts)]
+    size = " + ".join(f"LEN(_s{i})" for i in range(len(parts)))
+    joined = " & ".join(f"_s{i}" for i in range(len(parts)))
     return "\n".join(
         (
-            f'VAR _data = SUBSTITUTE({t} & "page" & {f} & "name" & {r} & "{name}" & {data}, "<", {less})',
-            "VAR _size = LEN(_data) + LEN([Renderer])",
-            f'VAR _small = {t} & "page" & {f} & "name" & {r} & "{name}" & {t} & "toolarge" & {f} & "size" & {f} & "budget" & {r} & _size & {f} & "{PAGE_BUDGET}"',
+            *sections,
+            f"VAR _size = LEN({head}) + {size} + LEN([Renderer])",
+            f'VAR _small = {head} & {t} & "toolarge" & {f} & "size" & {f} & "budget" & {r} & _size & {f} & "{PAGE_BUDGET}"',
             "RETURN",
             '    "<div id=""wd-app"" class=""wd""></div><script type=""text/plain"" id=""wd-data"">"',
-            f"        & IF(_size > {PAGE_BUDGET}, _small, _data)",
+            f'        & IF(_size > {PAGE_BUDGET}, _small, SUBSTITUTE({head} & {joined}, "<", {less}))',
             '        & "</script>" & [Renderer]',
         )
     )
@@ -586,6 +680,60 @@ def catalogue_tables(
     return expressions, tables
 
 
+#: The Scope table's columns, in the order deployment reads a row.
+_SCOPE_COLUMNS = (
+    "Workspace",
+    "Item type",
+    "Item name",
+    "Target",
+    "Object type",
+    "Object name",
+    "Schema key",
+    "Object key",
+)
+
+
+def scope_table(sources: Sequence[DashboardSource]) -> dict:
+    """The Filters pane's table, written into the model as deployment read it.
+
+    Static, so it reads no catalogue table, as Direct Lake requires of a
+    calculated table, and both modes hold the same rows.
+    """
+
+    columns = ("Catalogue code", *_SCOPE_COLUMNS)
+    rows = [
+        (str(code), *row)
+        for code, source in enumerate(sources, start=1)
+        for row in source.scope
+    ] or [("",) * len(columns)]
+    header = ", ".join(f"{_dax_string(c)}, STRING" for c in columns)
+    body = ",\n".join(
+        "    {" + ", ".join(_dax_string(str(v or "")) for v in row) + "}"
+        for row in rows
+    )
+    return {
+        "name": SCOPE,
+        "columns": [
+            {
+                "name": column,
+                "dataType": "string",
+                "sourceColumn": f"[{column}]",
+                **({} if column in SCOPE_FIELDS else {"isHidden": True}),
+            }
+            for column in columns
+        ],
+        "partitions": [
+            {
+                "name": SCOPE,
+                "source": {
+                    "type": "calculated",
+                    "expression": f"DATATABLE({header},\n{{\n{body}\n}})",
+                },
+            }
+        ],
+    }
+
+
 def model_text(sources: Sequence[DashboardSource], mode: str) -> str:
     """The Dashboard model's TMDL over ``sources``."""
 
@@ -599,6 +747,7 @@ def model_text(sources: Sequence[DashboardSource], mode: str) -> str:
     )
     measures = "/// Every measure of the Catalogue Dashboard." + measures
     expressions, tables = catalogue_tables(sources, mode)
+    tables.append(scope_table(sources))
     unit = "    "
     rendered = [head.rstrip("\n")]
     for expression in expressions:
@@ -618,6 +767,8 @@ __all__ = [
     "OPTIONAL",
     "PAGE_BUDGET",
     "RELATIONS",
+    "SCOPE",
+    "SCOPE_FIELDS",
     "declared_columns",
     "model_text",
     "required_columns",

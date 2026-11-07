@@ -26,5 +26,79 @@
         }
       }
     ]
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "scopeWorkspace",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Workspace"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeItemtype",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Item type"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeItemname",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Item name"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeObjecttype",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Object type"
+          }
+        },
+        "type": "Categorical"
+      },
+      {
+        "name": "scopeObjectname",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Scope"
+              }
+            },
+            "Property": "Object name"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
   }
 }

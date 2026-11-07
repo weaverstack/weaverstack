@@ -365,7 +365,38 @@ def _require_source(opened, base, label, owner, warehouse, reference, mode):
         server = opened.resolver(place).sql_endpoint(target).server
     from dataclasses import replace
 
-    return replace(source, server=server)
+    return replace(source, server=server, scope=_scope(opened, target, place))
+
+
+#: Each installed object, and each item with none, as the Filters pane lists them.
+_SCOPE_QUERY = """
+select i.[Workspace name] as workspace, i.[Item type] as item_type,
+    i.[Item name] as item_name, i.[Target name] as target, n.[Node kind] as kind,
+    n.[Label] as label, n.[Schema name] as schema_name, n.[Object name] as object_name
+from [_].[Installation] as i
+left join [_].[LineageNode] as n
+    on n.[Item type] = i.[Item type] and n.[Item name] = i.[Item name]
+    and n.[Is internal] = 0
+where i.[Item type] <> N'Warehouse' or i.[Item name] <> N'_weaver'
+order by 1, 2, 3, 6
+""".strip()
+
+
+def _scope(opened, target, place) -> tuple[tuple[str, ...], ...]:
+    rows = opened.query_tsql(_SCOPE_QUERY, target=target, workspace=place)
+    keys = (
+        "workspace",
+        "item_type",
+        "item_name",
+        "target",
+        "kind",
+        "label",
+        "schema_name",
+        "object_name",
+    )
+    return tuple(
+        tuple("" if row[k] is None else str(row[k]) for k in keys) for row in rows
+    )
 
 
 def _find(opened, base, name: str, kind: str):

@@ -126,9 +126,10 @@ function shell(mount, m) {
 /* A page whose data would exceed what one measure can return. */
 function tooLargePage(body, m) {
   var t = m.tooLarge;
-  body.appendChild(section("Too much to show at once", [el("p", { text:
-    "This page's data is " + fmt(num(t.size)) + " characters, more than the " + fmt(num(t.budget)) +
-    " one Power BI measure can return. Deploy a Dashboard over fewer catalogues, or with --ImportMode over the catalogues this page needs." })]));
+  body.appendChild(section("This page contains too much data to display", [
+    el("p", { text: "The selected data is " + fmt(num(t.size)) + " characters, over Power BI's limit of about " + fmt(num(t.budget)) + " for one measure." }),
+    el("p", { text: "Narrow the selection in the Filters pane on the right: Workspace, then Item type, Item name, Object type and Object name. The page recalculates over what remains." })
+  ]));
 }
 
 /* ---- choosing items --------------------------------------------------------- */

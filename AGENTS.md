@@ -179,10 +179,17 @@ measure, payload and Report binding, and a reduction such as the latest
 workflows runs once over every catalogue's rows. The columns the measures read
 are the catalogue's required schema. A Direct Lake model cannot refresh a
 calculated table over its Direct Lake tables without a fixed-identity
-connection, so the model holds nothing derived from the catalogues. Every page
+connection, so the model calculates nothing from the catalogue tables. Every page
 carries all of its data, and the renderer chooses the items a detail page
 shows, the first it offers until others are chosen; a page whose data exceeds
-the measure budget says so instead. The renderer qualifies every item,
+the measure budget says so instead. A page measure sums its sections' lengths
+and joins them only within the budget, because joining text past DAX's limit
+fails before it can be measured. The Filters pane narrows the data itself: a
+static `Scope` table, written from the catalogues at deployment, holds each
+object's workspace, item and object fields, and every `CATALOGUES` read keeps
+the rows of the items, and while an object field is selected the objects, that
+`Scope` selects. Without a selection every row stays, including any added
+since deployment; the catalogue's own item always stays. The renderer qualifies every item,
 node key and record ID with its catalogue's payload code, and joins physical
 `_.Shortcut` rows across catalogues as `weaver.catalogues.join` does. A
 catalogue holds `_.Mirror` only once it has been a mirror, so the model reads

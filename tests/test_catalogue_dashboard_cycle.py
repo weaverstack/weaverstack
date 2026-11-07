@@ -22,6 +22,7 @@ from weaver.catalogue_dashboard import (
 from weaver.dashboard_model import (
     DIRECT_LAKE,
     IMPORT,
+    SCOPE_FIELDS,
     declared_columns,
     model_text,
     required_columns,
@@ -212,14 +213,15 @@ def test_a_measure_reads_every_catalogue_and_reduces_across_them():
     workflows = workflows[: workflows.index("displayFolder")]
     # One union of both catalogues' rows, then one GROUPBY and one TOPN over it.
     assert f"'Log {a}'" in workflows and f"'Log {b}'" in workflows
-    assert workflows.count("UNION(") == 2
+    assert workflows.count("UNION(CALCULATETABLE(SELECTCOLUMNS(") == 2
     assert workflows.count("TOPN(40") == 1
     assert '"@catalogue", "Team1"' in workflows and '"@code", "2"' in workflows
     # Import reads the combined table and its catalogue column.
     imported_workflows = imported[imported.index("measure 'Workflow data'") :]
     assert "'Log'[Catalogue]" in imported_workflows
     assert (
-        "UNION(" not in imported_workflows[: imported_workflows.index("displayFolder")]
+        "UNION(CALCULATETABLE(SELECTCOLUMNS("
+        not in imported_workflows[: imported_workflows.index("displayFolder")]
     )
 
 
@@ -334,7 +336,18 @@ def test_each_page_shows_one_html_content_visual_over_its_page_measure(tmp_path)
         # The page draws everything, its item choosers included, in one visual.
         (visual,) = visuals
         settings = json.loads(parts[f"definition/pages/{page}/page.json"])
-        assert "filterConfig" not in settings
+        fields = [
+            (
+                f["field"]["Column"]["Expression"]["SourceRef"]["Entity"],
+                f["field"]["Column"]["Property"],
+            )
+            for f in settings["filterConfig"]["filters"]
+        ]
+        # The Filters pane narrows from workspace to object, where a page lists objects.
+        expected = (
+            SCOPE_FIELDS if page not in ("workspaces", "semantic") else SCOPE_FIELDS[:3]
+        )
+        assert fields == [("Scope", name) for name in expected]
         assert visual["visual"]["visualType"] == HTML_CONTENT
         (projection,) = visual["visual"]["query"]["queryState"]["content"][
             "projections"
@@ -367,6 +380,19 @@ class CatalogueSource(TestSession):
 
     def query_tsql(self, statement, **options):
         self.read.append(statement)
+        if "[_].[Installation] as i" in statement:
+            return [
+                {
+                    "workspace": "Demo",
+                    "item_type": "Lakehouse",
+                    "item_name": "Sales",
+                    "target": "Sales_LH",
+                    "kind": "Table",
+                    "label": "Sales.Customer",
+                    "schema_name": "Tables/Sales",
+                    "object_name": "Customer",
+                }
+            ]
         if "sys.tables" in statement:
             return [
                 {"table_name": table, "column_name": column, "type_name": kind}
@@ -489,6 +515,12 @@ def test_the_dashboard_deploys_over_the_catalogue_and_only_reads_it():
     (partition,) = node.partitions
     assert partition.mode == "directLake"
     assert node.isHidden
+    # The Filters pane lists what deployment read from the catalogue.
+    scope = next(text.decode() for path, text in submitted.items() if "Scope" in path)
+    assert (
+        '{"1", "Demo", "Lakehouse", "Sales", "Sales_LH", "Table", "Sales.Customer"'
+        in scope
+    )
     assert set(measures(submitted)) == set().union(*MEASURES.values())
     assert report.calls == ["update", "read"]
     # The catalogue is read and never written: no table is built, no row changes.
@@ -739,3 +771,49 @@ def test_signatures_are_sent_only_where_a_mirror_can_meet_its_source():
         both = model_text(two, mode)
         mirror = both[both.index("measure 'Mirror data'") :]
         assert '"1" = "0"' in mirror[: mirror.index("displayFolder")]
+
+
+@weaver_test()
+@pytest.mark.parametrize("mode", (DIRECT_LAKE, IMPORT))
+def test_the_filters_pane_narrows_every_catalogue_read_before_a_page_is_built(mode):
+    """Selected fields keep items, and objects while an object field is selected."""
+
+    from weaver.dashboard_model import scope_filters
+
+    sources = dashboard_sources(2)
+    text = model_text(sources, mode)
+    nodes = text[text.index("measure 'Node data'") :]
+    nodes = nodes[: nodes.index("displayFolder")]
+    assert "TREATAS(UNION(SELECTCOLUMNS(" in nodes
+    # Every row stays while nothing is selected, including any added since deployment.
+    assert "NOT ISFILTERED('Scope') || " in nodes
+    assert (
+        "ISFILTERED('Scope'[Object type]) || ISFILTERED('Scope'[Object name])" in nodes
+    )
+    if mode == DIRECT_LAKE:
+        # Each catalogue's table keeps that catalogue's selection.
+        for code, source in enumerate(sources, start=1):
+            assert f"FILTER('Scope', 'Scope'[Catalogue code] = \"{code}\")" in nodes
+            assert f"'Lineage node {source.alias}'[Item type]" in nodes
+    else:
+        assert "'Lineage node'[Catalogue code], 'Lineage node'[Item type]" in nodes
+    # The catalogue's own item stays: the page header names the catalogue from it.
+    assert '[Item name] = "_weaver"' in nodes
+    # A run record names its item by the target it ran against.
+    (log_item, _log_object) = scope_filters("Log", "'Log'")
+    assert "'Scope'[Target]" in log_item and "'Log'[Target name]" in log_item
+
+
+@weaver_test()
+def test_a_page_is_measured_from_its_sections_before_it_is_joined():
+    """Joining text past DAX's limit fails, so the size never needs the whole page."""
+
+    from weaver.dashboard_model import PAGE_BUDGET, page_expression
+
+    expression = page_expression("overview", "[Catalogue data] & [Lineage data]")
+    assert "VAR _s0 = [Catalogue data]" in expression
+    assert "VAR _s1 = [Lineage data]" in expression
+    assert "LEN(_s0) + LEN(_s1) + LEN([Renderer])" in expression
+    small, joined = expression.split(f"IF(_size > {PAGE_BUDGET}, ")[1].split(", ", 1)
+    assert small == "_small"
+    assert joined.startswith("SUBSTITUTE(") and "_s0 & _s1" in joined

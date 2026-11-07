@@ -50,7 +50,7 @@ function overviewPage(body, m) {
     tile("Workflows, 7 days", m.workflowCount || 0, m.workflows.length ? "latest " + ago(m.workflows[0].completed, m.at) : "none in the last 7 days", "none")
   ]));
 
-  var inventory = section("Installed items", [several ? workspaceInventory(m, open, items) : itemInventory(m, open, items)]);
+  var inventory = section("Installed items", [pageKey(m), several ? workspaceInventory(m, open, items) : itemInventory(m, open, items)]);
   var findings = health.all.filter(function (f) { return !f.unobserved; });
   var significant = section("Significant findings", [findings.length ? el("ul", { "class": "wd-findings wd-findings-wide" }, findings.slice(0, 12).map(function (f) {
     return el("li", {}, [severityChip(f.severity), f.node ? nodeLink(m, f.node.key, open) : el("span", { "class": "wd-mono", text: f.label }),
@@ -191,5 +191,5 @@ function healthPage(body, m) {
     segmented("Severity", ["all", "red", "amber", "green", "unobserved"], s.severity, function (v) { s.severity = v; render(); saveState(); }, function (v) { return { all: "All", red: "Red", amber: "Amber", green: "Green", unobserved: "Unobserved" }[v]; })
   ]));
   render();
-  body.appendChild(el("div", { "class": "wd-overview" }, [el("div", { "class": "wd-overview-main" }, [tableHost]), side]));
+  body.appendChild(el("div", { "class": "wd-overview" }, [el("div", { "class": "wd-overview-main" }, [pageKey(m), tableHost]), side]));
 }

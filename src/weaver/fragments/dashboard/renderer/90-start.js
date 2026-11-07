@@ -6,7 +6,6 @@ var PAGES = {
   workspaces: workspacesPage, overview: overviewPage, health: healthPage, orchestration: orchestrationPage, gantt: ganttPage,
   performance: performancePage, entities: entitiesPage, semantic: semanticPage
 };
-var KEYED_PAGES = ["overview", "health", "performance", "entities"];
 var STORE = "weaver-dashboard-state";
 /* View state is kept per set of catalogues, so one Dashboard's focus never
    lands on another's objects. */
@@ -46,11 +45,6 @@ function start() {
     try {
       if (m.tooLarge) tooLargePage(body, m);
       else (PAGES[m.page] || overviewPage)(body, m);
-      // Pages that list objects carry the key to their marks under their toolbar; the graphs carry their own.
-      if (KEYED_PAGES.indexOf(m.page) >= 0 && m.nodes.size) {
-        var bar = body.querySelector(":scope > .wd-toolbar");
-        body.insertBefore(el("div", { "class": "wd-legend wd-page-key" }, objectKey(m)), bar ? bar.nextSibling : body.firstChild);
-      }
     } catch (error) {
       body.appendChild(el("pre", { "class": "wd-error", text: "This page could not be drawn: " + (error && error.message) }));
     }

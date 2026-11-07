@@ -182,7 +182,7 @@ function entitiesPage(body, m) {
   var facets = el("div", { "class": "wd-facets", role: "radiogroup", "aria-label": "Entry kind" });
   var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(browsed.length) + " entries by name, kind or description; choose Column for columns · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
   var list = el("div", { "class": "wd-entry-list", role: "listbox" }), detail = el("div", { "class": "wd-entry-detail" }), note = el("div", { "class": "wd-status-line" });
-  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, el("div", { "class": "wd-dictionary" }, [list, detail])]));
+  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, pageKey(m), el("div", { "class": "wd-dictionary" }, [list, detail])]));
   function tableEntry(id) { return entries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0] || null; }
   function tableOf(e) {
     if (e.ref && e.ref.key) return e.ref.id;

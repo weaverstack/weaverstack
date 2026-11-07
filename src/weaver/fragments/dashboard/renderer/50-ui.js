@@ -449,6 +449,9 @@ function objectKey(m, plain) {
   return keys;
 }
 
+/* The key above the first table or list of a page that draws object marks. */
+function pageKey(m) { return el("div", { "class": "wd-legend wd-page-key" }, objectKey(m)); }
+
 /* plain leaves the item out, for a table that shows it in a column of its own. */
 function nodeLink(m, key, onOpen, plain) {
   var n = m.nodes.get(key);

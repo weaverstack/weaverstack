@@ -235,7 +235,10 @@ function mirrorSources(m, rows) {
     var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
     if (source) m.mirrored.set(ownerCode(r.item), source.code);
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
-    if (n && n.isMirrored && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, r.sourceschema, r.sourceobject)) || null };
+    // The source schema is named as Spark names it; a Lakehouse object's area is its own.
+    var slash = String(r.schema || "").indexOf("/"), sourceSchema = String(r.sourceschema || "");
+    if (slash >= 0 && sourceSchema.indexOf("/") < 0) sourceSchema = r.schema.slice(0, slash + 1) + sourceSchema;
+    if (n && n.isMirrored && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, sourceSchema, r.sourceobject)) || null };
   });
 }
 

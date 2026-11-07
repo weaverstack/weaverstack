@@ -983,6 +983,22 @@ test("a mirror whose borrowed objects were all built locally still pairs with it
   assert.equal(m.nodes.get(O("s", 2)).mirror, undefined);
 });
 
+test("a borrowed Lakehouse object finds its source by its own area", () => {
+  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
+  const nodes = table("nodes", NODE, [
+    [O("h", 1), O("Lakehouse/Lake", 1), "Files/Dss", "AgreementHtml", "Folder", "Dss.AgreementHtml", 9, ""],
+    [O("b", 2), O("Lakehouse/Lake", 2), "Files/Dss", "AgreementHtml", "Folder", "Dss.AgreementHtml", 4 | 8, ""]]);
+  const items = table("items", INSTALL, [
+    [O("Lakehouse/Lake", 1), "PROD", "Lake", "1", "w-prod", "i-prod"], [O("Lakehouse/Lake", 2), "DEV", "Lake", "1", "w-dev", "i-dev"]]);
+  // Mirror names the source schema as Spark does, without the area.
+  const mirrors = table("mirrors", MIRROR, [[O("Lakehouse/Lake", 2), "Files/Dss", "AgreementHtml", "PROD", "Lake", "Dss", "AgreementHtml"]]);
+  const loads = table("loads", LOAD, [[O("Lakehouse/Lake", 1), "Files/Dss", "AgreementHtml", "Succeeded", "w1", AT - H, AT - H + 1000, 1]]);
+  const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes + mirrors + loads);
+  const m = D.buildModel(p.tables, p.problems);
+  assert.equal(m.nodes.get(O("b", 2)).mirror.source.key, O("h", 1));
+  assert.equal(m.nodes.get(O("b", 2)).change, "borrowed");
+});
+
 test("a run knows the items it touched, so choosing items narrows the runs", () => {
   const extra = table("runs", ["workflow", "started", "completed", "records", "objects", "failed"], [["w1", AT - H, AT, 3, 2, 0], ["w2", AT - H, AT, 1, 1, 0]]) +
     table("runtargets", ["workflow", "catalogue", "targettype", "target"], [["w1", "2", "Warehouse", "Mart_WH"], ["w2", "1", "Warehouse", "Hub_WH"]]);

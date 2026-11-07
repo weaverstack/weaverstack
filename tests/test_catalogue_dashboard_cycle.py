@@ -724,3 +724,18 @@ def test_a_catalogue_that_was_never_a_mirror_is_read_without_one():
     assert "table 'Mirror'" not in neither
     status = neither[neither.index("measure 'Mirror data'") :]
     assert 'FILTER(ROW("@catalogue", "", "@code", ""' in status
+
+
+@weaver_test()
+def test_signatures_are_sent_only_where_a_mirror_can_meet_its_source():
+    """A mirror pairs with its source in another catalogue, never in its own."""
+
+    (one,) = dashboard_sources(1)
+    two = dashboard_sources(2)
+    for mode in (DIRECT_LAKE, IMPORT):
+        alone = model_text([one], mode)
+        mirror = alone[alone.index("measure 'Mirror data'") :]
+        assert '"0" = "0"' in mirror[: mirror.index("displayFolder")]
+        both = model_text(two, mode)
+        mirror = both[both.index("measure 'Mirror data'") :]
+        assert '"1" = "0"' in mirror[: mirror.index("displayFolder")]

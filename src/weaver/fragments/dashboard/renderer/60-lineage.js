@@ -11,13 +11,9 @@ var DEPTHS = [0, 1, 2, -1];
 function graphWorkspace(body, m, options) {
   var s = pageState(options.page);
   var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
-  s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
-  if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+  scopeSelection(m, s, options.items || null);
   if (s.up === undefined) s.up = 1;
   if (s.down === undefined) s.down = 1;
-  s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
-  s.moved = s.moved || {};
-  s.patterns = s.patterns || [];
   var matched = new Map();
   function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(m, q)); return matched.get(q); }
   /* The selected objects and every match of each wildcard term. */
@@ -119,6 +115,27 @@ function graphWorkspace(body, m, options) {
   // A remembered viewport is kept unless it no longer shows the focus or the estate.
   if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || scoped.length) view.fitWindow(false); else view.fitAll(false); }
   return { select: select };
+}
+
+/* A graph page's selection, made consistent with the catalogue and the items
+   chosen. When the chosen items change, what the page held for the previous
+   ones goes: objects, search terms with no match among the new items,
+   expansions and moved nodes. What still belongs stays selected. */
+function scopeSelection(m, s, items) {
+  s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
+  s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
+  s.moved = s.moved || {};
+  s.patterns = s.patterns || [];
+  var scope = items ? items.slice().sort().join("\n") : null;
+  if (s.scope !== undefined && s.scope !== scope && items) {
+    var inside = new Set(keysOf(m, items));
+    s.selection = s.selection.filter(function (k) { return inside.has(k); });
+    s.patterns = s.patterns.filter(function (q) { return nodeMatches(m, q).some(function (k) { return inside.has(k); }); });
+    s.expanded = []; s.moved = {};
+  }
+  s.scope = scope;
+  if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+  return s;
 }
 
 /* The objects of the given items. */

@@ -353,8 +353,9 @@ table 'Dashboard measures'
                     & _f & [@sourceschema] & _f & [@sourceobject],
                 ""
             )
+            // Signatures pair a mirror with its source, which only another catalogue can be.
             & IF(
-                ISEMPTY(_mirrors),
+                ISEMPTY(_mirrors) || "{several}" = "0",
                 "",
                 _t & "signatures" & _f & "item" & _f & "schema" & _f & "object" & _f & "kind" & _f & "signature"
                     & CONCATENATEX(

@@ -999,6 +999,49 @@ test("a borrowed Lakehouse object finds its source by its own area", () => {
   assert.equal(m.nodes.get(O("b", 2)).change, "borrowed");
 });
 
+test("a mirrored object's source is found by item type as well as name", () => {
+  const MIRROR = ["item", "schema", "object", "workspace", "target", "sourceschema", "sourceobject"];
+  // A Lakehouse and a Warehouse named Shared in one workspace, with different outcomes.
+  const nodes = table("nodes", NODE, [
+    [O("lh", 1), O("Lakehouse/Shared", 1), "Tables/S", "Customer", "Table", "S.Customer", 9, ""],
+    [O("wh", 1), O("Warehouse/Shared", 1), "Tables/S", "Customer", "Table", "S.Customer", 9, ""],
+    [O("b", 2), O("Lakehouse/Shared", 2), "Tables/S", "Customer", "Table", "S.Customer", 4 | 8, ""]]);
+  const items = table("items", INSTALL, [
+    [O("Lakehouse/Shared", 1), "PROD", "Shared", "1", "w-prod", "i-lh"],
+    [O("Warehouse/Shared", 1), "PROD", "Shared", "1", "w-prod", "i-wh"],
+    [O("Lakehouse/Shared", 2), "DEV", "Shared", "1", "w-dev", "i-dev"]]);
+  const mirrors = table("mirrors", MIRROR, [[O("Lakehouse/Shared", 2), "Tables/S", "Customer", "PROD", "Shared", "S", "Customer"]]);
+  const loads = table("loads", LOAD, [
+    [O("Lakehouse/Shared", 1), "Tables/S", "Customer", "Succeeded", "w1", AT - H, AT - H + 1000, 1],
+    [O("Warehouse/Shared", 1), "Tables/S", "Customer", "Failed", "w2", AT - H, AT - H + 1000, 1]]);
+  const p = D.parsePayload(table("meta", ["at", "format"], [[AT, 2]]) + items + nodes + mirrors + loads);
+  const m = D.buildModel(p.tables, p.problems);
+  const borrowed = m.nodes.get(O("b", 2));
+  assert.equal(borrowed.mirror.source.key, O("lh", 1));
+  assert.equal(borrowed.mirror.source.load.result, "Succeeded");
+});
+
+test("choosing other items drops what the page held for the previous ones", () => {
+  const p = D.parsePayload(federated());
+  const m = D.buildModel(p.tables, p.problems);
+  const hub = O("Warehouse/Hub", 1), mart = O("Warehouse/Mart", 2);
+  const s = { selection: [O("h", 1), O("m", 2)], focus: O("m", 2), patterns: ["MART.Summary", "*"], expanded: [O("s", 2)], moved: { x: 1 } };
+  D.scopeSelection(m, s, [hub, mart]);
+  assert.deepEqual(s.selection, [O("h", 1), O("m", 2)]);
+  // Hub alone: the Mart object and the term matching only Mart objects go;
+  // the Hub object stays selected and takes the focus.
+  D.scopeSelection(m, s, [hub]);
+  assert.deepEqual(s.selection, [O("h", 1)]);
+  assert.equal(s.focus, O("h", 1));
+  assert.deepEqual(s.patterns, ["*"]);
+  assert.deepEqual(s.expanded, []);
+  assert.deepEqual(s.moved, {});
+  // The same items again change nothing.
+  s.expanded = [O("hm", 1)];
+  D.scopeSelection(m, s, [hub]);
+  assert.deepEqual(s.expanded, [O("hm", 1)]);
+});
+
 test("a run knows the items it touched, so choosing items narrows the runs", () => {
   const extra = table("runs", ["workflow", "started", "completed", "records", "objects", "failed"], [["w1", AT - H, AT, 3, 2, 0], ["w2", AT - H, AT, 1, 1, 0]]) +
     table("runtargets", ["workflow", "catalogue", "targettype", "target"], [["w1", "2", "Warehouse", "Mart_WH"], ["w2", "1", "Warehouse", "Hub_WH"]]);

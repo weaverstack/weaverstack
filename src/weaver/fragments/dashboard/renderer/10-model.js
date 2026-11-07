@@ -223,16 +223,19 @@ function joinCatalogues(m, shortcuts) {
    source is read, the object's state is the source's, and none when the source
    no longer holds it; otherwise its state is not observed here. */
 function mirrorSources(m, rows) {
+  // A workspace names items uniquely per type: a Lakehouse and a Warehouse may share a name.
+  function where(type, workspace, target) { return [type, workspace, target].map(function (v) { return String(v || "").toLowerCase(); }).join("|"); }
   var byTarget = new Map();
   m.items.forEach(function (it) {
-    if (it.target) byTarget.set(String(it.workspace || "").toLowerCase() + "|" + String(it.target).toLowerCase(), it);
+    if (it.target) byTarget.set(where(it.type, it.workspace, it.target), it);
   });
   // A row whose object was since built locally still names the catalogue
   // mirrored. Lineage marks the objects still borrowed: a Warehouse records a
   // live row's delete time past the latest datetime DAX can read.
   m.mirrored = new Map();
   rows.forEach(function (r) {
-    var source = byTarget.get(String(r.workspace || "").toLowerCase() + "|" + String(r.target || "").toLowerCase());
+    // A mirror borrows each item into an item of its own type.
+    var source = byTarget.get(where(bare(r.item).split("/")[0], r.workspace, r.target));
     if (source) m.mirrored.set(ownerCode(r.item), source.code);
     var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
     // The source schema is named as Spark names it; a Lakehouse object's area is its own.

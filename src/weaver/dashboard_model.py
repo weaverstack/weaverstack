@@ -393,6 +393,7 @@ def expand_measures(text: str, sources: Sequence[DashboardSource], mode: str) ->
         else '""',
     )
     text = text.replace('"{catalogues}"', catalogue_rows(sources))
+    text = text.replace('"{several}"', '"1"' if len(sources) > 1 else '"0"')
     return _expand_blocks(text, expander)
 
 

@@ -27,7 +27,7 @@ from ..catalogue.tables import (
     TEST_STATUS,
 )
 from ..declaration.model import WeaverItemId
-from ..health import HealthReport, assess, resolve_as_of
+from ..health import HealthReport, JoinedHealthReport, assess, resolve_as_of
 from .items import installed_targets, requested_items
 from .workspace import operation_workspace
 
@@ -57,12 +57,20 @@ def health(
     *,
     as_of: str | datetime | None = None,
     workspace: str | None = None,
-    catalogue: str | None = None,
+    catalogue: str | Sequence[str] | None = None,
     workspace_config: str | Path | None = None,
     inventories: bool = True,
     session=None,
-) -> HealthReport:
+) -> "HealthReport | JoinedHealthReport":
     """Report the installed estate's operational health.
+
+    ``catalogue`` names one catalogue, or several as ``Workspace/Warehouse/Name``.
+    Several are read together and joined where a physical shortcut in one lands
+    on an object another installs. Each is reported in the order given, and an
+    object behind a source in another catalogue is reported as behind. One that
+    cannot be read is reported in its place with the reason. ``items`` then
+    names ``Workspace/Kind/Name`` for an item outside this workspace's
+    catalogue, and a bare workspace name every item of its catalogue.
 
     ``items`` restricts the subjects reported on. With none, every target the
     catalogue binds an item to. Managed ancestry outside the selection is still
@@ -80,6 +88,19 @@ def health(
     """
 
     started = datetime.now(timezone.utc)
+    if not isinstance(catalogue, (str, type(None))) and len(list(catalogue)) > 1:
+        return _joined_health(
+            items,
+            tuple(catalogue),
+            as_of=as_of,
+            workspace=workspace,
+            workspace_config=workspace_config,
+            inventories=inventories,
+            session=session,
+            started=started,
+        )
+    if not isinstance(catalogue, (str, type(None))):
+        catalogue = next(iter(catalogue), None)
     requested = requested_items(items, what="health")
     resolved = operation_workspace(
         "health",
@@ -111,11 +132,36 @@ def run_health(
     generated_at: datetime,
     inventories: bool = True,
 ) -> HealthReport:
+    catalogue, source = _read(session, workspace)
+    return _report(
+        session,
+        workspace=workspace,
+        catalogue=catalogue,
+        source=source,
+        items=items,
+        as_of=as_of,
+        generated_at=generated_at,
+        inventories=inventories,
+    )
+
+
+def _read(session, workspace, *, steps: bool = True):
+    """A catalogue and, where it mirrors one, its source catalogue.
+
+    Without ``steps`` the reads are not framed, for a caller reading several
+    catalogues at once.
+    """
+
+    from contextlib import nullcontext
+
     from ..catalogue.connection import catalogue_connection
     from ..catalogue.state import read_installed_catalogue
 
+    def step(name):
+        return session.step(name) if steps else nullcontext()
+
     connection = catalogue_connection(session, workspace)
-    with session.step("Read catalogue"):
+    with step("Read catalogue"):
         # Read current state and its supporting statistics together.
         catalogue = read_installed_catalogue(
             connection, tables=HEALTH_TABLES, load_history=True
@@ -125,7 +171,7 @@ def run_health(
     if catalogue.mirrors:
         from .mirror import mirrored_source
 
-        with session.step("Read the mirrored catalogue"):
+        with step("Read the mirrored catalogue"):
             # Mirrored load state comes from the catalogue where rows are written.
             source = mirrored_source(
                 catalogue,
@@ -135,6 +181,51 @@ def run_health(
                 tables=SOURCE_TABLES,
                 history=True,
             )
+    return catalogue, source
+
+
+def _report(
+    session,
+    *,
+    workspace,
+    catalogue,
+    source,
+    items: Sequence[WeaverItemId],
+    as_of: datetime,
+    generated_at: datetime,
+    inventories: bool,
+) -> HealthReport:
+    seen = _observe(
+        session,
+        workspace=workspace,
+        catalogue=catalogue,
+        items=items,
+        inventories=inventories,
+    )
+    return assess(
+        catalogue,
+        as_of=as_of,
+        generated_at=generated_at,
+        targets=seen.targets,
+        items=seen.items or None,
+        inventories=seen.inventories,
+        source=source,
+        installation_faults=seen.installation_faults,
+    )
+
+
+def _observe(
+    session, *, workspace, catalogue, items, inventories: bool, steps: bool = True
+):
+    """The selected targets, what they hold, and installations that no longer
+    name their Fabric item."""
+
+    from contextlib import nullcontext
+
+    from ..health import Observed
+
+    def step(name):
+        return session.step(name) if steps else nullcontext()
 
     dag = catalogue.dag()
     # Report physical targets bound by the catalogue's installations.
@@ -150,7 +241,7 @@ def run_health(
     read = {}
     faults = {}
     if inventories:
-        with session.step("Check installed items"):
+        with step("Check installed items"):
             faults = _installation_faults(
                 session,
                 workspace=workspace,
@@ -159,7 +250,7 @@ def run_health(
                 items=tuple(items),
                 targets=selected,
             )
-        with session.step("Read installed objects"):
+        with step("Read installed objects"):
             # A target whose item was replaced is reported, not read by name.
             broken = {dag.installations[item] for item in faults}
             read = _inventories(
@@ -168,17 +259,126 @@ def run_health(
                 targets=tuple(target for target in selected if target not in broken),
                 dag=dag,
             )
-
-    return assess(
-        catalogue,
-        as_of=as_of,
-        generated_at=generated_at,
+    return Observed(
         targets=selected if items else None,
-        items=tuple(items) or None,
+        items=tuple(items),
         inventories=read,
-        source=source,
         installation_faults=faults,
     )
+
+
+def _joined_health(
+    items,
+    catalogues: Sequence[str],
+    *,
+    as_of,
+    workspace,
+    workspace_config,
+    inventories: bool,
+    session,
+    started: datetime,
+):
+    from ..catalogues import Member
+    from ..health import Unread, assess_joined
+    from ..sessions.host import use_or_create_session
+    from .joined import concurrently, requested_by_label, resolve_places, retried
+
+    home, places = resolve_places(
+        "health",
+        catalogues,
+        workspace=workspace,
+        workspace_config=workspace_config,
+        session=session,
+    )
+    requested = (
+        {} if items is None else requested_by_label("health", items, places, home)
+    )
+    resolved_as_of = resolve_as_of(as_of, started=started)
+
+    with use_or_create_session(session, workspace=home) as opened:
+        with opened.task("Health", f"{len(places)} catalogues"):
+
+            def read(place):
+                """The catalogue as a member, what its targets hold, and why
+                either could not be had."""
+
+                with opened.concurrent_substep(f"Read {place.reference}"):
+                    try:
+                        catalogue, source = retried(
+                            lambda: _read(opened, place.workspace, steps=False),
+                            session=opened,
+                            workspace=place.workspace,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return None, None, f"Its catalogue could not be read: {exc}"
+                    try:
+                        dag = catalogue.dag()
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return (
+                            None,
+                            None,
+                            f"Its catalogue could not be interpreted: {exc}",
+                        )
+                    member = Member(
+                        label=place.label,
+                        workspace=place.workspace.workspace,
+                        catalogue_name=place.catalogue_name,
+                        catalogue=catalogue,
+                        dag=dag,
+                        source=source,
+                    )
+                    if requested and place.label not in requested:
+                        # Context only: its graph and load state are what is used.
+                        return member, None, None
+                    try:
+                        seen = retried(
+                            lambda: _observe(
+                                opened,
+                                workspace=place.workspace,
+                                catalogue=catalogue,
+                                items=requested.get(place.label, ()),
+                                inventories=inventories,
+                                steps=False,
+                            ),
+                            session=opened,
+                            workspace=place.workspace,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - reported in place
+                        return (
+                            member,
+                            None,
+                            f"Its targets could not be inventoried: {exc}",
+                        )
+                return member, seen, None
+
+            with opened.step(f"Read {len(places)} catalogues"):
+                outcomes = concurrently(places, read)
+            entries, observed, failures = [], {}, {}
+            for place, (member, seen, failure) in zip(places, outcomes):
+                if member is None:
+                    entries.append(
+                        Unread(
+                            place.label,
+                            place.workspace.workspace,
+                            place.reference,
+                            failure,
+                        )
+                    )
+                    continue
+                entries.append(member)
+                if seen is not None:
+                    observed[place.label] = seen
+                if failure is not None:
+                    failures[place.label] = failure
+            return assess_joined(
+                entries,
+                as_of=resolved_as_of,
+                generated_at=started,
+                observed=observed,
+                # With items named, the other catalogues give context only.
+                reported=tuple(requested) or None,
+                failures=failures,
+            )
 
 
 def _installation_faults(session, *, workspace, catalogue, dag, items, targets):

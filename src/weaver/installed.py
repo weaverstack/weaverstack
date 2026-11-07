@@ -1282,6 +1282,10 @@ class _References:
                 f"import, then build {consumer.item} again."
             )
         if not shortcut.is_logical:
+            # The consumer reads the installed destination, as a relation read
+            # of it does; what lies behind a physical shortcut is not Weaver's.
+            if shortcut.destination in self._objects:
+                return shortcut.destination, None
             self.external.setdefault(consumer, []).append(reference)
             return None
         return self._through(consumer, reference, shortcut)

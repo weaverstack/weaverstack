@@ -321,3 +321,31 @@ def test_rendering_the_same_diff_twice_is_identical():
 
     assert [a.id for a in first] == [a.id for a in second]
     assert first_payloads == second_payloads
+
+
+@weaver_test()
+def test_a_runtime_install_settles_after_a_folder_prune_on_its_target(monkeypatch):
+    """A pruned unmanaged folder can take the runtime area with it."""
+
+    from types import SimpleNamespace
+
+    from weaver.build_bundle import prune as module
+    from weaver.build_bundle.dependencies import pruned_objects_key
+    from weaver.build_bundle.prune import _item_prune_stage
+    from weaver.declaration.model import WeaverItemId
+
+    monkeypatch.setattr(module, "item_runtime_artefacts", lambda *a, **k: ())
+    target = bound_target()
+    stage = _item_prune_stage(
+        SimpleNamespace(source_documents={}, shortcuts=(), logical_shortcuts=()),
+        (),
+        item=WeaverItemId.parse("Lakehouse/Sales"),
+        target=target,
+        inventory=target_inventory(folder_schemas=("Raw",), folders=("Raw.Stale",)),
+        managed_builder=lambda *a, **k: keep(folder_schemas={"raw"}),
+        renderer=render_lakehouse_inventory_prune,
+    )
+
+    (action,) = stage.batches[0].actions
+    assert action.kind == "prune_folder"
+    assert stage.provides[action.id] == (pruned_objects_key(target.id),)

@@ -200,6 +200,16 @@ def test_authored_columns_refine_the_columns_a_source_generates(tmp_path):
                 "row_signature": "varchar",
             },
         ),
+        # A Lakehouse shortcut to a Warehouse table keeps the Warehouse spelling.
+        (
+            "Lakehouse/Serving/Tables/Cake.Sales",
+            {
+                "Row insert datetime": "datetime2",
+                "Row update datetime": "datetime2",
+                "Row delete datetime": "datetime2",
+                "Row signature": "varbinary",
+            },
+        ),
     ],
 )
 @weaver_test()

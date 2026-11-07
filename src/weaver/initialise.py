@@ -176,9 +176,14 @@ def initialise(
             (
                 "environment",
                 environment,
-                configured.environment.name if configured.environment else None,
+                str(configured.environment) if configured.environment else None,
             ),
         ):
+            if field == "environment" and supplied is not None and existing:
+                supplied, existing = (
+                    _environment_key(supplied, configured.workspace),
+                    _environment_key(existing, configured.workspace),
+                )
             if (
                 supplied is not None
                 and existing is not None
@@ -208,24 +213,41 @@ def initialise(
     has_data = bool(
         effective["lakehouse"] or effective["warehouse"] or _sources(adopted)
     )
+    # Build records a Report in a catalogue, and a Report needs no Spark.
+    reports_only = (
+        not has_data
+        and not effective["semantic_model"]
+        and any(item.startswith(f"{REPORT}/") for item in source_items)
+        and not any(item.startswith(f"{SEMANTIC_MODEL}/") for item in source_items)
+    )
+    workspace_name = _workspace_name(workspace, session=session)
+    environment_reference = environment or (
+        str(configured.environment)
+        if configured is not None and configured.environment
+        else DEFAULT_ENVIRONMENT
+        if has_data or publish_environment
+        else None
+    )
+    local_environment, shared_environment = _environment_parts(
+        environment_reference, workspace_name
+    )
+    if shared_environment and publish_environment:
+        raise InitialiseError(
+            f"{shared_environment} is in another workspace and is published from "
+            "the project that defines it. Initialise without publishing."
+        )
     request = ProjectRequest(
-        workspace=_workspace_name(workspace, session=session),
+        workspace=workspace_name,
         catalogue=catalogue
         or (
             configured.catalogue_item.name
             if configured is not None and configured.catalogue
             else DEFAULT_CATALOGUE
-            if has_data
+            if has_data or reports_only
             else None
         ),
-        environment=environment
-        or (
-            configured.environment.name
-            if configured is not None and configured.environment
-            else DEFAULT_ENVIRONMENT
-            if has_data or publish_environment
-            else None
-        ),
+        environment=local_environment,
+        shared_environment=shared_environment,
         **effective,
         example=example,
         source_items=source_items,
@@ -249,6 +271,13 @@ def initialise(
                     wanted_items=wanted_items,
                     existing_powerbi=source_items,
                 )
+                if request.shared_environment:
+                    _require_shared_environment(request.shared_environment, client=rest)
+                    resources.append(
+                        FabricItemOutcome(
+                            ENVIRONMENT_ROLE, request.shared_environment, EXISTING
+                        )
+                    )
 
             with opened.step(
                 "Reading the Environment"
@@ -322,7 +351,12 @@ def initialise(
                 return InitialiseReport(
                     project_folder=str(destination),
                     workspace=request.workspace,
-                    resources=_planned(request, found, wanted_items=wanted_items),
+                    resources=_in_role_order(
+                        (
+                            *_planned(request, found, wanted_items=wanted_items),
+                            *resources,
+                        )
+                    ),
                     files=tuple(sorted(files)),
                     example=ExampleOutcome(
                         generated=request.example is not None, name=request.example
@@ -498,6 +532,47 @@ def _bare(request: ProjectRequest):
     from .workspaces import Workspace
 
     return Workspace(workspace=request.workspace)
+
+
+def _environment_key(value, workspace: str) -> tuple[str, str]:
+    from .workspaces import EnvironmentRef
+
+    reference = EnvironmentRef.parse(value)
+    return (reference.owner(workspace).casefold(), reference.name)
+
+
+def _environment_parts(value, workspace: str) -> tuple[str | None, str | None]:
+    """The Environment as this project's own name, or as one in another
+    workspace that the project uses as it is."""
+
+    if value is None:
+        return None, None
+    from .workspaces import EnvironmentRef
+
+    reference = EnvironmentRef.parse(value)
+    if reference.owner(workspace).casefold() == workspace.casefold():
+        return reference.name, None
+    return None, str(reference)
+
+
+def _require_shared_environment(value: str, *, client) -> None:
+    """Refuse an Environment in another workspace that cannot be found there."""
+
+    from .workspaces import EnvironmentRef
+
+    reference = EnvironmentRef.parse(value)
+    try:
+        names = available_environments(reference.workspace, client=client)
+    except WeaverError as exc:
+        raise InitialiseError(
+            f"Cannot read the workspace {reference.workspace} for Environment "
+            f"{reference.name}: {exc}"
+        ) from exc
+    if reference.name not in names:
+        raise InitialiseError(
+            f"{reference.workspace} has no Environment named {reference.name}. "
+            "Name an existing Environment, or one in this workspace."
+        )
 
 
 def _workspace_name(workspace: str | None, *, session) -> str:

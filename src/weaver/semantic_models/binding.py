@@ -147,13 +147,15 @@ def _changes(before, after, key=""):
 
 
 def _housekeeping(reference):
-    """The audit and signature columns Weaver adds to a source's rows."""
+    """The audit and signature columns Weaver adds to a source's rows.
 
-    language = (
-        SQL if source_identity(reference).item.item_type == "Warehouse" else SPARK_SQL
-    )
+    Every spelling, because a Lakehouse table can be a shortcut to a Warehouse
+    table and carry the Warehouse's spelling.
+    """
+
     return {
         name.casefold()
+        for language in (SQL, SPARK_SQL)
         for name in (
             *(audit_column_name(c, language) for c in AUDIT_COLUMNS),
             signature_column_name(language),

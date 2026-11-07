@@ -117,3 +117,47 @@ def test_source_shape_and_endpoint_use_selected_session_identity(
         else:
             assert not session.scope().livy.acquired
             assert audiences == ["https://database.windows.net/.default"]
+
+
+@weaver_test()
+def test_a_lakehouse_table_the_endpoint_has_not_listed_is_refreshed_then_read():
+    """A new shortcut table appears in the endpoint only once it is synced."""
+
+    from weaver.sessions.semantic_sources import semantic_source
+
+    refreshed = []
+    answers = [[], [{"column_name": "Id", "data_type": "bigint"}]]
+    lakehouse = SimpleNamespace(
+        name="Bridge", type="Lakehouse", id="lakehouse-id", workspace_id="ws-id"
+    )
+    resolver = SimpleNamespace(
+        client=SimpleNamespace(
+            get_json=lambda path: {
+                "properties": {
+                    "sqlEndpointProperties": {
+                        "id": "endpoint-id",
+                        "connectionString": "lake.datawarehouse.fabric.microsoft.com",
+                    }
+                }
+            }
+        ),
+        refresh_sql_endpoint=lambda item, tables: refreshed.append((str(item), tables)),
+    )
+    session = SimpleNamespace(
+        resolve_item=lambda *a, **k: lakehouse,
+        resolver=lambda workspace: resolver,
+        query_tsql=lambda *a, **k: answers.pop(0),
+    )
+
+    observed = semantic_source(
+        session,
+        "Bridge",
+        item_type="Lakehouse",
+        schema="GOLD",
+        name="CustomerSales",
+        include_columns=True,
+        workspace=None,
+    )
+
+    assert refreshed == [("Bridge", [("GOLD", "CustomerSales")])]
+    assert observed["source_columns"] == [{"column_name": "Id", "data_type": "bigint"}]

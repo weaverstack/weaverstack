@@ -506,6 +506,72 @@ def external_source(fabric_external_lakehouse):
     return ExternalSource(item=item, location=location)
 
 
+#: The downstream workspace for catalogues read together, and the variable that
+#: renames it for another tenant.
+SPOKE_WORKSPACE_ENV = "WEAVER_FABRIC_WORKSPACE_SPOKE"
+DEFAULT_SPOKE_WORKSPACE = "PYTEST_WORKSPACE_SPOKE"
+
+#: Items of the two catalogues a joined run reads: a hub catalogue in the
+#: suite's workspace and a downstream one in the spoke workspace. Their own
+#: catalogues, so nothing else the suite builds is in either.
+JOINED_ITEMS = {
+    "hub_weaver": "PYTEST_HUB_WEAVER",
+    "hub_warehouse": "PYTEST_HUB_WH",
+    "spoke_weaver": "PYTEST_SPOKE_WEAVER",
+    "spoke_lakehouse": "PYTEST_SPOKE_LH",
+    "spoke_warehouse": "PYTEST_SPOKE_WH",
+}
+
+
+@dataclass(frozen=True)
+class JoinedEstate:
+    """The hub and spoke workspaces, and the fixed items each catalogue binds."""
+
+    hub_workspace: str
+    spoke_workspace: str
+    names: dict
+
+
+@pytest.fixture(scope="session")
+def joined_estate(fabric_workspace_item, fabric_client):
+    """The hub and spoke items, found or created, and never deleted."""
+
+    from weaver.fabric import find_workspace
+    from weaver.fabric.resources import (
+        LAKEHOUSE,
+        WAREHOUSE,
+        create_lakehouse,
+        create_warehouse,
+        find_item,
+    )
+
+    spoke_name = os.environ.get(SPOKE_WORKSPACE_ENV, DEFAULT_SPOKE_WORKSPACE)
+    try:
+        spoke = find_workspace(spoke_name)
+    except Exception as exc:
+        pytest.skip(
+            f"cannot reach the spoke workspace {spoke_name!r}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+    names = {role: _fixed_name_from(JOINED_ITEMS, role) for role in JOINED_ITEMS}
+    for role, workspace, kind, create in (
+        ("hub_weaver", fabric_workspace_item, WAREHOUSE, create_warehouse),
+        ("hub_warehouse", fabric_workspace_item, WAREHOUSE, create_warehouse),
+        ("spoke_weaver", spoke, WAREHOUSE, create_warehouse),
+        ("spoke_lakehouse", spoke, LAKEHOUSE, create_lakehouse),
+        ("spoke_warehouse", spoke, WAREHOUSE, create_warehouse),
+    ):
+        try:
+            find_item(workspace, names[role], item_type=kind, client=fabric_client)
+        except Exception:
+            create(workspace, names[role], client=fabric_client)
+    return JoinedEstate(
+        hub_workspace=fabric_workspace_item.name,
+        spoke_workspace=spoke.name,
+        names=names,
+    )
+
+
 @pytest.fixture(scope="session")
 def environment_name():
     return os.environ.get(ENVIRONMENT_ENV, DEFAULT_ENVIRONMENT)

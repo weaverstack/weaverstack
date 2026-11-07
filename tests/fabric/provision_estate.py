@@ -1,7 +1,8 @@
 """Provision the permanent Weaver Fabric pytest estate.
 
-Creates missing Lakehouses, Warehouses and the SemanticModel in PYTEST_WORKSPACE, and the
-external estate in PYTEST_WORKSPACE_EXT that shortcut tests point at. Existing
+Creates missing Lakehouses, Warehouses and the SemanticModel in PYTEST_WORKSPACE, the
+external estate in PYTEST_WORKSPACE_EXT that shortcut tests point at, and the
+downstream items in PYTEST_WORKSPACE_SPOKE that catalogues read together use. Existing
 items are reused and existing external contents are left as they are. Nothing is
 deleted.
 
@@ -29,6 +30,10 @@ Optional environment variables:
     WEAVER_PYTEST_SEMANTIC_MODEL
     WEAVER_PYTEST_EXTERNAL
     WEAVER_PYTEST_EXTERNAL_WAREHOUSE
+    WEAVER_FABRIC_WORKSPACE_SPOKE
+    WEAVER_PYTEST_HUB_WEAVER, WEAVER_PYTEST_HUB_WAREHOUSE
+    WEAVER_PYTEST_SPOKE_WEAVER, WEAVER_PYTEST_SPOKE_LAKEHOUSE,
+    WEAVER_PYTEST_SPOKE_WAREHOUSE
 """
 
 from __future__ import annotations
@@ -334,6 +339,51 @@ def create_semantic_model(workspace, name, *, client):
     return find_item(workspace, name, item_type=SEMANTIC_MODEL, client=client)
 
 
+#: The downstream workspace's items, by role, and its Warehouse roles in this
+#: workspace. Their catalogues are their own; see tests/fabric/conftest.py.
+SPOKE_LAKEHOUSE_ROLES = {"spoke_lakehouse": "PYTEST_SPOKE_LH"}
+SPOKE_WAREHOUSE_ROLES = {
+    "spoke_weaver": "PYTEST_SPOKE_WEAVER",
+    "spoke_warehouse": "PYTEST_SPOKE_WH",
+}
+WAREHOUSE_ROLES.update(
+    {"hub_weaver": "PYTEST_HUB_WEAVER", "hub_warehouse": "PYTEST_HUB_WH"}
+)
+
+
+def provision_spoke(client: FabricClient) -> list[str]:
+    """The downstream workspace's Lakehouse and Warehouses, where it exists."""
+
+    name = os.environ.get("WEAVER_FABRIC_WORKSPACE_SPOKE", "PYTEST_WORKSPACE_SPOKE")
+    try:
+        workspace = find_workspace(name)
+    except Exception as exc:
+        print(f"SKIPPED  spoke workspace {name}: {exc}")
+        return []
+    failures = []
+    for roles, kind, create in (
+        (SPOKE_LAKEHOUSE_ROLES, LAKEHOUSE, create_lakehouse),
+        (SPOKE_WAREHOUSE_ROLES, WAREHOUSE, create_warehouse),
+    ):
+        for role, default_name in roles.items():
+            item_name = configured_name(role, default_name)
+            try:
+                item, created = find_or_create(
+                    workspace=workspace,
+                    client=client,
+                    name=item_name,
+                    item_type=kind,
+                    create=create,
+                )
+            except Exception as exc:
+                failures.append(f"{kind} {item_name}: {type(exc).__name__}: {exc}")
+                print(f"FAILED  {kind}  {item_name}: {exc}")
+                continue
+            action = "CREATED" if created else "EXISTS "
+            print(f"{action}  {kind}  {name}/{item.name} ({item.id})")
+    return failures
+
+
 def main() -> int:
     # The chain a `weaver` command uses, as the suite installs: the Azure CLI
     # where `az login` has produced an identity, and the persisted browser
@@ -409,6 +459,8 @@ def main() -> int:
             continue
         action = "CREATED" if created else "EXISTS "
         print(f"{action}  SemanticModel  {item.name} ({item.id})")
+
+    failures.extend(provision_spoke(client))
 
     from weaver.workspaces import Workspace
 

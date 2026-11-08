@@ -239,6 +239,7 @@ def test_load_dry_run_emits_the_normal_run_report_shape(session):
         "order",
         "edges",
         "nodes",
+        "totals",
         "messages",
     }
 

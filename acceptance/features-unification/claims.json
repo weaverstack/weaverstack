@@ -25,7 +25,7 @@
     "id": "tsql",
     "group": 1,
     "title": "Ordinary T-SQL",
-    "brief_copy": "Keep the SELECTs your team knows\u2014without a proprietary modelling language or macros.",
+    "brief_copy": "Keep the SELECTs your team knows—without a proprietary modelling language or macros.",
     "urls": [
       "https://docs.weaverstack.dev/warehouse/first-project/"
     ],
@@ -93,10 +93,10 @@
     "title": "Built for developers and AI agents",
     "brief_copy": "Readable terminal output and structured --json results, with previews, validation and explicit outcomes, for developers and AI agents.",
     "urls": [
-      "https://docs.weaverstack.dev/reference/machine-readable-output/"
+      "https://docs.weaverstack.dev/reference/ai-agents/#json-output"
     ],
     "sources": [
-      "docs/reference/machine-readable-output.md"
+      "docs/reference/ai-agents.md"
     ],
     "description": "Readable terminal output for developers, and structured `--json` results for AI agents from Check, Build, Load, Test and Health. Preview, build, load, test and inspect in a repeatable cycle, with explicit outcomes for what ran and what needs attention.",
     "qualification": "",
@@ -113,7 +113,7 @@
     "id": "fabric-dag",
     "group": 2,
     "title": "One dependency graph across Fabric",
-    "brief_copy": "Connect supported Lakehouse Files, Python and Spark SQL work to Warehouse T-SQL and dependent semantic-model refreshes in **one managed DAG**\u2014without stitching those managed stages together with another Fabric pipeline.",
+    "brief_copy": "Connect Lakehouse Files, Python and Spark SQL work to Warehouse T-SQL and dependent semantic-model refreshes in one dependency graph.",
     "urls": [
       "https://docs.weaverstack.dev/estate/connected-items/",
       "https://docs.weaverstack.dev/semantic-models/managed-sources/"
@@ -122,8 +122,8 @@
       "docs/estate/connected-items.md",
       "docs/semantic-models/managed-sources.md"
     ],
-    "description": "Order selected managed Lakehouse work, Warehouse T-SQL and dependent Semantic Model refreshes in one DAG.",
-    "qualification": "",
+    "description": "Order selected managed Lakehouse work, Warehouse T-SQL and dependent Semantic Model refreshes in one dependency graph.",
+    "qualification": "Cycles use deterministic once-per-invocation ordering, not iteration to convergence. Runtime evidence: efc046e7cf066daefd27f9268413ae05c3ed64e4 src/weaver/graph.py. Historical documentation hashes below retain their original provenance.",
     "evidence": [
       {
         "repository": "matthias-wong-dev/weaverstack-docs",
@@ -239,7 +239,7 @@
     "id": "bookmarks",
     "group": 2,
     "title": "Per-consumer bookmarks",
-    "brief_copy": "Each consumer retains its own successful processing position\u2014even when multiple Tables read the same source.",
+    "brief_copy": "Each consumer retains its own successful processing position—even when multiple Tables read the same source.",
     "urls": [
       "https://docs.weaverstack.dev/lakehouse/incremental/"
     ],
@@ -702,6 +702,160 @@
         "revision": "df5e266ffe5c6b893ef7a6291ba7b23ab0ed2b45",
         "path": "docs/advanced/protecting-data.md",
         "sha256": "e4b1516243065bb5f8f837eb38cdf2f149fe301ea565ee38e0a5e8d816a97b9b"
+      }
+    ]
+  },
+  {
+    "id": "workflow",
+    "group": 1,
+    "title": "Share a Session across Python operations",
+    "brief_copy": "A workflow shares Session and configuration; Load and Test records correlate under its workflow ID.",
+    "urls": [
+      "https://docs.weaverstack.dev/core-concepts/sessions-and-workflows/"
+    ],
+    "sources": [
+      "src/weaver/workflow.py"
+    ],
+    "description": "A workflow shares Session and configuration; Load and Test records correlate under its workflow ID.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/workflow.py",
+        "sha256": "213ce2dd7be91405b8fc85a060b0a2820f5edc60caf3cac56744a13491972d33"
+      }
+    ]
+  },
+  {
+    "id": "execute",
+    "group": 4,
+    "title": "Run SQL, Python or DAX against a Fabric item",
+    "brief_copy": "Exactly one command or file is submitted. SQL and Python can mutate data; Weaver does not automatically create Load or Test records.",
+    "urls": [
+      "https://docs.weaverstack.dev/reference/cli/execute/"
+    ],
+    "sources": [
+      "src/weaver/operations/execute.py"
+    ],
+    "description": "Exactly one command or file is submitted. SQL and Python can mutate data; Weaver does not automatically create Load or Test records.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/operations/execute.py",
+        "sha256": "3d12d2b27f7edb4fea51780b841c62857d714c16b3a01c98176dfdad6fa7358d"
+      }
+    ]
+  },
+  {
+    "id": "stale",
+    "group": 4,
+    "title": "Rerun work that needs attention",
+    "brief_copy": "Test stale selection is distinct from the pre-existing Load stale selection.",
+    "urls": [
+      "https://docs.weaverstack.dev/estate/recovery/"
+    ],
+    "sources": [
+      "src/weaver/operations/test.py"
+    ],
+    "description": "Test stale selection is distinct from the pre-existing Load stale selection.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/operations/test.py",
+        "sha256": "8dbba01d334958105ba7206e98c327934c500c4ea30cea93e13708fe16089dd9"
+      }
+    ]
+  },
+  {
+    "id": "across-catalogues",
+    "group": 6,
+    "title": "Operate selected work across catalogues",
+    "brief_copy": "Catalogues supply context; item or workspace selection determines which work runs.",
+    "urls": [
+      "https://docs.weaverstack.dev/estate/across-catalogues/"
+    ],
+    "sources": [
+      "src/weaver/operations/joined.py"
+    ],
+    "description": "Catalogues supply context; item or workspace selection determines which work runs.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/operations/joined.py",
+        "sha256": "7caec9a9c2b4aaf8fe21be5457a6d360a21eb8f2ea0cb4ced745285cbc1bdfad"
+      }
+    ]
+  },
+  {
+    "id": "cycles",
+    "group": 6,
+    "title": "Run dependencies that contain cycles",
+    "brief_copy": "Deterministic once-per-invocation ordering, not iteration to convergence.",
+    "urls": [
+      "https://docs.weaverstack.dev/estate/across-catalogues/#cycles"
+    ],
+    "sources": [
+      "src/weaver/graph.py"
+    ],
+    "description": "Deterministic once-per-invocation ordering, not iteration to convergence.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/graph.py",
+        "sha256": "1d40c7d0725c85401d4bf348d635287364eba85f31d9ac6150ac02b1eedc3c5d"
+      }
+    ]
+  },
+  {
+    "id": "dashboard-across",
+    "group": 4,
+    "title": "Read participating catalogues in one Dashboard",
+    "brief_copy": "Up to ten Direct Lake catalogues; Import supports more than ten and requires refresh.",
+    "urls": [
+      "https://docs.weaverstack.dev/estate/catalogue-dashboard/#read-several-catalogues"
+    ],
+    "sources": [
+      "src/weaver/dashboard_model.py"
+    ],
+    "description": "Up to ten Direct Lake catalogues; Import supports more than ten and requires refresh.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/dashboard_model.py",
+        "sha256": "56471da08001bb7a4c76c6646bb43368dac5acb5b6263726347976a321304d5c"
+      }
+    ]
+  },
+  {
+    "id": "dashboard-export",
+    "group": 4,
+    "title": "Share an HTML snapshot",
+    "brief_copy": "A snapshot reflects model data at export; a downloaded local file opens without Fabric capacity. Lakehouse destinations still need access.",
+    "urls": [
+      "https://docs.weaverstack.dev/estate/catalogue-dashboard/#export-static-pages"
+    ],
+    "sources": [
+      "src/weaver/operations/catalogue_dashboard.py"
+    ],
+    "description": "A snapshot reflects model data at export; a downloaded local file opens without Fabric capacity. Lakehouse destinations still need access.",
+    "qualification": "Reviewed against runtime efc046e7cf066daefd27f9268413ae05c3ed64e4; documentation is a forthcoming-release draft.",
+    "evidence": [
+      {
+        "repository": "weaverstack/weaverstack",
+        "revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+        "path": "src/weaver/operations/catalogue_dashboard.py",
+        "sha256": "168391bce9551e3cd899a7cd78a1b29db37f424c0eb369b485f17ae6ef83fdb8"
       }
     ]
   }

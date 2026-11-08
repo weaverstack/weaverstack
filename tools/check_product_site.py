@@ -127,6 +127,7 @@ RETIRED_PAGES = {"/scale/": "https://weaverstack.dev/features/#scale"}
 
 
 def route_file(root, path):
+    path = path or "/"
     candidate = root / unquote(path).lstrip("/")
     return candidate / "index.html" if path.endswith("/") else candidate
 
@@ -193,9 +194,17 @@ def run(root: Path, developer_site: Path | None):
                 for n in doc.descendants("meta")
             ), f"{route}: fragment-losing refresh"
             if developer_site:
-                assert route_file(developer_site, route).is_file(), (
-                    f"{route}: pointer destination missing"
+                target_url = urlsplit(destination)
+                target_root = (
+                    root if target_url.netloc == "weaverstack.dev" else developer_site
                 )
+                target = route_file(target_root, target_url.path)
+                assert target.is_file(), f"{route}: pointer destination missing"
+                if target_url.fragment:
+                    assert unquote(target_url.fragment) in {
+                        n.attrs.get("id")
+                        for n in Document(target.read_text()).root.descendants()
+                    }, f"{route}: pointer destination fragment missing"
             forwarding[route] = destination
             continue
         documents[route] = doc

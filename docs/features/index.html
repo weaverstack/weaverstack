@@ -168,13 +168,10 @@
 </div>
 <figcaption>Python, Spark SQL, T-SQL, a semantic model and a Report remain one dependency graph, even though they use different Fabric objects and engines.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/estate/connected-items/">Connect Lakehouse and Warehouse</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/semantic-models/managed-sources/">Add a managed model source</a></p>
-</figure><div class="feature-list">
-<div class="feature-row" data-feature="fabric-dag"><h3><a href="https://docs.weaverstack.dev/estate/connected-items/">Keep work in the right order</a></h3><p>Run Lakehouse work, Warehouse SQL and dependent Power BI model refreshes in one connected workflow.</p></div>
-<div class="feature-row" data-feature="generated-warehouse"><h3><a href="https://docs.weaverstack.dev/warehouse/first-project/">Turn a SQL query into a working table</a></h3><p>Give Weaver a SELECT and a key. It creates the table and loading steps, tracks changes and records the results.</p></div>
-<div class="feature-row" data-feature="managed-lakehouse"><h3><a href="https://docs.weaverstack.dev/lakehouse/python/">Turn Python and SQL into Lakehouse tables</a></h3><p>Use Python and Spark SQL to load files and update Delta Tables, without building a separate pipeline to connect them.</p></div>
-<div class="feature-row" data-feature="dependency-discovery"><h3><a href="https://docs.weaverstack.dev/estate/connected-items/">Find what depends on what</a></h3><p>Weaver can read dependencies from Python imports and supported T-SQL references. With Spark SQL, you specify them.</p></div>
-<div class="feature-row" data-feature="incremental-changes"><h3><a href="https://docs.weaverstack.dev/warehouse/incremental/">Load only what has changed</a></h3><p>Apply inserts, updates and explicit deletes using rules you choose, without rebuilding every target.</p></div>
-<div class="feature-row" data-feature="bookmarks"><h3><a href="https://docs.weaverstack.dev/lakehouse/incremental/">Pick up where each table left off</a></h3><p>Each table or folder tracks its own progress through the source data, even when several share the same source.</p></div>
+</figure>
+<p>Weaver reads dependencies from Python imports and supported T-SQL references; you declare them explicitly for Spark SQL. Your Python and SQL supply the data, while Weaver handles the surrounding loading routines and records the result.</p>
+<div class="feature-list">
+<div class="feature-row" data-feature="incremental-changes"><h3><a href="https://docs.weaverstack.dev/warehouse/incremental/">Pick up where each table left off</a></h3><p>You supply inserts, updates and explicit deletes. Weaver applies them and tracks each table or folder's progress separately, even when several read the same source.</p></div>
 <div class="feature-row" data-feature="data-tests"><h3><a href="https://docs.weaverstack.dev/warehouse/tests/">Test data and calculations</a></h3><p>Compare actual and expected results or find invalid rows using Python, SQL and DAX.</p></div>
 <div class="feature-row" data-feature="quality-guards"><h3><a href="https://docs.weaverstack.dev/advanced/partial-failures-rejected-data-and-thresholds/">Data-quality safeguards</a></h3><p>Keep rejected rows and stop unusually large proposed updates or deletes before they reach your tables.</p></div>
 <div class="feature-row" data-feature="selection"><h3><a href="https://docs.weaverstack.dev/estate/selective-runs/">Run a table, a branch or an item</a></h3><p>Preview the work you intend to run. Select an item for its ordered loads, or name an object and explicitly include the upstream or downstream work you need.</p></div>
@@ -258,7 +255,7 @@
 <figcaption>Both commands deploy the same Warehouse item; the configuration chooses its workspace. <a href="https://docs.weaverstack.dev/estate/environments/">See workspace configuration</a>. You can also preview changes first.</figcaption>
 </figure>
 <div class="feature-list">
-<div class="feature-row" data-feature="environments"><h3><a href="https://docs.weaverstack.dev/estate/environments/">One project, multiple environments</a></h3><p>Use the same files in development and production. A configuration file sets which workspaces, Fabric items and Power BI models they belong to.</p></div>
+
 
 <div class="feature-row" data-feature="incremental-build"><h3><a href="https://docs.weaverstack.dev/advanced/incremental-build-selection/">Update only what changed</a></h3><p>Update changed source definitions and the work that depends on them, while leaving unchanged parts in place.</p></div>
 <div class="feature-row" data-feature="build-preview"><h3><a href="https://docs.weaverstack.dev/estate/development-cycle/">See changes before applying them</a></h3><p>Preview what will change, where it will go and whether anything will be replaced or deleted.</p></div>
@@ -279,7 +276,7 @@
 <div class="feature-row" data-feature="across-catalogues"><h3><a href="https://docs.weaverstack.dev/estate/across-catalogues/">Connect the work without merging the projects</a></h3><p>Supply the catalogues for the teams involved. Health follows their recorded dependencies; Load and Test coordinate the work you select and write each result to its owning catalogue.</p></div>
 <div class="feature-row" data-feature="concurrency"><h3><a href="https://docs.weaverstack.dev/estate/concurrency/">Run independent branches together</a></h3><p>Set concurrency limits for the run and its resources. Weaver can overlap independent Spark and Warehouse work while keeping dependent steps in order.</p></div>
 <div class="feature-row" data-feature="publication-readiness"><h3><a href="https://docs.weaverstack.dev/estate/connected-items/">Coordinate the hand-off between engines</a></h3><p>When your Warehouse reads a loaded Lakehouse table, Weaver waits for its SQL endpoint refresh. A shortcut reading another team's Warehouse table also waits for the source's OneLake publication.</p></div>
-<div class="feature-row" data-feature="cycles"><h3><a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">Keep reciprocal team dependencies workable</a></h3><p>If teams read each other's results, Weaver reports the cycle and runs selected objects once in a consistent order. A reader closing the loop uses the producer's available result from an earlier run.</p></div>
+<div class="feature-row" data-feature="cycles"><h3><a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">When teams read each other's results</a></h3><p>If teams read each other's results, Weaver reports the cycle and runs selected objects once in a consistent order. A reader closing the loop uses the producer's available result from an earlier run.</p></div>
 </div>
 <p>In the <a href="/guides/">50-workspace experiment</a>, one team checked its affected tables, then reloaded them after the central repair. A wider invocation coordinated work across the participating projects. You can use the same records for either decision.</p>
 <figure class="feature-spotlight scale-spotlight" data-spotlight="scale" aria-labelledby="scale-title">

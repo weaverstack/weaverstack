@@ -63,57 +63,12 @@
       ]
     },
     {
-      "id": "fabric-dag",
-      "group": 2,
-      "title": "Keep work in the right order",
-      "description": "Run Lakehouse work, Warehouse SQL and dependent Power BI model refreshes in one connected workflow.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/connected-items/"
-      ]
-    },
-    {
-      "id": "generated-warehouse",
-      "group": 2,
-      "title": "Turn a SQL query into a working table",
-      "description": "Give Weaver a SELECT and a key. It creates the table and loading steps, tracks changes and records the results.",
-      "urls": [
-        "https://docs.weaverstack.dev/warehouse/first-project/"
-      ]
-    },
-    {
-      "id": "managed-lakehouse",
-      "group": 2,
-      "title": "Turn Python and SQL into Lakehouse tables",
-      "description": "Use Python and Spark SQL to load files and update Delta Tables, without building a separate pipeline to connect them.",
-      "urls": [
-        "https://docs.weaverstack.dev/lakehouse/python/"
-      ]
-    },
-    {
-      "id": "dependency-discovery",
-      "group": 2,
-      "title": "Find what depends on what",
-      "description": "Weaver can read dependencies from Python imports and supported T-SQL references. With Spark SQL, you specify them.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/connected-items/"
-      ]
-    },
-    {
       "id": "incremental-changes",
       "group": 2,
-      "title": "Load only what has changed",
-      "description": "Apply inserts, updates and explicit deletes using rules you choose, without rebuilding every target.",
+      "title": "Pick up where each table left off",
+      "description": "You supply inserts, updates and explicit deletes. Weaver applies them and tracks each table or folder's progress separately, even when several read the same source.",
       "urls": [
         "https://docs.weaverstack.dev/warehouse/incremental/"
-      ]
-    },
-    {
-      "id": "bookmarks",
-      "group": 2,
-      "title": "Pick up where each table left off",
-      "description": "Each table or folder tracks its own progress through the source data, even when several share the same source.",
-      "urls": [
-        "https://docs.weaverstack.dev/lakehouse/incremental/"
       ]
     },
     {
@@ -261,15 +216,6 @@
       ]
     },
     {
-      "id": "environments",
-      "group": 6,
-      "title": "One project, multiple environments",
-      "description": "Use the same files in development and production. A configuration file sets which workspaces, Fabric items and Power BI models they belong to.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/environments/"
-      ]
-    },
-    {
       "id": "incremental-build",
       "group": 6,
       "title": "Update only what changed",
@@ -335,7 +281,7 @@
     {
       "id": "cycles",
       "group": 7,
-      "title": "Keep reciprocal team dependencies workable",
+      "title": "When teams read each other's results",
       "description": "If teams read each other's results, Weaver reports the cycle and runs selected objects once in a consistent order. A reader closing the loop uses the producer's available result from an earlier run.",
       "urls": [
         "https://docs.weaverstack.dev/estate/across-catalogues/#cycles"

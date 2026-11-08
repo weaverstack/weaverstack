@@ -195,11 +195,11 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <p>The <a href="/features/#visibility">Catalogue Dashboard</a> presents the same joined graph in Power BI. It reads up to ten catalogues over Direct Lake, or any number in Import mode, and never writes to them. Its Workspaces page shows the network of teams; Health, Orchestration and the Entity dictionary narrow to the items chosen. The Filters pane narrows the data by workspace, item and object before a page is built, and the whole Dashboard can be exported as static HTML that opens without a running capacity.</p>
 <figure class="dashboard-guide-demo">
 <iframe src="/assets/spread-dashboard/workspaces.html" title="The Spread Dashboard Workspaces page" loading="lazy"></iframe>
-<figcaption>The Spread Dashboard over ten of the 50 catalogues, read over Direct Lake and exported as static HTML on 7 November 2026. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
+<figcaption>The Spread Dashboard over ten of the 50 catalogues, read over Direct Lake and exported as static HTML. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
 </figure>
 
 <h2 id="results">6. Results</h2>
-<p>Every result below came from the Weaver CLI against real Fabric, on 7 November 2026.</p>
+<p>Every result below came from the Weaver CLI running against the 50 Fabric workspaces.</p>
 <div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Operation</th><th scope="col">Catalogues</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead><tbody>
 <tr><td>Health after the failure</td><td>All 50</td><td><code>BRZ.Customer</code> failed. 77 objects affected in 45 other catalogues, each naming the cause.</td><td>82 seconds</td></tr>
 <tr><td>Team 05's view</td><td>Team 05, Bronze, Central</td><td>Both of its Mart tables affected, traced to <code>BRZ.Customer</code>.</td><td>11 seconds</td></tr>
@@ -221,12 +221,13 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <p>After the failure, one organisation-wide <code>load --stale</code> reloaded only the 71 objects still behind and brought every workspace back to green, except the object held behind by the cycle.</p>
 
 <h2 id="conclusion">7. Conclusion</h2>
-<p>Fabric gives every object a tenant-wide name and lets workspaces share data through OneLake. With each object's dependencies and operational status recorded beside it, those properties are enough for 50 independently owned workspaces to behave as one dependency graph when the organisation needs one.</p>
-<p>This allows two ways of working on the same platform:</p>
+<p>Fabric is well suited to self-service across a large organisation. A single OneLake for the tenant, a five-part name for every object and shortcuts between workspaces let dozens of teams work in workspaces of their own while reading the same data, without copying it or running infrastructure between them. Fabric provides that foundation as part of the platform.</p>
+<p>Fabric leaves each team to record how its objects depend on other teams' objects and whether each one is current. Weaver records both in each team's own catalogue as the team builds and loads, so the workspaces that Fabric already connects can be operated as one dependency graph when the organisation needs one. This allows two ways of working on the same platform:</p>
 <ol class="implementation-steps">
 <li><strong>Decentralised by default.</strong><span>Every team builds, loads, tests and checks its own estate independently, with its own catalogue and release cycle.</span></li>
 <li><strong>Coordinated when required.</strong><span>Any team, or the organisation, can join the relevant catalogues to see dependencies, assess impact and coordinate recovery across workspaces.</span></li>
 </ol>
+<p>For a large organisation, this means teams can release on their own schedules without a central team acting as gatekeeper, while a failure upstream can still be traced to every workspace it reaches and repaired by the teams that own the affected objects.</p>
 <p>See <a href="/how-it-works/">how Weaver works</a>, then the <a href="https://docs.weaverstack.dev/">documentation</a>.</p>
 
 <h2 id="references">References</h2>

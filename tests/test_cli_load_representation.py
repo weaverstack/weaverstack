@@ -800,6 +800,56 @@ def test_json_renders_the_whole_report(recorded, capsys):
     assert (
         payload["nodes"][0]["node_id"] == "load:Lakehouse/Sales/Tables/Sales.Customer"
     )
+    assert payload["totals"] == {
+        "planned": 1,
+        "executed": 1,
+        "pending": 0,
+        "running": 0,
+        "succeeded": 1,
+        "succeeded_with_rejects": 0,
+        "failed": 0,
+        "blocked": 0,
+        "skipped": 0,
+    }
+
+
+@weaver_test()
+def test_a_tolerant_json_failure_exits_one_and_counts_the_failure(
+    monkeypatch, capsys, desktop_credential
+):
+    failed = _report(status=TASK_FAILED, node_status=FAILED)
+    monkeypatch.setattr(weaver, "load", lambda targets, **kwargs: failed)
+
+    assert main(_command("--fault-tolerant", "--json")) == 1
+
+    output = capsys.readouterr()
+    assert output.err == ""
+    payload = json.loads(output.out)
+    assert payload["status"] == TASK_FAILED
+    assert payload["totals"]["failed"] == 1 and payload["totals"]["succeeded"] == 0
+
+
+@weaver_test()
+def test_dry_run_json_totals_count_the_dry_run_statuses(
+    monkeypatch, capsys, desktop_credential
+):
+    from dataclasses import replace
+
+    planned = replace(
+        _report(status="succeeded", node_status="validated"), dry_run=True
+    )
+    monkeypatch.setattr(weaver, "load", lambda targets, **kwargs: planned)
+
+    main(_command("--dry-run", "--json"))
+
+    totals = json.loads(capsys.readouterr().out)["totals"]
+    assert totals == {
+        "planned": 1,
+        "executed": 1,
+        "validated": 1,
+        "invalid": 0,
+        "blocked": 0,
+    }
 
 
 @weaver_test()

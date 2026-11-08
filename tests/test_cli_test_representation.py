@@ -417,6 +417,69 @@ def test_json_emits_the_whole_report(captured, capsys):
 
 
 @weaver_test()
+def test_a_failing_json_run_exits_one_with_each_failure_in_one_document(
+    captured, capsys
+):
+    """An agent reads the document after the non-zero exit, so it names each failure."""
+
+    captured["report"] = ValidationRunReport(
+        status=INVALID,
+        nodes=(
+            _node(
+                "Sales.OrdersReconcile",
+                "Test",
+                FAILED,
+                TestResult(missing_count=2, unexpected_count=1),
+            ),
+            _node(
+                "Sales.PositiveAmounts",
+                "Assumption",
+                INVALID,
+                AssumptionResult.failed_to_run("Invalid object name 'Sales.Order'"),
+            ),
+            _node("Sales.CustomerKeys", "Test", PASSED, TestResult()),
+        ),
+    )
+
+    assert _run("Lakehouse/Sales", "--json") == 1
+
+    output = capsys.readouterr()
+    assert output.err == ""
+    payload = json.loads(output.out)
+    assert payload["status"] == INVALID
+    totals = {"planned": 3, "passed": 1, "failed": 1, "invalid": 1}
+    assert payload["totals"].items() >= totals.items()
+    failing = [node for node in payload["nodes"] if node["status"] in (FAILED, INVALID)]
+    assert [(node["logical_id"], node["kind"], node["status"]) for node in failing] == [
+        ("Lakehouse/Sales/Sales.OrdersReconcile", "test", FAILED),
+        ("Lakehouse/Sales/Sales.PositiveAmounts", "assumption", INVALID),
+    ]
+    assert failing[0]["missing_count"] == 2 and failing[0]["unexpected_count"] == 1
+    assert failing[1]["error_message"] == "Invalid object name 'Sales.Order'"
+
+
+@weaver_test()
+def test_a_run_that_cannot_start_is_the_json_error_document(
+    monkeypatch, capsys, desktop_credential
+):
+    from weaver.errors import CommandError
+
+    def refused(items, **kwargs):
+        raise CommandError("Warehouse/Weaver does not contain a Weaver catalogue")
+
+    monkeypatch.setattr(weaver, "test", refused)
+
+    assert _run("Lakehouse/Sales", "--json") == 1
+
+    output = capsys.readouterr()
+    assert output.err == ""
+    assert json.loads(output.out) == {
+        "status": "failed",
+        "error": {"message": "Warehouse/Weaver does not contain a Weaver catalogue"},
+    }
+
+
+@weaver_test()
 def test_json_has_no_terminal_styling_when_stdout_is_a_tty(captured, monkeypatch):
     import io
     import sys

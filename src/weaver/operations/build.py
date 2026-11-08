@@ -80,8 +80,11 @@ class BuildResult(ReportAlias):
             mapping["actions"] = self.installation_report.action_counts()
             mapping["report_path"] = self.report_path
         if self.dry_run:
+            preview = self.preview.to_mapping()
+            # The count an executed Build reports, so an empty plan reads 0.
+            mapping["actions"] = {"total": len(preview["actions"])}
             mapping["dry_run"] = True
-            mapping["preview"] = self.preview.to_mapping()
+            mapping["preview"] = preview
         return mapping
 
 

@@ -206,7 +206,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 
 <h2 id="results">6. Results</h2>
 <p>The deliberate failure in <code>BRZ.Customer</code> raises three practical questions: which recorded downstream work depends on it, what must the central team repair, and what should a business team reload afterwards? Keeping those questions separate matters. Local ownership does not remove the need to repair an upstream source.</p>
-<div class="table-scroll"><table class="benchmark"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Experiment results"><table class="benchmark" style="min-width:640px"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
 <tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 downstream loadable objects in 45 other workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
 <tr><td>Team 05</td><td>Which of our tables need attention, and why?</td><td>Both Mart tables, with the failed <code>BRZ.Customer</code> load named as the cause.</td><td>11 seconds</td></tr>
 <tr><td>The central team</td><td>Can we repair our selected work first?</td><td>Six objects reloaded across Bronze, Silver/Gold and the central model. No business-team load was selected.</td><td>2 minutes 18 seconds</td></tr>

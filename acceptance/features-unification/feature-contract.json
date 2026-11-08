@@ -48,9 +48,9 @@
       "id": "agents",
       "group": 1,
       "title": "Built for developers and AI agents",
-      "description": "Readable terminal output for developers, and structured `--json` results for AI agents from Check, Build, Load, Test and Health. Preview, build, load, test and inspect in a repeatable cycle, with explicit outcomes for what ran and what needs attention.",
+      "description": "Readable terminal output for developers, and structured `--json` results, previews and no prompts for AI agents. A guide covers running an agent against a development workspace.",
       "urls": [
-        "https://docs.weaverstack.dev/reference/machine-readable-output/"
+        "https://docs.weaverstack.dev/getting-started/ai-agents/"
       ]
     },
     {
@@ -249,7 +249,7 @@
       "id": "dashboard-live",
       "group": 4,
       "title": "Live over Direct Lake",
-      "description": "The model reads the catalogue\u2019s tables over Direct Lake, so each page shows your Weaver-managed estate as work settles.",
+      "description": "The dashboard reads the catalogue over Direct Lake, so its pages reflect the latest recorded results. Import mode reads more than ten catalogues.",
       "urls": [
         "https://docs.weaverstack.dev/estate/catalogue-dashboard/#what-it-reads"
       ]
@@ -315,6 +315,69 @@
       "description": "Keep irreplaceable sources outside managed targets and use Build replacement guards for protected owned objects.",
       "urls": [
         "https://docs.weaverstack.dev/advanced/protecting-data/"
+      ]
+    },
+    {
+      "id": "workflow",
+      "group": 1,
+      "title": "Run several steps from a notebook",
+      "description": "In Python, `with weaver.workflow():` runs Build, Load, Test and Health on one Session under one workflow ID, in a Fabric notebook or on a desktop.",
+      "urls": [
+        "https://docs.weaverstack.dev/core-concepts/sessions-and-workflows/"
+      ]
+    },
+    {
+      "id": "stale",
+      "group": 4,
+      "title": "Rerun only what is behind",
+      "description": "Load and Test with --stale run only the objects that failed, are pending or are behind their upstream, so recovery repeats as little work as possible.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/recovery/#rerun-failed-or-stale-load-work"
+      ]
+    },
+    {
+      "id": "execute",
+      "group": 4,
+      "title": "Query an item without changing state",
+      "description": "weaver execute runs a T-SQL, Spark SQL, Python or DAX query against one Lakehouse, Warehouse or semantic model and returns the result. It records nothing in the catalogue.",
+      "urls": [
+        "https://docs.weaverstack.dev/reference/cli/execute/"
+      ]
+    },
+    {
+      "id": "dashboard-across",
+      "group": 4,
+      "title": "Several teams on one Dashboard",
+      "description": "One Dashboard can read several teams' catalogues, show which workspaces supply which, and narrow every page by workspace, item and object in the Filters pane.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/catalogue-dashboard/#read-several-catalogues"
+      ]
+    },
+    {
+      "id": "dashboard-export",
+      "group": 4,
+      "title": "Static pages for sharing",
+      "description": "Export every page as static HTML, from the CLI or a notebook, so results can be shared and opened without a running Fabric capacity.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/catalogue-dashboard/#export-static-pages"
+      ]
+    },
+    {
+      "id": "across-catalogues",
+      "group": 6,
+      "title": "Work across teams' catalogues",
+      "description": "Give Health, Load or Test several teams' catalogues. Weaver joins them through the shortcuts between workspaces, so a failure is traced across teams and a load runs as one graph.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/across-catalogues/"
+      ]
+    },
+    {
+      "id": "cycles",
+      "group": 6,
+      "title": "Teams that read one another's data",
+      "description": "Workspaces can read one another's data in a loop. Weaver orders the loop, reports it and still traces a failure to every object in it.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/across-catalogues/#cycles"
       ]
     }
   ],

@@ -50,7 +50,7 @@
       "title": "Built for developers and AI agents",
       "description": "Readable terminal output for developers, and structured `--json` results, previews and no prompts for AI agents. A guide covers running an agent against a development workspace.",
       "urls": [
-        "https://docs.weaverstack.dev/getting-started/ai-agents/"
+        "https://docs.weaverstack.dev/reference/ai-agents/"
       ]
     },
     {

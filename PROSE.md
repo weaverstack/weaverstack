@@ -106,8 +106,11 @@ belong in `AGENTS.md`, source or tests.
 
 ## Product website
 
-Preserve the accepted tagline **Making Fabric easier to use**. Editing adjacent
-copy for tone is not permission to replace it or invent another proposition.
+Preserve the accepted tagline **Making Fabric easier to use** and its closing
+slogan **Making Fabric easier to use, and safer to scale.** Editing adjacent copy
+for tone is not permission to replace either or invent another proposition.
+Headings elsewhere describe what their section covers rather than selling it.
+The story page keeps its own voice.
 
 Lead with Microsoft Fabric. Present items in this order: Lakehouse, Warehouse,
 semantic models, Reports. When naming the platforms, use Fabric before Power BI.

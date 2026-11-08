@@ -117,8 +117,8 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <article class="article-body">
 <h2 id="introduction">Introduction</h2>
 <p>Many organisations adopt Microsoft Fabric as a self-service platform for the whole enterprise, not as a tool for one engineering team. A central team lands and conforms shared data, and dozens of business areas build on it in workspaces of their own, each with its own people, release cycle and priorities.</p>
-<p>That arrangement works until something upstream breaks. When a central Bronze table fails, every team downstream needs the same two answers: what is affected, and how do we recover? In most estates nobody can answer either question for the whole organisation, because each team's pipelines, schedules and run history live with that team.</p>
-<p>This guide shows that Fabric already holds what is needed to answer both, and tests it on 50 real workspaces. One failed Bronze table was traced to every affected object in the 49 other workspaces in under a minute and a half. The central team repaired its own estate without touching anyone else's. A business team saw and repaired its own share independently.</p>
+<p>The arrangement is tested when something upstream fails. When a central Bronze table fails, every team downstream needs to know what is affected and how to recover. In most estates nobody can answer either question for the whole organisation, because each team's pipelines, schedules and run history live with that team.</p>
+<p>This guide shows that Fabric already holds most of what is needed to answer both questions, and tests the approach on 50 real workspaces. In the test, one failed Bronze table was traced to every affected object in the 49 other workspaces in under a minute and a half. The central team then repaired its own estate without reloading any other team's data, and a business team identified and repaired its own affected tables independently.</p>
 <figure class="facts-figure" aria-label="Experiment at a glance">
 <div><strong>50</strong><span>Fabric workspaces</span></div><div><strong>50</strong><span>independent catalogues</span></div><div><strong>53</strong><span>cross-workspace connections</span></div><div><strong>FTL64</strong><span>trial capacity</span></div>
 <figcaption>One central Bronze, Silver/Gold and semantic-model architecture and 47 business workspaces, with no shared repository or configuration.</figcaption>
@@ -132,8 +132,8 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <li>Shared semantic models live in a third.</li>
 <li>Forty or fifty business areas own workspaces of their own. They read central data and occasionally one another's.</li>
 </ul>
-<p>Two common answers to cross-team failures both fall short. A central orchestrator that runs every team's pipelines gives one view of the estate, but it makes one team the gatekeeper for everyone's releases, which is exactly what self-service was meant to avoid. Independent schedules keep teams autonomous, but each team sees only its own runs: a business table can load successfully from stale or broken upstream data and report green.</p>
-<p>What an enterprise needs is both at once. Every team should operate on its own, and the organisation should still be able to see its dependencies, assess the impact of a failure and coordinate recovery when it has to.</p>
+<p>Organisations usually handle cross-team failures in one of two ways, and each has a cost. A central orchestrator that runs every team's pipelines gives one view of the estate, but it makes one team the gatekeeper for every release, which self-service was meant to avoid. Independent schedules keep teams autonomous, but each team sees only its own runs, so a business table can load successfully from stale or broken upstream data and still report green.</p>
+<p>An enterprise needs the advantages of both. Each team should be able to operate on its own, while the organisation can still see its dependencies, assess the impact of a failure and coordinate recovery when necessary.</p>
 
 <h2 id="what-fabric-provides">2. What Fabric already provides</h2>
 <p>Two properties of Fabric make an organisation-wide dependency graph possible without moving any data or adding a central service.</p>
@@ -143,24 +143,24 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <div class="name-parts"><div><strong>Workspace</strong><span>SPREAD_CENTRAL</span></div><div><strong>Item type</strong><span>Warehouse</span></div><div><strong>Item name</strong><span>Gold</span></div><div><strong>Schema</strong><span>GOLD</span></div><div><strong>Object</strong><span>CustomerSales</span></div></div>
 <figcaption>The item type is part of the name because a Lakehouse and its SQL analytics endpoint share a display name. A workspace names items uniquely per type.</figcaption>
 </figure>
-<p>A name like this identifies an object without reference to any team's tooling. Two teams that have never coordinated can still talk unambiguously about the same table.</p>
+<p>Because the name does not depend on any team's tooling, two teams that have never coordinated can refer to the same table unambiguously.</p>
 <h3 id="onelake-shares-data-across-workspaces">2.2 OneLake shares data across workspaces</h3>
 <p>Every Fabric tenant comes with a single OneLake instance <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">(Microsoft 2026a)</a>. Its shortcuts let an item in one workspace read data held by an item in another, including a Lakehouse reading a Warehouse, without copying it <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">(Microsoft 2026b)</a>.</p>
 <p>In this experiment, Spark addressed tables in other workspaces directly by four-part name. A Warehouse's T-SQL reached only items in its own workspace, so each business team brought central Gold tables into its workspace through shortcuts in a small bridge Lakehouse and read them through that Lakehouse's SQL analytics endpoint.</p>
-<p>The data is therefore already shared, and every object already has a name. What is missing is the information that connects them.</p>
+<p>Fabric therefore already shares the data and names every object. What it does not record is how objects in different workspaces depend on one another, and whether each one is current.</p>
 
 <h2 id="the-two-missing-pieces">3. The two missing pieces</h2>
-<p>An organisation-wide dependency graph needs only two things beyond what Fabric provides.</p>
+<p>Beyond what Fabric provides, an organisation-wide dependency graph needs two pieces of information about each object.</p>
 <figure class="strategy-figure" aria-label="What a dependency graph needs">
 <div><strong>01</strong><span>Dependencies</span><small>Which five-part names each object reads, including across workspaces</small></div><div><strong>02</strong><span>Operational status</span><small>When each object last loaded, and whether it succeeded</small></div>
 </figure>
 <h3 id="dependencies-between-names">3.1 Dependencies between five-part names</h3>
-<p>Each object's upstream must be recorded as the five-part names it reads. Within a workspace this is ordinary lineage. Across workspaces it is the shortcut: a shortcut names the item and path it reads, and the item's Fabric ID identifies the workspace and team that own it. Matching that ID against another team's records connects the two graphs, with nothing declared for the join.</p>
+<p>Each object's upstream must be recorded as the five-part names it reads. Within a workspace this is ordinary lineage. Across workspaces it is the shortcut: a shortcut names the item and path it reads, and the item's Fabric ID identifies the workspace and team that own it. Matching that ID against another team's records connects the two graphs, so teams do not need to declare the connection.</p>
 <h3 id="operational-status-of-names">3.2 Operational status of five-part names</h3>
 <p>Each object must also record its operational state: when it last loaded, whether that load succeeded, and when its upstream last changed. With that, a failed table can be traced to every object that read it, and an object that loaded successfully before its upstream was repaired can be identified as behind.</p>
-<p>Neither piece needs a central store. If each team records both for its own objects, any team can read the records of the teams it depends on and assemble the part of the graph it cares about, or the whole organisation's.</p>
+<p>Neither piece requires a central store. If each team records both for its own objects, any team can read the records of the teams it depends on and assemble the part of the graph it needs, or the whole organisation's graph.</p>
 <h3 id="concurrency">3.3 A bonus: concurrency</h3>
-<p>Concurrency is not needed for the graph, but the graph makes it possible. Once the graph exists, loading across it is a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
+<p>Concurrency is not required for the graph, but the graph makes it available: once the dependencies are known, loading across workspaces becomes a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
 
 <h2 id="experimental-setup">4. Experimental setup</h2>
 <p>The experiment built 50 real Fabric workspaces on an FTL64 trial capacity. Each workspace had its own catalogue, its own project and its own configuration. Every team was initialised, built and loaded independently before the experiment began.</p>
@@ -173,26 +173,26 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <tr><td>Lakehouses</td><td>4</td><td>Lakehouse with a shortcut to Gold and a Python table</td></tr>
 <tr><td>Thin reports</td><td>4</td><td>A report bound to the central semantic model in another workspace</td></tr>
 </tbody></table></div>
-<p>Two business teams were deliberately made to read each other's summaries, forming a dependency cycle across workspaces. In a federated estate such cycles are inevitable, so the system has to tolerate them.</p>
+<p>Two business teams were deliberately made to read each other's summaries, forming a dependency cycle across workspaces. Cycles of this kind are likely in any federated estate, so the system must tolerate them.</p>
 <p>The experiment then introduced a failure into the central Bronze table <code>BRZ.Customer</code>, and tested what each team could see and do.</p>
-<p>The tables are deliberately small. The experiment tests coordination across workspaces, not data volume; volume is the subject of the performance guide.</p>
+<p>The tables are deliberately small, because the experiment tests coordination across workspaces rather than data volume. The performance guide covers volume.</p>
 
 <h2 id="the-implementation-weaver">5. The implementation: Weaver</h2>
 <p><a href="/">Weaver</a> is an open-source data engineering framework for Microsoft Fabric. Every Weaver project keeps a catalogue in a Fabric Warehouse, and building and loading record both missing pieces there as a by-product: the dependencies between five-part names, including shortcuts into other workspaces, and each object's operational status.</p>
 <h3 id="the-weaver-cli">5.1 The Weaver CLI</h3>
-<p>Every Weaver command works on one team's catalogue by default. Passing more than one catalogue joins them into one graph. There is no federation configuration: the catalogues already hold the dependencies.</p>
-<pre><code># Health across the whole organisation
-weaver health --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
-              --catalogue SPREAD_CENTRAL/Warehouse/Catalogue \
-              ...         # every catalogue to include
+<p>By default, each Weaver command works on one team's catalogue. Given more than one catalogue, Weaver joins them into one graph. No federation configuration is required, because the catalogues already record the dependencies.</p>
+<div class="code"><div class="code-bar"><span>Terminal</span></div><pre><code><span class="c-dim"># Health across the whole organisation</span>
+<span class="c-key">$</span> weaver health --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
+                --catalogue SPREAD_CENTRAL/Warehouse/Catalogue \
+                ...   <span class="c-dim"># every catalogue to include</span>
 
-# Team 05 reloads only what is behind, reading its upstream for context
-weaver load --stale --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
-                    --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
-                    --catalogue SPREAD_CENTRAL/Warehouse/Catalogue</code></pre>
+<span class="c-dim"># Team 05 reloads only what is behind, reading its upstream for context</span>
+<span class="c-key">$</span> weaver load --stale --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
+                      --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
+                      --catalogue SPREAD_CENTRAL/Warehouse/Catalogue</code></pre></div>
 <p>Health assesses each catalogue in turn, with ancestry reaching through the others, and names the upstream cause of every finding. A load across several catalogues is one run: one graph, one workflow ID, each object recorded in its own team's catalogue. <code>--stale</code> selects only the objects that are behind their upstream. A team needs read access to the catalogues it joins, and a load that changes another team's objects needs that team's permission.</p>
 <h3 id="the-catalogue-dashboard">5.2 The Catalogue Dashboard</h3>
-<p>The <a href="/features/#visibility">Catalogue Dashboard</a> presents the same joined graph in Power BI. It reads up to ten catalogues over Direct Lake, or any number imported, and only reads them. Its Workspaces page shows the network of teams; Health, Orchestration and the Entity dictionary narrow to the items chosen. The Filters pane narrows the data by workspace, item and object before a page is built, and the whole Dashboard can be exported as static HTML that opens without a running capacity.</p>
+<p>The <a href="/features/#visibility">Catalogue Dashboard</a> presents the same joined graph in Power BI. It reads up to ten catalogues over Direct Lake, or any number in Import mode, and never writes to them. Its Workspaces page shows the network of teams; Health, Orchestration and the Entity dictionary narrow to the items chosen. The Filters pane narrows the data by workspace, item and object before a page is built, and the whole Dashboard can be exported as static HTML that opens without a running capacity.</p>
 <figure class="dashboard-guide-demo">
 <iframe src="/assets/spread-dashboard/workspaces.html" title="The Spread Dashboard Workspaces page" loading="lazy"></iframe>
 <figcaption>The Spread Dashboard over ten of the 50 catalogues, read over Direct Lake and exported as static HTML on 7 November 2026. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
@@ -210,19 +210,19 @@ weaver load --stale --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
 <tr><td>Federated load</td><td>All 50</td><td>125 nodes in one graph, all succeeded under one workflow ID.</td><td>5 minutes 15 seconds</td></tr>
 </tbody></table></div>
 <h3 id="impact-across-the-organisation">6.1 Impact across the organisation</h3>
-<p>One Health operation across all 50 catalogues found the failed table and the 77 objects downstream of it in 45 other catalogues: 61 Warehouse tables, 5 Lakehouse tables and 11 semantic models. Only one object had failed. The other 77 were still serving their last good load, and each finding named <code>BRZ.Customer</code> as its cause. The four thin-report teams have nothing to load and stayed green.</p>
+<p>One Health operation across all 50 catalogues found the failed table and the 77 objects downstream of it in 45 other catalogues: 61 Warehouse tables, 5 Lakehouse tables and 11 semantic models. Only one object had failed; the other 77 were still serving their last successful load, and each finding named <code>BRZ.Customer</code> as its cause. The four thin-report teams had nothing to load and stayed green.</p>
 <h3 id="independent-recovery">6.2 Independent recovery</h3>
 <p>The central team repaired its estate with one <code>load --stale</code> over its own three catalogues. The plan held six objects to reload, ordered across Bronze, Silver/Gold and the central semantic model, with the SQL endpoint refreshes and OneLake publications between them. No business team's data was reloaded.</p>
 <p>Team 05 then saw, from its own catalogue alongside its upstream, that its tables were now behind the repaired data rather than broken. It reloaded only its two stale tables and returned to green, without waiting for the central team or asking it to run anything.</p>
 <h3 id="cycles">6.3 Cycles</h3>
-<p>The cycle between teams 01 and 02 was found and reported once. Loads ordered it by cutting one edge, and the rest of the estate ran normally. One object stayed correctly behind afterwards, because it read the other team's previous load. A system that reports this honestly is more useful than one that declares everything green.</p>
+<p>The cycle between teams 01 and 02 was found and reported once. Loads ordered it by cutting one edge, and the rest of the estate ran normally. Afterwards one object remained behind, because it had read the other team's previous load, and Health reported it as behind rather than green.</p>
 <h3 id="coordination-when-required">6.4 Coordination when required</h3>
-<p>The same commands work across the whole organisation when coordination is wanted. One federated load across all 50 workspaces ran 125 nodes in one graph: 80 objects to load, and 45 SQL endpoint refreshes and OneLake publications that make sure each team reads fresh data. It finished in just over five minutes, of which execution took about two, with up to 12 nodes running at once. The rest was reading 50 catalogues, planning and starting Spark.</p>
+<p>When coordination is required, the same commands run across the whole organisation. One federated load across all 50 workspaces ran 125 nodes in one graph: 80 objects to load, and 45 SQL endpoint refreshes and OneLake publications that make sure each team reads fresh data. It finished in just over five minutes, of which execution took about two, with up to 12 nodes running at once. The remainder was spent reading 50 catalogues, planning the run and starting Spark.</p>
 <p>After the failure, one organisation-wide <code>load --stale</code> reloaded only the 71 objects still behind and brought every workspace back to green, except the object held behind by the cycle.</p>
 
 <h2 id="conclusion">7. Conclusion</h2>
 <p>Fabric gives every object a tenant-wide name and lets workspaces share data through OneLake. With each object's dependencies and operational status recorded beside it, those properties are enough for 50 independently owned workspaces to behave as one dependency graph when the organisation needs one.</p>
-<p>That makes two modes possible on the same platform:</p>
+<p>This allows two ways of working on the same platform:</p>
 <ol class="implementation-steps">
 <li><strong>Decentralised by default.</strong><span>Every team builds, loads, tests and checks its own estate independently, with its own catalogue and release cycle.</span></li>
 <li><strong>Coordinated when required.</strong><span>Any team, or the organisation, can join the relevant catalogues to see dependencies, assess impact and coordinate recovery across workspaces.</span></li>

@@ -4,26 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f7f7f6">
-<title>One Dependency Graph Across 50 Microsoft Fabric Workspaces</title>
-<meta name="description" content="How 50 independently owned Microsoft Fabric workspaces, each with its own catalogue, form one dependency graph for impact assessment and recovery, without a central orchestrator.">
+<title>Organising Microsoft Fabric Workspaces for a Large Enterprise: An Experiment Coordinating 50 Workspaces</title>
+<meta name="keywords" content="organising Microsoft Fabric workspaces, Fabric workspace design, self-service data in Microsoft Fabric, data democratisation in Microsoft Fabric, enterprise Fabric, cross-workspace dependencies">
+<meta name="description" content="How to organise Microsoft Fabric workspaces for self-service data and data democratisation in a large enterprise, tested by coordinating 50 independently owned workspaces.">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<link rel="canonical" href="https://weaverstack.dev/guides/fabric-enterprise-dependency-graph/">
+<link rel="canonical" href="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:type" content="article">
-<meta property="og:url" content="https://weaverstack.dev/guides/fabric-enterprise-dependency-graph/">
+<meta property="og:url" content="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:site_name" content="Weaver">
-<meta property="og:title" content="One dependency graph across 50 Microsoft Fabric workspaces">
-<meta property="og:description" content="Impact assessment and recovery across 50 independently owned Fabric workspaces, each with its own catalogue, without a central orchestrator.">
+<meta property="og:title" content="Organising Microsoft Fabric workspaces for a large enterprise: an experiment coordinating 50 workspaces">
+<meta property="og:description" content="How to organise Microsoft Fabric workspaces for self-service data and data democratisation in a large enterprise, tested by coordinating 50 independently owned workspaces.">
 <meta property="og:image" content="https://weaverstack.dev/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Weaver across 50 Microsoft Fabric workspaces.">
+<meta property="og:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
 <meta property="og:locale" content="en_AU">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="One dependency graph across 50 Microsoft Fabric workspaces">
-<meta name="twitter:description" content="Impact assessment and recovery across 50 independently owned Fabric workspaces, each with its own catalogue, without a central orchestrator.">
+<meta name="twitter:title" content="Organising Microsoft Fabric workspaces for a large enterprise: an experiment coordinating 50 workspaces">
+<meta name="twitter:description" content="How to organise Microsoft Fabric workspaces for self-service data and data democratisation in a large enterprise, tested by coordinating 50 independently owned workspaces.">
 <meta name="twitter:image" content="https://weaverstack.dev/og.png">
-<meta name="twitter:image:alt" content="Weaver across 50 Microsoft Fabric workspaces.">
+<meta name="twitter:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
@@ -35,9 +36,9 @@
   "@graph": [
     {
       "@type": "TechArticle",
-      "headline": "One dependency graph across 50 Microsoft Fabric workspaces",
-      "description": "Impact assessment and recovery across 50 independently owned Fabric workspaces, each with its own catalogue, without a central orchestrator.",
-      "url": "https://weaverstack.dev/guides/fabric-enterprise-dependency-graph/",
+      "headline": "Organising Microsoft Fabric workspaces for a large enterprise: an experiment coordinating 50 workspaces",
+      "description": "How to organise Microsoft Fabric workspaces for self-service data and data democratisation in a large enterprise, tested by coordinating 50 independently owned workspaces.",
+      "url": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/",
       "inLanguage": "en-AU",
       "author": {"@type": "Organization", "name": "Weaver contributors"},
       "publisher": {"@type": "Organization", "name": "Weaver", "url": "https://weaverstack.dev/"},
@@ -49,7 +50,7 @@
       "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://weaverstack.dev/"},
         {"@type": "ListItem", "position": 2, "name": "Fabric Engineering Guides", "item": "https://weaverstack.dev/guides/"},
-        {"@type": "ListItem", "position": 3, "name": "One dependency graph across 50 workspaces", "item": "https://weaverstack.dev/guides/fabric-enterprise-dependency-graph/"}
+        {"@type": "ListItem", "position": 3, "name": "Organising Microsoft Fabric workspaces for a large enterprise", "item": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/"}
       ]
     }
   ]
@@ -110,22 +111,22 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <main id="main">
 <section class="page-head"><div class="wrap">
 <p class="eyebrow"><a href="/guides/">Fabric Engineering Guides</a></p>
-<h1>One Dependency Graph Across 50 Microsoft Fabric Workspaces</h1>
-<p class="lead">How independently owned Fabric workspaces, each with its own catalogue, can assess the impact of a failure and recover from it across the whole organisation, without a central orchestrator.</p>
+<h1>Organising Microsoft Fabric Workspaces for a Large Enterprise: An Experiment Coordinating 50 Workspaces</h1>
+<p class="lead">How a large enterprise can organise Microsoft Fabric workspaces for self-service data, and still trace and recover from failures across them, tested by coordinating 50 independently owned workspaces.</p>
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
-<h2 id="introduction">Introduction</h2>
-<p>Many organisations adopt Microsoft Fabric as a self-service platform for the whole enterprise, not as a tool for one engineering team. A central team lands and conforms shared data, and dozens of business areas build on it in workspaces of their own, each with its own people, release cycle and priorities.</p>
-<p>The arrangement is tested when something upstream fails. When a central Bronze table fails, every team downstream needs to know what is affected and how to recover. In most estates nobody can answer either question for the whole organisation, because each team's pipelines, schedules and run history live with that team.</p>
-<p>This guide shows that Fabric already holds most of what is needed to answer both questions, and tests the approach on 50 real workspaces. In the test, one failed Bronze table was traced to every affected object in the 49 other workspaces in under a minute and a half. The central team then repaired its own estate without reloading any other team's data, and a business team identified and repaired its own affected tables independently.</p>
+<h2 id="introduction">Organising Microsoft Fabric workspaces in a large enterprise</h2>
+<p>One of the first questions an organisation faces when it designs its Microsoft Fabric estate is how to organise the workspaces. A small team can keep everything in one or two. A large enterprise has a central data team, dozens of business areas, separate owners and separate release cycles, and many adopt Fabric so that those areas can serve themselves. Self-service data in Microsoft Fabric therefore usually means a workspace for each team, with a central team landing and conforming shared data that the others build on.</p>
+<p>Organising workspaces this way supports data democratisation, but it brings common problems. Teams cannot see what they depend on beyond their own workspace. When a central table fails, business teams find out from stale or wrong numbers, and the central team cannot tell who is affected. Recovery depends on tickets and meetings between teams, and the usual remedy, a central orchestrator that runs every team's pipelines, takes back the independence that self-service was meant to provide.</p>
+<p>This guide shows that Fabric already holds most of what is needed to solve these problems, and tests the approach by coordinating 50 real workspaces. In the test, one failed Bronze table was traced to every affected object in the 49 other workspaces in under a minute and a half. The central team then repaired its own estate without reloading any other team's data, and a business team identified and repaired its own affected tables independently.</p>
 <figure class="facts-figure" aria-label="Experiment at a glance">
 <div><strong>50</strong><span>Fabric workspaces</span></div><div><strong>50</strong><span>independent catalogues</span></div><div><strong>53</strong><span>cross-workspace connections</span></div><div><strong>FTL64</strong><span>trial capacity</span></div>
 <figcaption>One central Bronze, Silver/Gold and semantic-model architecture and 47 business workspaces, with no shared repository or configuration.</figcaption>
 </figure>
 
-<h2 id="the-enterprise-problem">1. The enterprise problem</h2>
-<p>A typical federated estate looks like this:</p>
+<h2 id="the-enterprise-problem">1. Self-service data and the coordination problem</h2>
+<p>A common way to organise Microsoft Fabric workspaces for self-service data looks like this:</p>
 <ul>
 <li>A central team owns the Bronze Lakehouse in one workspace.</li>
 <li>Another team owns the Silver Lakehouse and Gold Warehouse in a second.</li>
@@ -220,21 +221,22 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <p>Some events need the whole organisation to move together, such as recovering from a major incident. One <code>load --stale</code> across all 50 catalogues reloaded only the 71 objects still behind, rather than rerunning every team's estate, and returned every workspace to green apart from the object held behind by the cycle.</p>
 <p>A full coordinated load across all 50 workspaces ran 125 steps in one graph: 80 objects and the 45 SQL endpoint refreshes and OneLake publications that make sure each team reads fresh data. It finished in just over five minutes, with up to 12 steps running at once, and every object was recorded in its own team's catalogue. Coordination did not require a central orchestrator, a shared repository or a change to any team's project.</p>
 
-<h2 id="conclusion">7. Conclusion</h2>
-<p>Fabric is well suited to self-service across a large organisation. A single OneLake for the tenant, a five-part name for every object and shortcuts between workspaces let dozens of teams work in workspaces of their own while reading the same data, without copying it or running infrastructure between them. Fabric provides that foundation as part of the platform.</p>
+<h2 id="conclusion">7. Conclusion: self-service data in Microsoft Fabric at enterprise scale</h2>
+<p>Fabric is well suited to self-service data and data democratisation across a large enterprise. A single OneLake for the tenant, a five-part name for every object and shortcuts between workspaces let dozens of teams work in workspaces of their own while reading the same data, without copying it or running infrastructure between them. Fabric provides that foundation as part of the platform.</p>
 <p>Fabric leaves each team to record how its objects depend on other teams' objects and whether each one is current. Weaver records both in each team's own catalogue as the team builds and loads, so the workspaces that Fabric already connects can be operated as one dependency graph when the organisation needs one. This allows two ways of working on the same platform:</p>
 <ol class="implementation-steps">
 <li><strong>Decentralised by default.</strong><span>Every team builds, loads, tests and checks its own estate independently, with its own catalogue and release cycle.</span></li>
 <li><strong>Coordinated when required.</strong><span>Any team, or the organisation, can join the relevant catalogues to see dependencies, assess impact and coordinate recovery across workspaces.</span></li>
 </ol>
 <p>For a large organisation, this means teams can release on their own schedules without a central team acting as gatekeeper, while a failure upstream can still be traced to every workspace it reaches and repaired by the teams that own the affected objects.</p>
+<p>For an enterprise deciding how to organise its Microsoft Fabric workspaces, a workspace for each team therefore does not have to cost the organisation its view of the whole estate. Teams keep ownership of their workspaces, and the organisation can still see and coordinate across all of them.</p>
 <p>See <a href="/how-it-works/">how Weaver works</a>, then the <a href="https://docs.weaverstack.dev/">documentation</a>.</p>
 
 <h2 id="references">References</h2>
 <p>Microsoft (2026a). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">OneLake, the unified data lake</a>. Microsoft Learn. Accessed 8 November 2026.</p>
 <p>Microsoft (2026b). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">Unify data sources with OneLake shortcuts</a>. Microsoft Learn. Accessed 8 November 2026.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Introduction</a></li><li><a href="#the-enterprise-problem">The enterprise problem</a></li><li><a href="#what-fabric-provides">What Fabric already provides</a></li><li><a href="#the-two-missing-pieces">The two missing pieces</a></li><li><a href="#experimental-setup">Experimental setup</a></li><li><a href="#the-implementation-weaver">The implementation: Weaver</a></li><li><a href="#results">Results</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#references">References</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Organising Fabric workspaces</a></li><li><a href="#the-enterprise-problem">Self-service and coordination</a></li><li><a href="#what-fabric-provides">What Fabric already provides</a></li><li><a href="#the-two-missing-pieces">The two missing pieces</a></li><li><a href="#experimental-setup">Experimental setup</a></li><li><a href="#the-implementation-weaver">The implementation: Weaver</a></li><li><a href="#results">Results</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#references">References</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

@@ -199,26 +199,26 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 </figure>
 
 <h2 id="results">6. Results</h2>
-<p>Every result below came from the Weaver CLI running against the 50 Fabric workspaces.</p>
-<div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Operation</th><th scope="col">Catalogues</th><th scope="col">Result</th><th scope="col">Duration</th></tr></thead><tbody>
-<tr><td>Health after the failure</td><td>All 50</td><td><code>BRZ.Customer</code> failed. 77 objects affected in 45 other catalogues, each naming the cause.</td><td>82 seconds</td></tr>
-<tr><td>Team 05's view</td><td>Team 05, Bronze, Central</td><td>Both of its Mart tables affected, traced to <code>BRZ.Customer</code>.</td><td>11 seconds</td></tr>
-<tr><td>Central recovery, <code>load --stale</code></td><td>Bronze, Central, Semantic</td><td>Six objects reloaded across Bronze, Silver/Gold and the central model. No business team's object.</td><td>2 minutes 18 seconds</td></tr>
-<tr><td>Team 05's view after the repair</td><td>Team 05, Bronze, Central</td><td>Both tables now behind the repaired upstream.</td><td>5 seconds</td></tr>
-<tr><td>Team 05 recovery, <code>load --stale</code></td><td>Team 05, Bronze, Central</td><td>Its two stale tables reloaded; back to green.</td><td>15 seconds</td></tr>
-<tr><td>Organisation-wide recovery, <code>load --stale</code></td><td>All 50</td><td>Only the 71 objects still behind, in 43 workspaces.</td><td>4 minutes 16 seconds</td></tr>
-<tr><td>Federated load</td><td>All 50</td><td>125 nodes in one graph, all succeeded under one workflow ID.</td><td>5 minutes 15 seconds</td></tr>
+<p>The failure in <code>BRZ.Customer</code> is the kind of incident that, in a federated estate, often produces a day of tickets: business teams notice odd numbers, each investigates its own pipelines, and the central team works out who is affected by asking them. In this experiment every team could answer its own questions from the records, within seconds or minutes, and recover without waiting on anyone else.</p>
+<div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
+<tr><td>The organisation</td><td>What did this failure affect?</td><td>77 objects in 45 other teams' workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
+<tr><td>Team 05</td><td>Are our numbers affected, and why?</td><td>Both of its Mart tables, because of <code>BRZ.Customer</code>.</td><td>11 seconds</td></tr>
+<tr><td>The central team</td><td>Can we repair our estate without disturbing the business teams?</td><td>Yes. Six objects reloaded across Bronze, Silver/Gold and the central model, and no business team's data.</td><td>2 minutes 18 seconds</td></tr>
+<tr><td>Team 05</td><td>The upstream is fixed. What do we need to reload?</td><td>Its two tables, now behind the repaired data. Reloaded and back to green.</td><td>5 seconds to check, 15 seconds to reload</td></tr>
+<tr><td>The organisation</td><td>Bring every workspace up to date after the incident.</td><td>Only the 71 objects still behind, in 43 workspaces.</td><td>4 minutes 16 seconds</td></tr>
+<tr><td>The organisation</td><td>Run everything as one coordinated load.</td><td>125 steps across 50 workspaces in one graph, all succeeded.</td><td>5 minutes 15 seconds</td></tr>
 </tbody></table></div>
-<h3 id="impact-across-the-organisation">6.1 Impact across the organisation</h3>
-<p>One Health operation across all 50 catalogues found the failed table and the 77 objects downstream of it in 45 other catalogues: 61 Warehouse tables, 5 Lakehouse tables and 11 semantic models. Only one object had failed; the other 77 were still serving their last successful load, and each finding named <code>BRZ.Customer</code> as its cause. The four thin-report teams had nothing to load and stayed green.</p>
-<h3 id="independent-recovery">6.2 Independent recovery</h3>
-<p>The central team repaired its estate with one <code>load --stale</code> over its own three catalogues. The plan held six objects to reload, ordered across Bronze, Silver/Gold and the central semantic model, with the SQL endpoint refreshes and OneLake publications between them. No business team's data was reloaded.</p>
-<p>Team 05 then saw, from its own catalogue alongside its upstream, that its tables were now behind the repaired data rather than broken. It reloaded only its two stale tables and returned to green, without waiting for the central team or asking it to run anything.</p>
-<h3 id="cycles">6.3 Cycles</h3>
-<p>The cycle between teams 01 and 02 was found and reported once. Loads ordered it by cutting one edge, and the rest of the estate ran normally. Afterwards one object remained behind, because it had read the other team's previous load, and Health reported it as behind rather than green.</p>
-<h3 id="coordination-when-required">6.4 Coordination when required</h3>
-<p>When coordination is required, the same commands run across the whole organisation. One federated load across all 50 workspaces ran 125 nodes in one graph: 80 objects to load, and 45 SQL endpoint refreshes and OneLake publications that make sure each team reads fresh data. It finished in just over five minutes, of which execution took about two, with up to 12 nodes running at once. The remainder was spent reading 50 catalogues, planning the run and starting Spark.</p>
-<p>After the failure, one organisation-wide <code>load --stale</code> reloaded only the 71 objects still behind and brought every workspace back to green, except the object held behind by the cycle.</p>
+<h3 id="impact-across-the-organisation">6.1 Knowing the impact of a failure</h3>
+<p>Within a minute and a half of asking, the organisation knew that one Bronze table had failed and that 77 objects in 45 other teams' workspaces depended on it: 61 Warehouse tables, 5 Lakehouse tables and 11 semantic models. Each affected object named <code>BRZ.Customer</code> as its cause, so no team needed to investigate its own pipelines to find out why its data was behind, and the central team did not need to ask anyone what they used.</p>
+<p>The finding also told owners what their users were seeing. Only one object had failed; the other 77 were still serving their last successful load, so business reports showed data that was older than expected rather than wrong. The four teams with only reports had nothing to reload and were correctly shown as unaffected.</p>
+<h3 id="independent-recovery">6.2 Each team recovers on its own terms</h3>
+<p>The central team repaired its estate with one command over its own three catalogues. Weaver reloaded six objects in the right order across Bronze, Silver/Gold and the central semantic model, including the SQL endpoint refreshes and OneLake publications between them, and left every business team's data alone. The central team did not need to coordinate a release window with 47 other teams.</p>
+<p>Team 05 then checked its own position. Its tables were no longer broken but behind the repaired data, so it reloaded those two tables and returned to green in 15 seconds, without raising a ticket with the central team or waiting for an organisation-wide rerun. Every other team could do the same on its own schedule.</p>
+<h3 id="cycles">6.3 Teams that read one another's data</h3>
+<p>Teams 01 and 02 read each other's summaries, which a scheduler that requires an acyclic graph would refuse to run. Here the cycle was reported once, loads ran around it, and the rest of the organisation was unaffected. One object remained behind because it had read the other team's previous load, and Health reported it that way, so both teams could see exactly where their data stood.</p>
+<h3 id="coordination-when-required">6.4 Coordination when the organisation needs it</h3>
+<p>Some events need the whole organisation to move together, such as recovering from a major incident. One <code>load --stale</code> across all 50 catalogues reloaded only the 71 objects still behind, rather than rerunning every team's estate, and returned every workspace to green apart from the object held behind by the cycle.</p>
+<p>A full coordinated load across all 50 workspaces ran 125 steps in one graph: 80 objects and the 45 SQL endpoint refreshes and OneLake publications that make sure each team reads fresh data. It finished in just over five minutes, with up to 12 steps running at once, and every object was recorded in its own team's catalogue. Coordination did not require a central orchestrator, a shared repository or a change to any team's project.</p>
 
 <h2 id="conclusion">7. Conclusion</h2>
 <p>Fabric is well suited to self-service across a large organisation. A single OneLake for the tenant, a five-part name for every object and shortcuts between workspaces let dozens of teams work in workspaces of their own while reading the same data, without copying it or running infrastructure between them. Fabric provides that foundation as part of the platform.</p>

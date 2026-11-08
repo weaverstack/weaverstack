@@ -54,24 +54,29 @@ Developer-specific completion and exact tests are recorded in the companion deve
 | T09 | Product/article no unlimited Import claim or live snapshot promise. Current eight-page reader route retained. Historical snapshot bytes left unchanged. |
 | T10 | Current AI route retained. Integrated developer build, old fragments and demo-helper dependency still need final verification. |
 
-## Experiment evidence and unresolved exact figures
+## Experiment evidence: recovered, parsed and retained
 
-Evidence currently retrieved: runtime PR #268's retained description (`gh pr view 268 --repo weaverstack/weaverstack --json body`). It documents a 50-workspace coordinated run: 125 nodes, 80 loads, 41 endpoint refreshes, four publication waits, all succeeded, 305 seconds end to end. Boundaries include catalogue reads, planning, Spark wait, execution and records. The PR explicitly says this run predates its review fixes. This is retained maintainer evidence, not a live rerun or independently recovered raw run artifact. Exact pre-review source SHA and raw report path remain unlocated.
+The original CLI reports were located after the initial provisional pass. The article now uses the coherent **7 November 2026 main rerun**, not the earlier PR #268 run. No Fabric rerun was performed. Runtime `efc046e7cf066daefd27f9268413ae05c3ed64e4`, wheel `weaverstack-0.10.0.dev2733981627354525514`, FTL64 trial capacity in Australia East. `runs3/RESULTS.md` records the run context; `runs3/00-publish.txt` identifies the wheel; `runs3/times.json` records CLI harness wall time.
 
-The article's 315 seconds is not silently rounded to 305: the table now explicitly uses the documented 305-second run and its boundary. The previous 315-second figure is removed pending a matching source.
+Original evidence was in the Claude scratchpad identified by the experiment owner. Selected originals are now preserved outside disposable worktrees in the runtime repository's ignored `.cache/docs-0.11-editorial/spread-evidence/`. `spread-evidence.json` records hashes and programmatic reductions, not invented replacement output. Reproduce those reductions with `check_spread_evidence.py <retained-evidence-root>`.
 
-| Earlier claim | Action pending raw evidence |
-|---|---|
-| 50 catalogues, 53 connections, FTL64 | retain general 50-workspace trial context documented by #268; remove unverified 53/FTL64 headline figures |
-| 77 affected / 45 workspaces / 61+5+11 / 82 seconds | omit exact breakdown and timing until its report is located; preserve the operational investigation |
-| Team 05 11s / 5s / 15s | omit timings; explain supported selected-recovery task, not a fabricated observed result |
-| six central loads / 138s | omit exact result/timing; preserve central selection and upstream repair |
-| 71 remaining / 43 workspaces / 256s | omit unsupported sequence; explain wider selected stale recovery |
-| 315-second coordinated load | replace with explicitly sourced older 305-second run, not a claim of current-head timing |
-| cycle leaves one member behind in Health | remove; contradicts current intra-cycle comparison suppression |
-| thin reports unaffected / numbers merely old, not wrong | remove; no separate load action does not establish report/business correctness |
+| Published fact | Source and measurement boundary | Verified disposition |
+|---|---|---|
+| 50 workspaces, 50 catalogues, 53 connections | `runs/RESULTS.md` estate inventory; `spread_estate.py`; 50 catalogue reports in rerun | simulated team architecture, not adoption |
+| 77 downstream subjects in 45 workspaces | unique `(catalogue, object_id)` findings naming BRZ.Customer in `runs3/04-impact-health.json`, excluding failed source | 61 Warehouse + 5 Lakehouse + 11 semantic models; catalogue statuses 1 red / 45 amber / 4 green |
+| impact 82s | `times.json`, 04-impact-health 81.9s | rounded wall time, not only execution |
+| Team05 impact 11s | 05-team05-health.txt; times 10.8s | two affected Mart tables |
+| central repair 138s | 06b-central-plan.txt and 06c-central-recovery.txt; times 137.6s | six object loads, no business-team loads; planning is a separate 23.2s measurement |
+| Team05 check 5s, reload 15s | 07a-team05-ready.txt, 07b-team05-reload.txt, 07c-team05-after.txt; times 5.0s / 14.9s | post-repair sequence retained; green check confirmed separately |
+| 71 remaining loads, combined run in 43 workspaces, 256s | 08-federated-stale.json; times 256.0s | 112 steps = 71 logical loads owned by **42** catalogues + 41 readiness steps; **all nodes** span 43 catalogues. Do not call all 43 object owners. |
+| coordinated 125 steps / 80 loads / 315s | 01-federated-load.json; times 314.5s | 125 succeeded, 41 endpoint refreshes + 4 publication waits; one workflow ID; 50 catalogues supplied but load-bearing nodes owned by 46 |
+| final Health | 09-final-health.json | 49 green, one amber; do not turn this into a claim that cycles necessarily leave one member stale |
 
-A pointer request was sent to the runtime teammate, with no rerun requested. Restore only figures backed by a coherent retained report/revision. No invented first-person authorship; current organisational byline retained.
+The earlier **305-second** PR #268 run is different: source `55d6e3f886756aab9e2432712057e0f6b2b88998`, published checkout `355dd0ffa16735f0987a0c806798f25e11b73949`, wheel `weaverstack-0.10.0.dev12201172653880442203`, prior to review fixes. It must not replace or be rounded into the 315-second main rerun.
+
+The final amber finding names Team02 `MART.RegionCustomers` as the newer ancestor of Team01 `MART.PeerSummary`. `RegionCustomers` is **outside** the reported strongly connected component (whose Team02 member is `MART.Summary`). This is not evidence that Health compared relative load times inside the cycle. The article teaches current cycle semantics without attributing this historical finding to a nonexistent universal cycle rule.
+
+Thin-report workspaces have no separate load here, but can still display affected source data. No business-correctness claim is drawn from the recorded states. No invented first-person authorship; the organisational byline is retained.
 
 ## Editorial changes and reusable policy
 

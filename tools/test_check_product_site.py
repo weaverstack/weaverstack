@@ -7,7 +7,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from check_product_site import run, stamp_assets
+from check_product_site import route_file, run, stamp_assets
+
+
+class RouteResolution(unittest.TestCase):
+    def test_origin_without_path_resolves_to_index(self):
+        root = Path("built-docs")
+        self.assertEqual(route_file(root, ""), root / "index.html")
+        self.assertEqual(route_file(root, "/"), root / "index.html")
+        self.assertEqual(route_file(root, "/guide/"), root / "guide/index.html")
+        self.assertEqual(route_file(root, "/demo.html"), root / "demo.html")
 
 ROOT = Path(__file__).resolve().parents[1] / "docs"
 

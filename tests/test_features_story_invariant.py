@@ -30,11 +30,10 @@ def test_features_and_homepage_show_different_fabric_objects_in_one_dag():
     homepage = HOME.read_text(encoding="utf-8")
 
     assert (
-        '<h3 id="dag-title">A single DAG across all your work — from Python to SQL '
-        "to Power BI.</h3>"
+        '<h3 id="dag-title">One dependency graph across Python, SQL and Power BI</h3>'
     ) in features
     assert '<svg class="parcel-diagram"' in features
-    assert "Different Fabric objects, one DAG." in homepage
+    assert "One dependency graph across Fabric items" in homepage
     assert "Python, Spark SQL, T-SQL, a semantic model and a Report" in homepage
 
     for node in DAG_NODES:
@@ -62,10 +61,10 @@ def test_warehouse_visibility_is_one_feature_story():
     assert "#operations" not in jumps
     assert jumps.count("#visibility") == 1
     assert '<section class="section feature-group" id="operations"' not in features
-    assert "<h2>Visibility, included</h2>" in visibility
+    assert "<h2>Operational visibility</h2>" in visibility
     estate_line = (
-        "The entire estate — every object and its health state — is exposed through "
-        "Warehouse tables."
+        "Every object Weaver manages is recorded in tables in a Fabric Warehouse, "
+        "with its dependencies and the outcome of its last load and Test."
     )
     assert estate_line in visibility
     assert visibility.index("<h2>") < visibility.index(estate_line)

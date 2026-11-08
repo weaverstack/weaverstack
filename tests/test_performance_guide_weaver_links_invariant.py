@@ -81,8 +81,8 @@ def test_feature_scale_story_links_to_the_guide_after_advanced_features():
     page = FEATURES.read_text(encoding="utf-8")
     guide = 'href="/guides/fabric-performance-optimisation/"'
 
-    assert '<h3 id="scale-title">From 3 objects to 3,000.</h3>' in page
-    assert "When your estate gets complicated" in page
+    assert '<h3 id="scale-title">Measured at 3,000 objects</h3>' in page
+    assert "<h2>Several workspaces" in page
     assert page.count(guide) == 1
     assert page.index('id="advanced"') < page.index('id="scale"')
     assert page.index('id="scale"') < page.index(guide)

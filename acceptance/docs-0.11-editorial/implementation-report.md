@@ -1,6 +1,6 @@
 # Weaver 0.11 editorial implementation — working evidence
 
-Status: implementation in progress; not a release or publication sign-off. No live Fabric operations authorised or performed. Runtime, CI, package configuration and VERSION are unchanged.
+Status: draft implementation complete, with the confirmed T05 runtime defect explicitly outstanding; not a release or publication sign-off. No live Fabric operations authorised or performed. Runtime, CI, package configuration and VERSION are unchanged.
 
 ## Starting revisions and ownership
 
@@ -37,22 +37,22 @@ The runtime comparison includes already-merged developer documentation. These ar
 | multi-catalogue Dashboard | #270; dashboard_model.py | Dashboard deployment, demos, Features/comparison | Direct Lake up to ten, Import more than ten, current page names |
 | static HTML export | #271 efc046e7; operations/catalogue_dashboard.py | Dashboard export CLI/Python; Features/article | model-data snapshot; local downloaded copy vs remote destination availability |
 
-Developer-specific completion and exact tests are recorded in the companion developer-repository acceptance report; this working ledger must be reconciled before sign-off.
+Developer-specific completion, full coverage and exact tests are recorded in the companion developer-repository `acceptance/docs-0.11-editorial/` report and ledger. The final docs bundle passes 20/20 checks after correcting a stale example-format assertion. The confirmed T05 defect remains separate from editorial completion.
 
 ## Technical findings
 
 | Item | Current disposition |
 |---|---|
-| T01 | Confirmed in source: Execute's _RUN submits code without read-only validation. Product corrected. Developer corrections in progress. |
-| T02 | No permissions inferred from --yes or config. Agent guide/parser audit delegated; product avoids universal flag protocol. |
-| T03 | Source graph.py inspected: strongly connected components, closing edges based on deterministic order, acyclic execution. Article and product corrected; developer sweep in progress. |
-| T04 | Product Mirror caption scoped. Developer old ownership/source and retained-row explanations under reconciliation. |
-| T05 | Separate focused runtime investigation; no runtime fix authorised. Pending result. |
-| T06 | Product removes universal Contributor claim. Exact Microsoft prerequisites and developer matrix under review. |
+| T01 | Confirmed in source: Execute's _RUN submits code without read-only validation. Product and developer docs corrected. |
+| T02 | No permissions inferred from --yes or config. Agent guide corrected; 54 complete commands parsed without dispatch. Check/workflow flag restrictions tested. |
+| T03 | Source graph.py inspected: strongly connected components, closing edges based on deterministic order, acyclic execution. Article, product and developer contradiction sweep corrected. |
+| T04 | Product Mirror caption scoped. Developer ownership/source, scope and retained-row explanations reconciled. |
+| T05 | Confirmed offline: joined remote workspace resolution clears mirror configuration, so Health cannot resolve borrowed state. Separate developer T05 report/probe retained. Own-configuration invocation documented; runtime unchanged. |
+| T06 | Product removes universal Contributor claim. Microsoft-backed permissions cover semantic ownership, default/shared Environments, shortcut identity, Execute Queries and organisational visuals. |
 | T07 | Product and article separate supplied context from selected work and owner-local records. Article has complete three-catalogue commands, explicit working workspace and positional Team 05 selection. |
 | T08 | Article rewritten around team ownership; acknowledges Fabric lineage/impact analysis; names separated from GUID identity; no business-correctness inference. |
 | T09 | Product/article no unlimited Import claim or live snapshot promise. Current eight-page reader route retained. Historical snapshot bytes left unchanged. |
-| T10 | Current AI route retained. Integrated developer build, old fragments and demo-helper dependency still need final verification. |
+| T10 | Current AI route/#json-output retained; developer rendered crawl covers 114 original pages and 872 fragments. Integrated product-to-built-docs check passes, including root URLs and actual pointer destinations. Demo check passes with #275 helper. |
 
 ## Experiment evidence: recovered, parsed and retained
 
@@ -99,7 +99,16 @@ From isolated product site worktree:
 - local parser check via build_parser(): seven product/article commands parsed, none dispatched. Includes explicit Team05 selection and working workspace.
 - `git diff --check`: pass.
 
-Pending: combined runtime representation tests, integrated article/site build, final developer-site link/fragment crawl, desktop/mobile/no-JS rendered review and exact final PR head readback.
+Final additional validation:
+
+- Parent reran all 20 developer checks: strict MkDocs, four generated references, Dashboard demo, estate/reference/refresh/journey examples, route/asset checks, generator tests, complete commands and T05 probe: 20/20 pass. The stale Executive format expectation now checks its existing authored `0 "delivered"` override; no fixture/runtime change.
+- 296 focused runtime tests passed in the developer investigation; parent independently ran 51 joined Health/Load representation tests, all passing.
+- Product checker regression suite: 12 passed after adding a failing-then-passing root-URL regression. Integrated checking also exposed an old pointer gate that looked up the source route on the developer site rather than its actual destination; corrected to resolve destination host/path/fragment, without disabling broken-target checks.
+- Product #275 and article #273 merged only into a detached local integration tree. Combined product checker against the built developer site passes; both remote bases remain unchanged.
+- Actual browser review at 1280px desktop and 390px mobile: Features, article opening/results; no page-level horizontal overflow. Results table scrolls inside its container on mobile. Features content and safety statement remain readable with JavaScript disabled; full navigation remains available. Developer targeted desktop/mobile review is recorded in its own report.
+- Loopback HTML and private tailnet HTTPS article content verified. Review preview serves only integrated product `docs/`, not a repository root. It remains a tracked review server, not public deployment; requires this Mac awake and connected. No unrelated Serve route was changed.
+
+Final scope: draft editorial changes, acceptance evidence and reusable skills are delivered. T05 is a real runtime issue requiring separate authorisation, not an unresolved prose task. Exact final PR head/draft readback accompanies the delivery message.
 
 ## Proposed later integration/publication order
 

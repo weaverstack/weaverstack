@@ -1,169 +1,124 @@
 # Weaver prose
 
-Read this guide before changing user-facing text, documentation, docstrings or
-source comments. It governs wording, not product behaviour.
+Read this guide before changing product pages, documentation, CLI text, docstrings
+or source comments. It governs wording, not product behaviour.
 
-## Default
+## Public pages and explanatory guides
 
-For comments and docstrings, preserve the smallest amount of prose that carries
-non-obvious engineering information.
+**Confident explanation.** Lead with the task, capability or result. State what the
+reader provides and what Weaver does. Define meaningful scope once. Prefer a
+supported action or requirement to a sentence about what Weaver does not do.
+Keep clear warnings for destructive actions and real security or compatibility
+limits. Put detailed semantics in Reference and review provenance in maintainer
+evidence.
 
-For user-facing text, preserve only information needed to understand the current
-result or choose the next action. Internal facts do not earn a place merely
-because they explain why Weaver behaves that way.
+**Persuasion through substance.** Product pages and organisational articles should
+explain why the capabilities matter. Concrete benefits, examples and considered
+recommendations are welcome. Support claims with the mechanism or evidence;
+avoid slogans and unsupported superlatives.
 
-Delete everything else. Do not optimise for deletion count. Optimise for
-information density.
+**Enough explanation to teach.** Optimise for reader understanding and successful
+action, not maximum information density or minimum word count. Use named actors,
+reasons and examples where they help. Preserve concise passages that already work.
 
-## Principles
+### Three related voices
 
-1. **Senior engineer to senior engineer.** Assume competence. Be clear without
-   teaching down, selling or performing expertise.
+- Product pages explain what a team can do, why it helps and where to start.
+- Guides walk a reader through a recognisable task, its decisions and consequences.
+- Reference specifies exact inputs, defaults, state changes and failure rules.
 
-2. **Use plain, concrete technical language.** Name the actual thing: Weaver,
-   Fabric, the catalogue, the command, the table, TDS or OneLake.
+Begin with a failed load, shared table, development change or release decision
+before introducing storage, bindings and identity. Explain one relationship at a
+time with ordinary verbs. A senior engineering voice is approachable and precise.
+Vary sentence length naturally; adding pronouns or making every sentence short
+is not a substitute for an explanation.
 
-3. **State the model.** Describe the current behaviour positively. State the
-   rule or constraint, not the accident that a different design might cause.
-   Contrast it with what it is not only when that distinction is genuinely easy
-   to miss.
+Keep useful benefits such as “without copying data” or “no separate monitoring
+service”. Give selection rules as controls: what the reader includes and what
+runs. Give prerequisites as the setup needed for the action. Keep genuine data
+loss, partial-state, security and compatibility consequences explicit beside the
+relevant command. Link exact contracts rather than repeating them across cards.
 
-4. **Be succinct.** Give the fact, constraint or reason needed to understand the
-   issue. Stop there.
+Write release pages for the release being shipped. Keep draft status, review
+history, test oracles, package-publication sequencing and planned coverage in
+maintainer evidence. Public examples state their project, files and active
+configuration, and give the reader a useful result and next step.
 
-5. **Stay local to the problem at hand.** Especially in user-facing prose,
-   include only what affects the current action, error or decision. Do not
-   explain adjacent configuration, architecture or edge cases unless they
-   matter now. A fact being true and related is not enough reason to include it.
+### Product website
 
-6. **No defensiveness.** Do not justify the implementation against imaginary
-   objections or alternative designs nobody proposed.
+Preserve **Making Fabric easier to use** and the closing line **Making Fabric
+easier to use, and safer to scale.** The Story page keeps its personal history
+and voice. Other headings name a task, capability or result.
 
-7. **No archaeology.** Describe the system as it exists now. Leave out previous
-   implementations, old bugs, abandoned approaches and development history
-   unless compatibility or migration depends on them.
+Lead with Microsoft Fabric. Present items in this order: Lakehouse, Warehouse,
+semantic models, Reports. Use Fabric before Power BI when naming platforms.
+Explain standalone Power BI deployment where it helps a reader choose a setup.
 
-8. **Keep the real actor and action visible when agency matters.** Do not make
-   abstractions think, know, want, care, decide or refuse. Do not hide a relevant
-   actor behind vague passive prose. Do not insert Weaver as the subject when a
-   label or direct statement of state is clearer.
+Use familiar Python, SQL and native Power BI work to introduce the project.
+Explain the engineering Weaver handles around it, then the next useful capability.
+Keep precise API contracts in Reference rather than making them an admission
+requirement for understanding the product.
 
-9. **Explain constraints, not hypothetical failure chains.** State the condition
-   that matters and its consequence. Do not narrate everything that might
-   otherwise go wrong.
+### Evidence-led articles and examples
 
-10. **Comments explain the non-obvious engineering fact.** Preserve invariants,
-    platform constraints, ordering requirements and failure boundaries. Do not
-    narrate obvious code or turn comments into design essays.
+Use measured results to explain what people learned and accomplished. State the
+workload, participating scope and measurement boundary once where they matter.
+Keep source runs, revisions, hashes and reductions in the acceptance record.
+Round results without changing the measured claim. Preserve historical captures
+and use generators to update derived interfaces and illustrations.
 
-11. **User-facing prose serves the user.** Say what happened, identify the
-    relevant thing and give the next action when one is known. Nothing more.
+Separate observed results from organisational implications. Projects representing
+teams demonstrate an architecture; customer adoption and first-person experience
+need their own evidence. Keep the central team's coordination and business teams'
+ownership visible in the argument. Retain meaningful engineering detail and
+useful benefits rather than adding a disclaimer after each result.
 
-## Applying the principles
+For graphs that can contain cycles, use “dependency graph”; an acyclic execution
+plan is a separate concept. Explain the useful execution rule on product pages
+and link the exact algorithm and Health behaviour in Reference.
 
-### CLI help
+Make passing validation the ordinary path through examples. Deliberate failures,
+diagnostic selectors and restoration exercises belong in clearly optional
+exploration, with the recovery actions and consequences preserved.
+
+## Source comments and docstrings
+
+Preserve non-obvious engineering information: invariants, platform constraints,
+ordering requirements, failure boundaries and reasons the code cannot express.
+Describe current behaviour. Leave old bugs and abandoned designs in history
+unless compatibility or migration depends on them.
+
+State the shortest direct explanation that preserves the engineering fact.
+Delete comments that narrate obvious code. Document parameters and return values
+when their meaning needs more than the signature and types. Source-comment
+brevity is not the writing model for a product page or teaching guide.
+
+Public behaviour belongs in `docs.weaverstack.dev`; implementation invariants
+belong in source, tests or `AGENTS.md`.
+
+## CLI help, errors, warnings and reports
 
 Say what the command or option does. Name its input, target or effect when that
-information changes how it is used.
-
-### Errors and warnings
-
-For every help string, prompt, warning or surfaced error:
+changes how it is used. For a result or error:
 
 1. State the condition in the user's vocabulary.
 2. Name the affected thing.
 3. Give the next action when Weaver knows it.
-4. Delete anything that only explains the implementation.
 
-Errors are not miniature architecture documentation. Avoid internal terms such
-as Registry rows, planner structures, bindings, item graphs, four-part naming
-and transport boundaries unless the user must interact with that concept to
-resolve the error.
+Keep the information needed to act. An error is not an architecture lecture;
+Registry rows, planner structures, bindings and transports belong there when the
+user must interact with them to resolve it. Name catalogue tables when actionable;
+otherwise describe the Warehouse or catalogue condition directly.
 
-Catalogue implementation details such as `[_]` and `[_].[Mirror]` appear in
-user-facing prose only when they are actionable. Usually name the user-visible
-condition: a Warehouse does not contain a Weaver catalogue, a catalogue is
-incompatible with this Weaver version, or a catalogue is already mirrored.
-
-### Reports
-
-Report the result and the facts needed to act on it. Do not reproduce the log or
-explain unrelated architecture.
-
-### Docstrings
-
-Identify any non-obvious purpose or contract, then preserve its shortest direct
-statement. Delete the docstring when no useful information remains. Describe
-parameters or return values only when their meaning is not clear from the
-signature and types.
-
-### Comments
-
-Identify any invariant or constraint the code cannot express, then preserve its
-shortest direct statement. Delete comments that only narrate the code. Public
-product behaviour belongs at `docs.weaverstack.dev`; implementation invariants
-belong in `AGENTS.md`, source or tests.
-
-## Product website
-
-Preserve the accepted tagline **Making Fabric easier to use** and its closing
-slogan **Making Fabric easier to use, and safer to scale.** Editing adjacent copy
-for tone is not permission to replace either or invent another proposition.
-Headings elsewhere describe what their section covers rather than selling it.
-The story page keeps its own voice.
-
-Lead with Microsoft Fabric. Present items in this order: Lakehouse, Warehouse,
-semantic models, Reports. When naming the platforms, use Fabric before Power BI.
-Catalogue-free Power BI operation is a setup detail, not the product proposition.
-
-Use the same senior engineering voice on the website. Explain the work Weaver
-removes and how it fits a project; do not substitute slogans or reassurance for
-that explanation. Feature cards can be a little more inviting without becoming
-sales copy. Read the heading and first paragraph as someone meeting Weaver for
-the first time: do not introduce catalogue exceptions before the reader knows
-what the product does.
-
-Keep benchmark evidence in the maintainer record. Public scale copy uses rounded
-results and the workload/capacity context, not PR numbers, second-level timing,
-tuning diaries or a catalogue of caveats. Round without changing the measured
-claim, and describe observed results rather than universal performance promises.
-
-## First success and progressive depth
-
-Write as a practitioner teaching another person. On the product site, explain
-what the team can do and why the mechanism helps. In guides, begin with a
-recognisable task or decision, explain the choices, then show a complete example.
-Reference pages keep exact inputs, requirements and behaviour economical.
-
-Lead an important explanation with a failed load, shared table, release decision
-or development workspace before introducing storage and identity mechanisms.
-Name who acts. Explain one relationship at a time, using ordinary verbs rather
-than compressed implementation nouns. Do not replace an explanation with slogan
-fragments, or mechanically add pronouns and shorten every sentence.
-
-State accurate scope in the main sentence. Put permissions and prerequisites
-beside the task that needs them; link the exact matrix instead of repeating it.
-Keep a clear warning beside an operation that resets or deletes data. Preview,
-confirmation flags and configuration selection are not access-control boundaries.
-
-Keep organisational arguments purposeful: separate measured results from their
-implications for central and business teams. Simulated team boundaries are not
-customer adoption. Retain a count or timing only with its source run, revision
-and measurement boundary; do not retrofit current behaviour into an old capture.
-When dependencies can contain cycles, call the general model a dependency graph;
-an acyclic execution plan is a separate concept.
-
-Keep the current architecture. Lead with familiar Python, SQL or native Power BI work, give one working result, then explain the engineering handled around it and the next useful capability. A senior voice is approachable and precise, not dry or exhaustive. Keep full contracts in Reference rather than making them an admission requirement.
-
-State the project, required files and active configuration. Leave checkpoint maps, fixture variants, testing oracles and why examples are different in maintenance evidence; name a real source change plainly when the next task needs it. Keep actual permissions, trusted-code warnings and destructive scope at the action that depends on them.
-
-Make passing validation the ordinary path. Put deliberate failures, diagnostic selectors and restoration exercises behind clearly optional exploration; retain safe restoration and operation-specific failure boundaries. Judge flow through complete rendered reader routes, not sentence/page counts or exact-sentence assertions.
+Do not justify behaviour against imaginary alternatives. Preserve actual
+ordering, partial-state and destructive consequences. A report summarises the
+result and useful evidence rather than reproducing an unrelated log.
 
 ## Review
 
-For every comment, docstring, error or help string, ask:
+For public pages, ask whether a reader can understand the capability, provide the
+needed inputs and take the next useful step. Check the whole explanation, not
+just its shortest sentences. Keep warnings and exact rules at their useful owner.
 
-1. What non-obvious information, if any, is here?
-2. Does that information belong here?
-3. What is the shortest direct way to preserve it?
-4. If there is no useful information, delete it.
+For source comments and diagnostics, ask which non-obvious fact or next action
+the text carries, whether it belongs there and how directly it can be expressed.

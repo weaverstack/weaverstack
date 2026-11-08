@@ -50,7 +50,7 @@
       "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://weaverstack.dev/"},
         {"@type": "ListItem", "position": 2, "name": "Fabric Engineering Guides", "item": "https://weaverstack.dev/guides/"},
-        {"@type": "ListItem", "position": 3, "name": "Organising Microsoft Fabric workspaces for a large enterprise", "item": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/"}
+        {"@type": "ListItem", "position": 3, "name": "Organising Fabric workspaces for independent teams", "item": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/"}
       ]
     }
   ]
@@ -73,6 +73,7 @@
 table.benchmark { width: 100%; border-collapse: collapse; background: var(--white); }
 table.benchmark th, table.benchmark td { padding: 11px 13px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
 table.benchmark th { color: var(--ink); background: var(--paper-deep); }
+table.benchmark td:nth-child(2) { white-space: normal; }
 .facts-figure { display: grid; grid-template-columns: repeat(4, 1fr); margin: 34px 0 48px; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .facts-figure div { padding: 0 18px; border-left: 1px solid var(--line); }
 .facts-figure div:first-child { padding-left: 0; border-left: 0; }
@@ -205,7 +206,7 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 
 <h2 id="results">6. Results</h2>
 <p>The deliberate failure in <code>BRZ.Customer</code> raises three practical questions: which recorded downstream work depends on it, what must the central team repair, and what should a business team reload afterwards? Keeping those questions separate matters. Local ownership does not remove the need to repair an upstream source.</p>
-<div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
+<div class="table-scroll"><table class="benchmark"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
 <tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 downstream loadable objects in 45 other workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
 <tr><td>Team 05</td><td>Which of our tables need attention, and why?</td><td>Both Mart tables, with the failed <code>BRZ.Customer</code> load named as the cause.</td><td>11 seconds</td></tr>
 <tr><td>The central team</td><td>Can we repair our selected work first?</td><td>Six objects reloaded across Bronze, Silver/Gold and the central model. No business-team load was selected.</td><td>2 minutes 18 seconds</td></tr>

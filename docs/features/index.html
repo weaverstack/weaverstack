@@ -77,9 +77,9 @@
 <section class="page-head"><div class="wrap">
 <h1>What Weaver does in Microsoft Fabric</h1>
 <p class="lead">Your team writes Python, SQL and native Power BI files. Weaver deploys that work to Fabric, runs data loads in dependency order, executes your tests and records the results. Work from your editor or a Fabric notebook.</p>
-<nav class="feature-jumps" aria-label="Feature sections"><a href="#start-simple">Familiar tools</a><a href="#data-engineering">Data pipelines</a><a href="#power-bi">Power BI</a><a href="#visibility">Investigate</a><a href="#development">Develop changes</a><a href="#scale">Scale and coordinate</a></nav>
+<nav class="feature-jumps" aria-label="Feature sections"><a href="#start-simple">Native development</a><a href="#data-engineering">Data engineering</a><a href="#power-bi">Power BI</a><a href="#visibility">Operational visibility</a><a href="#development">Development and production</a><a href="#scale">Enterprise scale</a></nav>
 </div></section>
-<section class="section feature-group" id="start-simple" data-feature-group="1"><div class="wrap"><h2>Start with what you know</h2>
+<section class="section feature-group" id="start-simple" data-feature-group="1"><div class="wrap"><h2>Native Python, SQL and Power BI</h2>
 <div class="feature-list">
 <div class="feature-row" data-feature="python-spark"><h3><a href="https://docs.weaverstack.dev/lakehouse/spark-sql/">Python and Spark SQL, together</a></h3><p>Use Python and Spark SQL together to load files and create Lakehouse tables. Weaver runs the steps in the right order.</p></div>
 <div class="feature-row" data-feature="tsql"><h3><a href="https://docs.weaverstack.dev/warehouse/first-project/">Ordinary T-SQL</a></h3><p>Keep ordinary SELECTs, without a proprietary modelling language or macros.</p></div>
@@ -89,7 +89,7 @@
 <div class="feature-row" data-feature="execute"><h3><a href="https://docs.weaverstack.dev/reference/cli/execute/">Query your Fabric data from the terminal</a></h3><p>Use <code>weaver execute</code> to inspect a Warehouse, Lakehouse or model with T-SQL, Spark SQL, Python or DAX. Read the results without switching tools. Submitted SQL and Python can also change data.</p></div>
 </div>
 <p class="group-docs"><a href="https://docs.weaverstack.dev/lakehouse/python/">First Python pipeline</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/weaver-documents/overview/">Native document reference</a></p></div></section>
-<section class="section feature-group" id="data-engineering" data-feature-group="2"><div class="wrap"><h2>Build reliable data pipelines</h2>
+<section class="section feature-group" id="data-engineering" data-feature-group="2"><div class="wrap"><h2>Data engineering</h2>
 <p class="group-lead">Your Warehouse query reads a Lakehouse table, and your model reads the Warehouse. You should be able to load that connected work without building another pipeline to hold it together. Define the sources and dependencies; Weaver creates the loading routines and coordinates the selected steps.</p>
 <figure class="feature-spotlight dag-spotlight" data-spotlight="cross-engine-dag" aria-labelledby="dag-title">
 <h3 id="dag-title">One dependency graph across Python, SQL and Power BI</h3>
@@ -184,7 +184,7 @@
 <figcaption>Declare the key used to reconcile rows. Incremental source logic identifies changes and explicit deletes.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/warehouse/first-project/">From a query to a managed Table</a></p>
 </figure><p class="group-docs"><a href="https://docs.weaverstack.dev/warehouse/first-project/">First Warehouse pipeline</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/load/">Load behaviour</a></p></div></section>
-<section class="section feature-group" id="power-bi" data-feature-group="3"><div class="wrap"><h2>Power BI semantic models and Reports</h2>
+<section class="section feature-group" id="power-bi" data-feature-group="3"><div class="wrap"><h2>Power BI</h2>
 <p class="group-lead">Keep designing models and Reports in the Power BI tools you know. Use Weaver to apply the same conventions across models, test your calculations and deploy the right model and Report together.</p>
 <figure class="feature-spotlight powerbi-spotlight" data-spotlight="power-bi" aria-labelledby="powerbi-title">
 <h3 id="powerbi-title">Shared standards, model rules and unit tests over native Power BI files</h3>
@@ -214,7 +214,7 @@
 <p class="group-docs"><a href="https://docs.weaverstack.dev/semantic-models/native-tmdl/">Deploy a native model</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/power-bi/">Power BI reference</a></p></div></section>
 <section class="section feature-group" id="visibility" data-feature-group="4"><div class="wrap">
 <span id="operations" aria-hidden="true"></span>
-<h2>Find out what happened, and what needs attention</h2>
+<h2>Operational visibility</h2>
 <p class="group-lead">When a load fails, you need to know what ran, what failed and which downstream work needs attention. Weaver keeps managed objects, their dependencies and load and test results in a Fabric Warehouse catalogue. Query those records directly or investigate with the included Power BI Dashboard.</p>
 <figure class="feature-spotlight dashboard-spotlight" data-spotlight="catalogue-dashboard" aria-labelledby="dashboard-title">
 <h3 id="dashboard-title">The Catalogue Dashboard</h3>
@@ -231,7 +231,7 @@
 </div>
 <p>Deploy the included model and Report with <code>weaver catalogue-dashboard</code>, then adapt the Report or query the catalogue for your own analysis. Direct Lake reads up to ten catalogues; use Import mode and refresh the model for larger sets.</p>
 <p class="group-docs"><a href="https://docs.weaverstack.dev/estate/operate/">Run and inspect your project</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/">Operation boundaries</a></p></div></section>
-<section class="section feature-group" id="development" data-feature-group="6"><div class="wrap"><span id="advanced" aria-hidden="true"></span><h2>Develop and review changes</h2>
+<section class="section feature-group" id="development" data-feature-group="6"><div class="wrap"><span id="advanced" aria-hidden="true"></span><h2>Development and production</h2>
 <p class="group-lead">You need to try a change against realistic data before putting it into production. Keep the same project files, choose development destinations, and review the deployment before applying it. With Mirror, you can borrow existing data while changing only the parts you are working on.</p>
 <figure class="feature-spotlight command-spotlight workspace-spotlight" aria-labelledby="workspace-example-title">
 <h3 id="workspace-example-title">One project, deployed to several workspaces</h3>
@@ -270,7 +270,7 @@
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/estate/mirror/">Develop using Mirror</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/mirror/">Scope and reset boundaries</a></p>
 </figure>
 </div></section>
-<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Scale and coordinate across teams</h2>
+<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Enterprise scale</h2>
 <p class="group-lead">Your team can own its project and schedule while still depending on another team's data. Bring the participating catalogues together to see those dependencies, catch up your own work after an upstream repair, or coordinate a run across selected workspaces. Each team keeps its own deployment and records.</p>
 <div class="feature-list">
 <div class="feature-row" data-feature="across-catalogues"><h3><a href="https://docs.weaverstack.dev/estate/across-catalogues/">Connect the work without merging the projects</a></h3><p>Supply the catalogues for the teams involved. Health follows their recorded dependencies; Load and Test coordinate the work you select and write each result to its owning catalogue.</p></div>

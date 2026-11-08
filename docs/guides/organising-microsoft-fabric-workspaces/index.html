@@ -165,7 +165,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>Concurrency is not required for the graph, but the graph makes it available: once the dependencies are known, loading across workspaces becomes a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
 
 <h2 id="experimental-setup">4. Experimental setup</h2>
-<p>The experiment used 50 real Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with its own catalogue, project and configuration, initialised, built and loaded separately. The results below come from the 7 November 2026 run against Weaver's forthcoming 0.11.0 code.</p>
+<p>The experiment used 50 real Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with its own catalogue, project and configuration, initialised, built and loaded separately. The results below come from the 7 November 2026 run.</p>
 <div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Team</th><th scope="col">Workspaces</th><th scope="col">Each holds</th></tr></thead><tbody>
 <tr><td>Bronze</td><td>1</td><td>Bronze Lakehouse with Python tables run in Spark</td></tr>
 <tr><td>Central</td><td>1</td><td>Silver Lakehouse with shortcuts into Bronze; Gold Warehouse</td></tr>

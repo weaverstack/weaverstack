@@ -6,14 +6,14 @@
 <meta name="theme-color" content="#f7f7f6">
 <title>Organising Fabric workspaces for independent teams</title>
 <meta name="keywords" content="organising Microsoft Fabric workspaces, Fabric workspace design, self-service data in Microsoft Fabric, data democratisation in Microsoft Fabric, enterprise Fabric, cross-workspace dependencies">
-<meta name="description" content="Keep team ownership while coordinating shared data: a 50-workspace Fabric experiment using separate projects and participating catalogues.">
+<meta name="description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:site_name" content="Weaver">
 <meta property="og:title" content="Organising Fabric workspaces for independent teams">
-<meta property="og:description" content="Keep team ownership while coordinating shared data: a 50-workspace Fabric experiment using separate projects and participating catalogues.">
+<meta property="og:description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
 <meta property="og:image" content="https://weaverstack.dev/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 <meta property="og:locale" content="en_AU">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Organising Fabric workspaces for independent teams">
-<meta name="twitter:description" content="Keep team ownership while coordinating shared data: a 50-workspace Fabric experiment using separate projects and participating catalogues.">
+<meta name="twitter:description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
 <meta name="twitter:image" content="https://weaverstack.dev/og.png">
 <meta name="twitter:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -37,7 +37,7 @@
     {
       "@type": "TechArticle",
       "headline": "Organising Fabric workspaces for independent teams",
-      "description": "Keep team ownership while coordinating shared data: a 50-workspace Fabric experiment using separate projects and participating catalogues.",
+      "description": "Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.",
       "url": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/",
       "inLanguage": "en-AU",
       "author": {"@type": "Organization", "name": "Weaver contributors"},
@@ -113,14 +113,12 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <section class="page-head"><div class="wrap">
 <p class="eyebrow"><a href="/guides/">Fabric Engineering Guides</a></p>
 <h1>Organising Fabric workspaces for independent teams</h1>
-<p class="lead">Keep team ownership while coordinating shared data. An experiment across 50 Fabric workspaces explores how separate projects can participate in one operational run.</p>
+<p class="lead">Teams can own separate Fabric projects and still coordinate the work between them. In this 50-workspace experiment, teams recovered their own work and joined a coordinated load using the dependencies recorded in their catalogues.</p>
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
-<h2 id="introduction">Ownership does not remove dependencies</h2>
-<p>If you lead a data team in a large organisation, you want business teams to own their Fabric workspaces and release their work without involving the central team in every change.</p>
-<p>The difficulty is that their data still depends on work owned elsewhere. Finance might run its own Warehouse and schedule, but read a customer table maintained centrally. When that table fails, Finance needs to understand which of its tables depend on it, and the central team needs to coordinate the repair.</p>
-<p>This experiment used 50 real Fabric workspaces and separately configured projects to represent central and business teams. It tested whether the dependencies and run results already recorded by those projects could support both local recovery and a coordinated run.</p>
+<h2 id="introduction">Team ownership and shared dependencies</h2>
+<p>Finance might run its own Warehouse and schedule, but read a customer table maintained centrally. When that table fails, Finance needs to understand which of its tables depend on it, and the central team needs to coordinate the repair.</p>
 <figure class="facts-figure" aria-label="Experiment at a glance">
 <div><strong>50</strong><span>Fabric workspaces</span></div><div><strong>50</strong><span>separate catalogues</span></div><div><strong>53</strong><span>cross-workspace connections</span></div><div><strong>FTL64</strong><span>trial capacity</span></div>
 <figcaption>One central Bronze, Silver/Gold and semantic-model architecture and 47 business workspaces, with no shared repository or configuration.</figcaption>
@@ -134,7 +132,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <li>Shared semantic models live in a third.</li>
 <li>Forty or fifty business areas own workspaces of their own. They read central data and occasionally one another's.</li>
 </ul>
-<p>You can coordinate loads through a central scheduler or let teams manage their own schedules. In either case, someone still needs to understand the dependencies between teams and decide what to rerun after a failure. A successful load alone does not tell you whether its upstream data is current.</p>
+<p>You can coordinate loads through a central scheduler or let teams manage their own schedules. In either case, someone still needs to understand the dependencies between teams and decide what to rerun after a failure. To decide whether a table is up to date, a team needs its latest load result and the state of the sources it reads.</p>
 <p>An enterprise needs the advantages of both. Each team should be able to operate on its own, while the organisation can still see its dependencies, assess the impact of a failure and coordinate recovery when necessary.</p>
 
 <h2 id="what-fabric-provides">2. What Fabric already provides</h2>
@@ -143,9 +141,9 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>A name such as <code>CustomerSales</code> needs context. In this example, the workspace, item type, item name, schema and object name tell a reader which Warehouse table is being discussed. Folders use paths rather than Warehouse schemas; a model or Report is an item in its own right.</p>
 <figure class="name-figure">
 <div class="name-parts"><div><strong>Workspace</strong><span>SPREAD_CENTRAL</span></div><div><strong>Item type</strong><span>Warehouse</span></div><div><strong>Item name</strong><span>Gold</span></div><div><strong>Schema</strong><span>GOLD</span></div><div><strong>Object</strong><span>CustomerSales</span></div></div>
-<figcaption>A readable qualification for this Warehouse table. Weaver records the Fabric workspace and item IDs separately from these display names.</figcaption>
+<figcaption>A readable qualification for the central team's Warehouse table.</figcaption>
 </figure>
-<p>Display names help people locate the work; they are not immutable tenant-wide identifiers. Weaver matches installed items using their recorded Fabric IDs and uses the shortcut's source path to identify the table being read.</p>
+<p>The workspace, item and object name give readers the context they need to identify the table. When a shortcut reads another team's table, Weaver matches its source against the installations in the catalogues you supply and connects the dependency.</p>
 <h3 id="onelake-shares-data-across-workspaces">2.2 OneLake shares data across workspaces</h3>
 <p>Every Fabric tenant comes with a single OneLake instance <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">(Microsoft 2026a)</a>. Its shortcuts let an item in one workspace read data held by an item in another, including a Lakehouse reading a Warehouse, without copying it <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">(Microsoft 2026b)</a>.</p>
 <p>In this experiment, Spark addressed tables in other workspaces directly by four-part name. A Warehouse's T-SQL reached only items in its own workspace, so each business team brought central Gold tables into its workspace through shortcuts in a small bridge Lakehouse and read them through that Lakehouse's SQL analytics endpoint.</p>
@@ -160,9 +158,9 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>Finance's shortcut already identifies the central item and path it reads. Given both catalogues, Weaver matches that source to the central team's installed table and connects the recorded dependencies. The teams do not need to maintain the same connection again in a second map.</p>
 <h3 id="operational-status-of-names">3.2 Follow the load results</h3>
 <p>Each object must also record its operational state: when it last loaded, whether that load succeeded, and when its upstream last changed. With that, a failed table can be traced to every object that read it, and an object that loaded successfully before its upstream was repaired can be identified as behind.</p>
-<p>Each team can keep these records in its own catalogue. A caller with access supplies the participating catalogues to assemble the graph needed for an investigation or selected run. Weaver follows those records; it does not discover every workspace in the tenant automatically.</p>
+<p>Each team keeps its own catalogue. Choose the catalogues to include, and Weaver connects their recorded dependencies for the investigation or run. You can inspect a pair of teams or bring the participating catalogues together for a wider view.</p>
 <h3 id="concurrency">3.3 A bonus: concurrency</h3>
-<p>Concurrency is not required for the graph, but the graph makes it available: once the dependencies are known, loading across workspaces becomes a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
+<p>Once the dependencies are known, Weaver can schedule independent branches in different workspaces together. Each reader waits for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
 
 <h2 id="experimental-setup">4. Experimental setup</h2>
 <p>The experiment used 50 real Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with its own catalogue, project and configuration, initialised, built and loaded separately. The results below come from the 7 November 2026 run.</p>
@@ -177,12 +175,11 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 </tbody></table></div>
 <p>Two simulated business teams read each other's summaries, deliberately forming a dependency cycle across workspaces.</p>
 <p>The experiment then introduced a failure into the central Bronze table <code>BRZ.Customer</code>, and tested what each team could see and do.</p>
-<p>The tables are deliberately small, because the experiment tests coordination across workspaces rather than data volume. The performance guide covers volume.</p>
 
 <h2 id="the-implementation-weaver">5. The implementation: Weaver</h2>
 <p><a href="/">Weaver</a> is an open-source data engineering framework for Microsoft Fabric. In this setup, each project keeps a catalogue in a Fabric Warehouse. Build records the managed objects and dependencies; Load and Test record their results. Those records let a caller investigate connected work without moving the teams into one project.</p>
 <h3 id="the-weaver-cli">5.1 The Weaver CLI</h3>
-<p>Give Health the catalogues needed to follow the connection. For Load and Test, supply the same context and select the items or workspaces to run. Repeating <code>--catalogue</code> alone does not select every team's work: without item selection, the working workspace's catalogue sets the default scope.</p>
+<p>Use <code>--catalogue</code> to choose the records Weaver reads. For Load and Test, use item or workspace selectors to choose the work it runs. With no item selector, Load and Test run the working workspace's catalogue by default.</p>
 <div class="code"><div class="code-bar"><span>Terminal: three participating catalogues</span></div><pre><code><span class="c-dim"># Assess these catalogues and their recorded connections</span>
 <span class="c-key">$</span> weaver health --workspace SPREAD_TEAM_05 \
   --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
@@ -194,46 +191,46 @@ table.benchmark td:nth-child(2) { white-space: normal; }
   --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
   --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
   --catalogue SPREAD_CENTRAL/Warehouse/Catalogue</code></pre></div>
-<p>These are complete commands for three catalogues, not abbreviated commands for all 50. Health follows recorded ancestry through the supplied catalogues and reports unavailable or unassessable context as incomplete. A selected load runs as one graph under one workflow ID; each object runs in its owning workspace and its result stays in that team's catalogue.</p>
+<p>Team 05 uses the central catalogues to understand its dependencies while loading its own tables. A run can also select work across several teams. Weaver orders that work together, records results in each team's catalogue and uses one workflow ID to connect the records. See <a href="https://docs.weaverstack.dev/estate/across-catalogues/">working across catalogues</a> for selection and assessment details.</p>
 <p>Give the running identity read access to each catalogue you include. To load another team's objects, it also needs permission to run that work and record the results there. See the <a href="https://docs.weaverstack.dev/reference/permissions/">permissions reference</a> for the command requirements.</p>
 <h3 id="the-catalogue-dashboard">5.2 The Catalogue Dashboard</h3>
 <p>Use the <a href="/features/#visibility">Catalogue Dashboard</a> to explore the participating catalogues in Power BI. Start with Workspaces to see the connections, then use Health and Orchestration to investigate a failure. Filters narrow the pages by workspace, item and object.</p>
-<p>The Dashboard reads up to ten catalogues over Direct Lake; Import mode supports more than ten and needs refreshes to pick up new records. It does not write to the catalogues. Exported HTML is a snapshot of the deployed model's data, and a downloaded local copy opens without a running Fabric capacity.</p>
+<p>The Dashboard reads up to ten catalogues over Direct Lake; use Import mode for larger sets and refresh it to pick up new records. Exported HTML is a snapshot of the deployed model's data, and a downloaded local copy opens without a running Fabric capacity.</p>
 <figure class="dashboard-guide-demo">
 <iframe src="/assets/spread-dashboard/workspaces.html" title="The Spread Dashboard Workspaces page" loading="lazy"></iframe>
 <figcaption>The Spread Dashboard over ten of the 50 catalogues, read over Direct Lake and exported as static HTML. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
 </figure>
 
 <h2 id="results">6. Results</h2>
-<p>The deliberate failure in <code>BRZ.Customer</code> raises three practical questions: which recorded downstream work depends on it, what must the central team repair, and what should a business team reload afterwards? Keeping those questions separate matters. Local ownership does not remove the need to repair an upstream source.</p>
+<p>The experiment introduced a failure into <code>BRZ.Customer</code> and followed the recovery from three perspectives: the central team repairing the source, a business team updating its own tables, and an operator coordinating the remaining work across workspaces.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Experiment results"><table class="benchmark" style="min-width:640px"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
-<tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 downstream loadable objects in 45 other workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
+<tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 managed tables and semantic models in 45 downstream workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
 <tr><td>Team 05</td><td>Which of our tables need attention, and why?</td><td>Both Mart tables, with the failed <code>BRZ.Customer</code> load named as the cause.</td><td>11 seconds</td></tr>
-<tr><td>The central team</td><td>Can we repair our selected work first?</td><td>Six objects reloaded across Bronze, Silver/Gold and the central model. No business-team load was selected.</td><td>2 minutes 18 seconds</td></tr>
-<tr><td>Team 05</td><td>The upstream is repaired. What should we reload?</td><td>Its two stale Mart tables, then a green Health result.</td><td>5 seconds to check, 15 seconds to reload</td></tr>
+<tr><td>The central team</td><td>Can we repair our selected work first?</td><td>Six central objects reloaded across Bronze, Silver/Gold and the shared model.</td><td>2 minutes 18 seconds</td></tr>
+<tr><td>Team 05</td><td>The upstream is repaired. What should we reload?</td><td>Its two stale Mart tables.</td><td>5 seconds to check, 15 seconds to reload</td></tr>
 <tr><td>The organisation</td><td>Recover the remaining selected work.</td><td>71 object loads plus 41 readiness steps. The combined run spanned 43 workspaces.</td><td>4 minutes 16 seconds</td></tr>
-<tr><td>The organisation</td><td>Run the selected work across 50 workspaces.</td><td>125 steps: 80 loads, 41 endpoint refreshes and four publication waits. All succeeded under one workflow ID.</td><td>5 minutes 15 seconds end to end</td></tr>
+<tr><td>The organisation</td><td>Coordinate a run using all 50 participating catalogues.</td><td>125 steps: 80 loads, 41 endpoint refreshes and four publication waits. All succeeded under one workflow ID.</td><td>5 minutes 15 seconds end to end</td></tr>
 </tbody></table></div>
+<p class="small">The coordinated run's end-to-end time includes catalogue reads, planning, Spark startup, execution and recording. The test used small tables on the FTL64 trial capacity to measure coordination across workspaces. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>
 <h3 id="impact-across-the-organisation">6.1 Knowing the impact of a failure</h3>
-<p>The impact check found 61 downstream Warehouse tables, five Lakehouse tables and 11 semantic models with findings linked to the failed load. These are managed loadable objects, not a count of every business or end-user impact. The central team and downstream owners could use the same recorded cause rather than reconstructing the connection from separate pipeline histories.</p>
-<p>A load-state finding does not establish what every report user sees or whether the business calculation is correct. Thin-report workspaces have no separate data load to select here, but their reports can still display affected source data.</p>
+<p>Health linked the failed Bronze load to 61 Warehouse tables, five Lakehouse tables and 11 semantic models across 45 downstream workspaces. The central team could see where the failure reached, and each business team could identify which of its own objects needed attention. Both were working from the same recorded cause.</p>
+<p>The four thin-report workspaces read the central semantic model, so their data recovery follows that model's upstream recovery.</p>
 <h3 id="independent-recovery">6.2 Each team recovers on its own terms</h3>
-<p>The central recovery selected work across Bronze, Silver/Gold and the shared semantic model, leaving the business teams' loads unselected. Weaver ordered that work and waited for the publications and endpoint refreshes its readers needed.</p>
-<p>After the central repair, Team 05 checked its position, reloaded its two stale tables and returned to green. The command above shows that selected scope while using the central catalogues for context. Its project and schedule remained its own; it did not have to run every other business team's pipeline to recover.</p>
+<p>The central team reloaded six objects across Bronze, Silver/Gold and the shared semantic model. Weaver ordered the work and waited for the publications and endpoint refreshes its readers needed. Business teams retained control of when to reload their own tables.</p>
+<p>After the central repair, Team 05 checked its two Mart tables, reloaded them and returned to green. Its project and schedule remained its own, and it could recover its work independently of the other business teams' runs.</p>
 <h3 id="cycles">6.3 Teams that read one another's data</h3>
-<p>Teams 01 and 02 read each other's summaries. Weaver reports the cycle and orders its members deterministically, running each selected member once per invocation. Dependencies that close the cycle can therefore read results left by an earlier run; this is not an iteration until the teams' results converge.</p>
-<p>Health suppresses relative newer-load comparisons within a cycle. It still reports and propagates relevant failed, Pending and overdue states, so a cycle does not hide a failed load.</p>
+<p>Teams 01 and 02 read each other's summaries. Weaver reported that cycle and ran its members once in a consistent order. Where a dependency closed the loop, the consumer could use the result available from an earlier run. Health continued to report failures, pending work and overdue loads. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">cycle guide</a> explains the execution and assessment rules.</p>
 <h3 id="coordination-when-required">6.4 Coordination when the organisation needs it</h3>
 <p>For a wider recovery, a caller supplies the participating catalogues and selects the workspaces or items to rerun. <code>--stale</code> narrows that selection to work whose recorded state requires another load.</p>
-<p>The coordinated timing in the table includes catalogue reads, graph planning, the Spark wait, execution and recording. It describes this small-data estate and trial capacity, not a performance guarantee for another workload. The invocation coordinated the run; it needed no permanent central scheduling service or shared project.</p>
+<p>The invocation coordinates the selected work across projects. Teams can join that run without maintaining a permanent central scheduling service or a shared project.</p>
 
 <h2 id="conclusion">7. Team ownership, coordinated operation</h2>
-<p>The experiment shows a practical way to keep team ownership while coordinating work across Fabric workspaces. Each simulated team kept its own project and catalogue; the wider run used the dependencies those projects already recorded.</p>
+<p>The experiment demonstrates how a central team and business teams can operate from the same dependency records while keeping separate projects and schedules.</p>
 <ol class="implementation-steps">
-<li><strong>Central coordination.</strong><span>A central data team can use the participating catalogues to assess dependencies and coordinate selected work across workspaces.</span></li>
-<li><strong>Business-team ownership.</strong><span>A business team can keep its own project and schedule, check its upstream dependencies and recover its affected work after the upstream repair.</span></li>
+<li><strong>Central coordination.</strong><span>The central team can coordinate shared work across catalogues.</span></li>
+<li><strong>Business-team ownership.</strong><span>Business teams can inspect the sources they depend on and recover their own work after an upstream repair.</span></li>
 </ol>
-<p>Both ways of operating use the same catalogue records. Teams do not need to move into one centrally managed project or maintain a second cross-team dependency map.</p>
+<p>Weaver records those relationships as teams build and run their projects. Bringing the catalogues together reuses that information, so teams can join coordinated operations while retaining ownership of their own work. They can do this without maintaining a second cross-team dependency map.</p>
 <p>See <a href="/how-it-works/">how Weaver works</a>, then the <a href="https://docs.weaverstack.dev/">documentation</a>.</p>
 
 <h2 id="references">References</h2>

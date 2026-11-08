@@ -843,5 +843,9 @@ def physical_driver(
 
     lanes = () if lane is None else (lane,)
     return MutationDriver(
-        run, resources=lanes, serial_resources=lanes, preflight=preflight
+        run,
+        resources=lanes,
+        serial_resources=lanes,
+        preflight=preflight,
+        timeout=getattr(executor, "timeout", None),
     )

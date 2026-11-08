@@ -130,6 +130,29 @@ claim, and describe observed results rather than universal performance promises.
 
 ## First success and progressive depth
 
+Write as a practitioner teaching another person. On the product site, explain
+what the team can do and why the mechanism helps. In guides, begin with a
+recognisable task or decision, explain the choices, then show a complete example.
+Reference pages keep exact inputs, requirements and behaviour economical.
+
+Lead an important explanation with a failed load, shared table, release decision
+or development workspace before introducing storage and identity mechanisms.
+Name who acts. Explain one relationship at a time, using ordinary verbs rather
+than compressed implementation nouns. Do not replace an explanation with slogan
+fragments, or mechanically add pronouns and shorten every sentence.
+
+State accurate scope in the main sentence. Put permissions and prerequisites
+beside the task that needs them; link the exact matrix instead of repeating it.
+Keep a clear warning beside an operation that resets or deletes data. Preview,
+confirmation flags and configuration selection are not access-control boundaries.
+
+Keep organisational arguments purposeful: separate measured results from their
+implications for central and business teams. Simulated team boundaries are not
+customer adoption. Retain a count or timing only with its source run, revision
+and measurement boundary; do not retrofit current behaviour into an old capture.
+When dependencies can contain cycles, call the general model a dependency graph;
+an acyclic execution plan is a separate concept.
+
 Keep the current architecture. Lead with familiar Python, SQL or native Power BI work, give one working result, then explain the engineering handled around it and the next useful capability. A senior voice is approachable and precise, not dry or exhaustive. Keep full contracts in Reference rather than making them an admission requirement.
 
 State the project, required files and active configuration. Leave checkpoint maps, fixture variants, testing oracles and why examples are different in maintenance evidence; name a real source change plainly when the next task needs it. Keep actual permissions, trusted-code warnings and destructive scope at the action that depends on them.

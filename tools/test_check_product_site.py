@@ -43,8 +43,8 @@ class ProductMigration(unittest.TestCase):
     def test_rejects_a_link_to_the_retired_scale_page(self):
         self.mutate(
             "features",
-            "<h2>Built for scale</h2>",
-            '<h2>Built for scale</h2><a href="/scale/">old</a>',
+            '<h3 id="scale-title">',
+            '<a href="/scale/">old</a><h3 id="scale-title">',
         )
         with self.assertRaisesRegex(AssertionError, "stale retired product link"):
             self.check()

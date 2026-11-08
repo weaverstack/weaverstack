@@ -63,8 +63,8 @@ def test_warehouse_visibility_is_one_feature_story():
     assert '<section class="section feature-group" id="operations"' not in features
     assert "<h2>Operational visibility</h2>" in visibility
     estate_line = (
-        "Every object Weaver manages is recorded in tables in a Fabric Warehouse, "
-        "with its dependencies and the outcome of its last load and Test."
+        "When a load fails, you need to know what ran, what failed and which "
+        "downstream work needs attention."
     )
     assert estate_line in visibility
     assert visibility.index("<h2>") < visibility.index(estate_line)

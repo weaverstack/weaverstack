@@ -515,3 +515,45 @@ def test_a_scoped_start_syncs_the_tables_its_payload_names():
         "tables": [("Sales", "Order")],
         "timeout": REFRESH_TIMEOUT,
     }
+
+
+class _SyncedFabric:
+    """Fabric answering each refresh at once with its per-table sync results."""
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+
+    def request(self, method, path, *, payload=None, expected):
+        import json
+
+        body = {"value": self.answers.pop(0)}
+        return SimpleNamespace(
+            status_code=200,
+            content=json.dumps(body).encode(),
+            headers={"x-ms-operation-id": "op"},
+            json=lambda: body,
+        )
+
+
+def _synced(name, status, code=None):
+    row = {"tableName": name, "status": status}
+    if code:
+        row["error"] = {"errorCode": code, "message": f"{name} not found."}
+    return row
+
+
+@weaver_test()
+def test_a_refresh_keeps_each_table_fabric_could_not_sync_across_batches():
+    tables = [("Sales", f"T{n:02d}") for n in range(26)]
+    fabric = _SyncedFabric(
+        [_synced("Sales.T00", "Success"), _synced("Sales.T01", "Failure", "Missing")],
+        [_synced("Sales.T25", "Failure", "DeltaTableNotFound")],
+    )
+
+    refresh = start_sql_endpoint_refresh(_ENDPOINT, tables=tables, client=fabric)
+
+    assert refresh["done"]
+    assert refresh["failed_tables"] == {
+        "Sales.T01": "Missing: Sales.T01 not found.",
+        "Sales.T25": "DeltaTableNotFound: Sales.T25 not found.",
+    }

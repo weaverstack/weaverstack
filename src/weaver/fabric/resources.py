@@ -338,6 +338,10 @@ def _request(handle: dict, batch, client: FabricClient) -> dict:
         "status": "Running",
     }
     if started["done"]:
+        started["failed_tables"] = {
+            **handle.get("failed_tables", {}),
+            **_failed_tables(response),
+        }
         return _next({**started, "status": _refresh_status(response)}, client)
     operation = accepted_operation(response)
     return {
@@ -386,6 +390,23 @@ def refresh_details(refresh: dict) -> dict:
         key: refresh[key]
         for key in ("lakehouse", "sql_endpoint_id", "operation_id", "status")
     }
+
+
+def _failed_tables(response) -> dict[str, str]:
+    """``Schema.Table`` to Fabric's reason, for each table a refresh could not sync."""
+
+    body = response.json() if response.content else {}
+    rows = body.get("value") if isinstance(body, dict) else None
+    failed = {}
+    for row in rows if isinstance(rows, list) else ():
+        if not isinstance(row, dict) or row.get("status") != "Failure":
+            continue
+        error = row.get("error") if isinstance(row.get("error"), dict) else {}
+        reason = ": ".join(
+            str(part) for part in (error.get("errorCode"), error.get("message")) if part
+        )
+        failed[str(row.get("tableName"))] = reason or "Failure"
+    return failed
 
 
 def _refresh_status(response) -> str:

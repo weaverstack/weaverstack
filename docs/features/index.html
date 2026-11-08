@@ -75,7 +75,7 @@
 </header>
 <main id="main" class="features-showcase">
 <section class="page-head"><div class="wrap">
-<h1>Write your code. Weaver handles the work around it.</h1>
+<h1>What Weaver does in Microsoft Fabric</h1>
 <p class="lead">Keep using Python, SQL and Power BI in Fabric. Weaver gives your team a consistent way to load data, test results, deploy changes and connect the work.</p>
 <nav class="feature-jumps" aria-label="Feature sections"><a href="#start-simple">Start simple</a><a href="#data-engineering">Data engineering</a><a href="#power-bi">Power BI</a><a href="#visibility">Visibility</a><a href="#advanced">Advanced</a><a href="#scale">Scale</a></nav>
 </div></section>
@@ -90,7 +90,7 @@
 <p class="group-docs"><a href="https://docs.weaverstack.dev/lakehouse/python/">First Python pipeline</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/weaver-documents/overview/">Native document reference</a></p></div></section>
 <section class="section feature-group" id="data-engineering" data-feature-group="2"><div class="wrap"><h2>Build reliable data pipelines</h2>
 <figure class="feature-spotlight dag-spotlight" data-spotlight="cross-engine-dag" aria-labelledby="dag-title">
-<h3 id="dag-title">A single DAG across all your work — from Python to SQL to Power BI.</h3>
+<h3 id="dag-title">One dependency graph across Python, SQL and Power BI</h3>
 <div class="project-diagram-scroll" tabindex="0" role="region" aria-label="Different Fabric objects in one dependency graph; scroll horizontally on narrow screens">
 <svg class="parcel-diagram" viewBox="0 0 960 340" role="img" aria-labelledby="dag-title feature-dag-desc">
 <desc id="feature-dag-desc">One dependency graph branches from Python files and Tables in a Lakehouse into Spark SQL and a Warehouse Shortcut, then continues through T-SQL to a semantic model and Report.</desc>
@@ -177,14 +177,14 @@
 <div class="feature-row" data-feature="quality-guards"><h3><a href="https://docs.weaverstack.dev/advanced/partial-failures-rejected-data-and-thresholds/">Data-quality safeguards</a></h3><p>Keep rejected rows and stop unusually large proposed updates or deletes before they reach your tables.</p></div>
 </div>
 <figure class="feature-spotlight warehouse-spotlight" data-spotlight="generated-warehouse" aria-labelledby="select-title">
-<h3 id="select-title">Write a SELECT. Get the engineering around it.</h3>
+<h3 id="select-title">From a SELECT to a managed Warehouse Table</h3>
 <div class="select-engineering"><div class="authored-query"><h4>You write</h4><strong>T-SQL query</strong><span>+ native metadata comment</span></div><span class="engineering-arrow" aria-hidden="true">→</span><div class="generated-work"><h4>Weaver supplies</h4><ul><li>Physical Table</li><li>Load procedure &amp; staging</li><li>Declared-key reconciliation</li><li>Supported dependencies</li><li>Change statistics</li><li>Health evidence</li></ul></div></div>
 <figcaption>Declare the key used to reconcile rows. Incremental source logic identifies changes and explicit deletes.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/warehouse/first-project/">From a query to a managed Table</a></p>
 </figure><p class="group-docs"><a href="https://docs.weaverstack.dev/warehouse/first-project/">First Warehouse pipeline</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/load/">Load behaviour</a></p></div></section>
-<section class="section feature-group" id="power-bi" data-feature-group="3"><div class="wrap"><h2>Power BI, engineered for organisations</h2>
+<section class="section feature-group" id="power-bi" data-feature-group="3"><div class="wrap"><h2>Power BI semantic models and Reports</h2>
 <figure class="feature-spotlight powerbi-spotlight" data-spotlight="power-bi" aria-labelledby="powerbi-title">
-<h3 id="powerbi-title">Keep your Power BI files. Add shared standards, model-specific rules and unit tests.</h3>
+<h3 id="powerbi-title">Shared standards, model rules and unit tests over native Power BI files</h3>
 <pre class="policy-tree" aria-label="Power BI project with a standard PBIP file, organisation-wide policy, Sales-specific TMDL rules, native models and Reports, and semantic-model unit tests"><code>PowerBI/
 ├── <b>policy.tmdl</b>          <i>← organisation-wide policies</i>
 ├── Sales/
@@ -211,11 +211,11 @@
 <p class="group-docs"><a href="https://docs.weaverstack.dev/semantic-models/native-tmdl/">Deploy a native model</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/power-bi/">Power BI reference</a></p></div></section>
 <section class="section feature-group" id="visibility" data-feature-group="4"><div class="wrap">
 <span id="operations" aria-hidden="true"></span>
-<h2>Visibility, included</h2>
-<p class="group-lead">The entire estate — every object and its health state — is exposed through Warehouse tables. So you know exactly what exists, what ran and what needs attention.</p>
+<h2>Operational visibility</h2>
+<p class="group-lead">Every object Weaver manages is recorded in tables in a Fabric Warehouse, with its dependencies and the outcome of its last load and Test. What exists, what ran and what needs attention can be queried directly.</p>
 <p class="group-lead">Weaver includes a companion Power BI dashboard. One command adds it to your Fabric workspace.</p>
 <figure class="feature-spotlight dashboard-spotlight" data-spotlight="catalogue-dashboard" aria-labelledby="dashboard-title">
-<h3 id="dashboard-title">All your Fabric work, at a glance.</h3>
+<h3 id="dashboard-title">The Catalogue Dashboard</h3>
 <div class="dashboard-gallery"><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#overview"><img src="/assets/images/catalogue-dashboard/overview.webp" width="1440" height="900" loading="lazy" alt="Overview: installed items and Health."><span>Overview</span></a><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#orchestration"><img src="/assets/images/catalogue-dashboard/orchestration.webp" width="1440" height="900" loading="lazy" alt="Orchestration: one table's lineage, readiness and last outcome."><span>Orchestration</span></a><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#performance"><img src="/assets/images/catalogue-dashboard/performance.webp" width="1440" height="900" loading="lazy" alt="Performance: each run as a bar from its start to its finish by time of day, and one load's own row counts beside the loads around it."><span>Performance</span></a><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#gantt"><img src="/assets/images/catalogue-dashboard/gantt.webp" width="1440" height="900" loading="lazy" alt="Gantt: one workflow's loads and Tests on a timeline."><span>Gantt</span></a><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#entity-dictionary"><img src="/assets/images/catalogue-dashboard/entities.webp" width="1440" height="900" loading="lazy" alt="Entity dictionary: an ER diagram from declared keys."><span>Entity dictionary</span></a></div>
 <figcaption>Seven pages: Overview, Health, the Orchestration graph, Performance by time of day, a Gantt of each workflow, an ER diagram with a metadata browser, and a bus matrix for every semantic model.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#the-pages">Try every page in the browser</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#deploy-the-dashboard">Deploy the Catalogue Dashboard</a></p>
@@ -224,17 +224,17 @@
 <div class="feature-row" data-feature="catalogue"><h3><a href="https://docs.weaverstack.dev/core-concepts/catalogue/">See all your work in one place</a></h3><p>Weaver keeps its Catalogue of deployed items, dependencies and run results in an ordinary Fabric Warehouse. There's no separate monitoring service to run.</p></div>
 <div class="feature-row" data-feature="health"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-and-health/">See what is up to date or needs attention</a></h3><p>See what is up to date, waiting, failed or inconsistent across your managed Fabric work.</p></div>
 <div class="feature-row" data-feature="history"><h3><a href="https://docs.weaverstack.dev/advanced/row-auditing-and-operational-history/">See run history and results</a></h3><p>See what ran, how long it took, row counts, data changes and recorded results.</p></div>
-<div class="feature-row" data-feature="dashboard-deploy"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#deploy-the-dashboard">One command</a></h3><p><code>weaver catalogue-dashboard</code> deploys the semantic model and Report beside the catalogue, and brings them up to date on the next run.</p></div>
+<div class="feature-row" data-feature="dashboard-deploy"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#deploy-the-dashboard">Deployed with one command</a></h3><p><code>weaver catalogue-dashboard</code> deploys the semantic model and Report beside the catalogue, and brings them up to date on the next run.</p></div>
 <div class="feature-row" data-feature="dashboard-live"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#what-it-reads">Live over Direct Lake</a></h3><p>The dashboard reads the Fabric Catalogue using Direct Lake, so its pages reflect the latest recorded results.</p></div>
-<div class="feature-row" data-feature="dashboard-yours"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/">Free to tweak</a></h3><p>It is an ordinary Power BI Report. Tweak it to fit your needs, or throw it away and build your own over the catalogue.</p></div>
+<div class="feature-row" data-feature="dashboard-yours"><h3><a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/">An ordinary Power BI Report</a></h3><p>It is an ordinary Power BI Report. Tweak it to fit your needs, or throw it away and build your own over the catalogue.</p></div>
 <div class="feature-row" data-feature="recovery"><h3><a href="https://docs.weaverstack.dev/estate/recovery/">Recover from failures</a></h3><p>Keep results from completed steps, record failures and optionally continue unrelated Load work.</p></div>
 <div class="feature-row" data-feature="selection"><h3><a href="https://docs.weaverstack.dev/estate/selective-runs/">Run only the parts you choose</a></h3><p>Select work by name, preview what will run and include related steps when you need them.</p></div>
 <div class="feature-row" data-feature="concurrency"><h3><a href="https://docs.weaverstack.dev/estate/concurrency/">Control how much runs at once</a></h3><p>Set limits on how much runs together while Weaver keeps dependent work in the right order.</p></div>
 </div>
 <p class="group-docs"><a href="https://docs.weaverstack.dev/estate/operate/">Run and inspect your project</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/">Operation boundaries</a></p></div></section>
-<section class="section feature-group" id="advanced" data-feature-group="6"><div class="wrap"><h2>When your estate gets complicated</h2>
+<section class="section feature-group" id="advanced" data-feature-group="6"><div class="wrap"><h2>Several workspaces and environments</h2>
 <figure class="feature-spotlight command-spotlight workspace-spotlight" aria-labelledby="workspace-example-title">
-<h3 id="workspace-example-title">Same code. Different workspaces. No rewrites.</h3>
+<h3 id="workspace-example-title">One project, deployed to several workspaces</h3>
 <p class="example-intro">Keep one set of Python, SQL and Power BI files. Choose where to deploy by changing the workspace configuration file.</p>
 <div class="workspace-examples">
 <div class="command-panel">
@@ -263,15 +263,15 @@
 <div class="feature-row" data-feature="data-protection"><h3><a href="https://docs.weaverstack.dev/advanced/protecting-data/">Protect important data</a></h3><p>Keep irreplaceable sources outside managed targets and use Build replacement guards for protected owned objects.</p></div>
 </div>
 <figure class="feature-spotlight mirror-spotlight" data-spotlight="mirror" aria-labelledby="mirror-title">
-<h3 id="mirror-title">Fork your data, not just your code.</h3>
+<h3 id="mirror-title">Develop against existing data with Mirror</h3>
 <ol class="mirror-flow"><li><strong>Existing source estate</strong><span>Source-owned data</span></li><li><strong>Borrowed development data</strong><span>Warehouse Views · Lakehouse Shortcuts</span></li><li><strong>Selected changed work</strong><span>Materialised locally by Build</span></li></ol>
 <figcaption>With Mirror, you can change the parts you're working on and use existing data for the rest, without reloading everything.</figcaption>
 <p class="spotlight-docs"><a href="https://docs.weaverstack.dev/estate/mirror/">Develop using Mirror</a><span aria-hidden="true"> · </span><a href="https://docs.weaverstack.dev/reference/operation-behaviour/mirror/">Scope and reset boundaries</a></p>
 </figure>
 </div></section>
-<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Built for scale</h2>
+<section class="section feature-group" id="scale" data-feature-group="7"><div class="wrap"><h2>Scale</h2>
 <figure class="feature-spotlight scale-spotlight" data-spotlight="scale" aria-labelledby="scale-title">
-<h3 id="scale-title">From 3 objects to 3,000.</h3>
+<h3 id="scale-title">Measured at 3,000 objects</h3>
 <ol class="scale-flow"><li><b>3</b><strong>Easy to keep in your head.</strong></li><li><b>30</b><strong>It’s hard to keep track.</strong></li><li><b>300</b><strong>It’s no longer whether you use a framework, but which one.</strong></li><li><b>3,000</b><strong>Scheduling and recovery decide everything.</strong></li></ol>
 <figcaption>Weaver has been tested and tuned for thousands of connected objects. It runs independent work together, tracks what data has changed and refreshes SQL access only when needed.</figcaption>
 </figure>
@@ -283,7 +283,7 @@
 </div>
 <p class="group-docs"><a href="/guides/fabric-performance-optimisation/">Read the 3,000-object performance guide</a><span aria-hidden="true"> · </span><a href="/get-started/">Get started</a></p>
 </div></section>
-<section class="section feature-cta"><div class="wrap"><h2>Start with one item.</h2>
+<section class="section feature-cta"><div class="wrap"><h2>Start with one item</h2>
 <p>Begin with a Lakehouse, a Warehouse or a Power BI model, and connect more as you need them.</p>
 <div class="actions"><a class="button blue" href="/get-started/">Get started →</a><a class="button ghost" href="https://docs.weaverstack.dev">Read the documentation →</a></div>
 </div></section></main>

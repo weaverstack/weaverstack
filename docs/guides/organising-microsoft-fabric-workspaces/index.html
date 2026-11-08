@@ -6,14 +6,14 @@
 <meta name="theme-color" content="#f7f7f6">
 <title>Organising Fabric workspaces for independent teams</title>
 <meta name="keywords" content="organising Microsoft Fabric workspaces, Fabric workspace design, self-service data in Microsoft Fabric, data democratisation in Microsoft Fabric, enterprise Fabric, cross-workspace dependencies">
-<meta name="description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
+<meta name="description" content="How to organise Microsoft Fabric workspaces so teams own their projects and schedules while coordinating shared data dependencies and recovery.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:site_name" content="Weaver">
 <meta property="og:title" content="Organising Fabric workspaces for independent teams">
-<meta property="og:description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
+<meta property="og:description" content="How to organise Microsoft Fabric workspaces so teams own their projects and schedules while coordinating shared data dependencies and recovery.">
 <meta property="og:image" content="https://weaverstack.dev/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 <meta property="og:locale" content="en_AU">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Organising Fabric workspaces for independent teams">
-<meta name="twitter:description" content="Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.">
+<meta name="twitter:description" content="How to organise Microsoft Fabric workspaces so teams own their projects and schedules while coordinating shared data dependencies and recovery.">
 <meta name="twitter:image" content="https://weaverstack.dev/og.png">
 <meta name="twitter:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -37,7 +37,7 @@
     {
       "@type": "TechArticle",
       "headline": "Organising Fabric workspaces for independent teams",
-      "description": "Coordinate shared Fabric work while teams keep their own projects: recovery and a joined load across 50 participating catalogues.",
+      "description": "How to organise Microsoft Fabric workspaces so teams own their projects and schedules while coordinating shared data dependencies and recovery.",
       "url": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/",
       "inLanguage": "en-AU",
       "author": {"@type": "Organization", "name": "Weaver contributors"},
@@ -117,7 +117,8 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
-<h2 id="introduction">Team ownership and shared dependencies</h2>
+<h2 id="introduction">Introduction</h2>
+<p>When you are deciding how to organise Microsoft Fabric workspaces, you are also deciding who owns the data, who can change it and how teams will depend on one another. A workspace per team gives you a clear place for that ownership. The next question is how to keep their work connected as they start sharing data.</p>
 <p>Suppose you run Finance's Warehouse. Your team owns its tables and its schedule, but your sales analysis reads a customer table maintained centrally. That customer load fails. Which of your tables are affected? Once the central team repairs it, what should you reload?</p>
 <p>You need answers at both levels: the central team needs to see the reach of the failure, and you need to recover Finance's work on your own schedule. Keeping separate projects should make ownership clearer, not leave you reconstructing the connections during an incident.</p>
 <figure class="facts-figure" aria-label="Experiment at a glance">
@@ -231,7 +232,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>Microsoft (2026a). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">OneLake, the unified data lake</a>. Microsoft Learn. Accessed 8 November 2026.</p>
 <p>Microsoft (2026b). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">Unify data sources with OneLake shortcuts</a>. Microsoft Learn. Accessed 8 November 2026.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Organising Fabric workspaces</a></li><li><a href="#the-enterprise-problem">Self-service and coordination</a></li><li><a href="#what-fabric-provides">What Fabric already provides</a></li><li><a href="#the-two-missing-pieces">The two missing pieces</a></li><li><a href="#experimental-setup">Experimental setup</a></li><li><a href="#the-implementation-weaver">The implementation: Weaver</a></li><li><a href="#results">Results</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#references">References</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Introduction</a></li><li><a href="#the-enterprise-problem">Self-service and coordination</a></li><li><a href="#what-fabric-provides">What Fabric already provides</a></li><li><a href="#the-two-missing-pieces">The two missing pieces</a></li><li><a href="#experimental-setup">Experimental setup</a></li><li><a href="#the-implementation-weaver">The implementation: Weaver</a></li><li><a href="#results">Results</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#references">References</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

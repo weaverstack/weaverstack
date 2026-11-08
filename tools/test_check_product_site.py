@@ -18,6 +18,7 @@ class RouteResolution(unittest.TestCase):
         self.assertEqual(route_file(root, "/guide/"), root / "guide/index.html")
         self.assertEqual(route_file(root, "/demo.html"), root / "demo.html")
 
+
 ROOT = Path(__file__).resolve().parents[1] / "docs"
 
 

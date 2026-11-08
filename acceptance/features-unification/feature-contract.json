@@ -1,18 +1,18 @@
 {
   "groups": {
     "start-simple": "Start with what you know",
-    "data-engineering": "Serious data engineering, already included",
-    "power-bi": "Power BI, engineered for organisations",
-    "visibility": "Visibility, included",
-    "scale": "Built for scale",
-    "advanced": "When your estate gets complicated"
+    "data-engineering": "Build reliable data pipelines",
+    "power-bi": "Power BI semantic models and Reports",
+    "visibility": "Find out what happened, and what needs attention",
+    "development": "Develop and review changes",
+    "scale": "Scale and coordinate across teams"
   },
   "features": [
     {
       "id": "python-spark",
       "group": 1,
       "title": "Python and Spark SQL, together",
-      "description": "Use Python and Spark SQL together for Lakehouse Files and Delta Tables in the same dependency model.",
+      "description": "Use Python and Spark SQL together to load files and create Lakehouse tables. Weaver runs the steps in the right order.",
       "urls": [
         "https://docs.weaverstack.dev/lakehouse/spark-sql/"
       ]
@@ -29,8 +29,8 @@
     {
       "id": "native-powerbi",
       "group": 1,
-      "title": "Native Power BI",
-      "description": "Add enterprise power to your Power BI models and reports, while keeping to native PBIP, TMDL and native Report definitions.",
+      "title": "Keep using Power BI files",
+      "description": "Apply modelling standards, run unit tests and deploy Reports using standard Power BI project files (PBIP and TMDL).",
       "urls": [
         "https://docs.weaverstack.dev/semantic-models/native-tmdl/"
       ]
@@ -38,8 +38,8 @@
     {
       "id": "portable",
       "group": 1,
-      "title": "Windows, macOS, Linux, or just Fabric Notebooks",
-      "description": "Develop and operate Weaver projects on Windows, macOS or Linux, or work entirely inside Fabric Notebooks. Build and deploy native Power BI models and Reports without Power BI Desktop or a Windows computer.",
+      "title": "Work in Fabric or your own editor",
+      "description": "Write code in VS Code or another editor on Windows, macOS or Linux, or work entirely in Fabric Notebooks. Deploy native Power BI models and Reports without Power BI Desktop.",
       "urls": [
         "https://docs.weaverstack.dev/advanced/portable-execution-between-desktop-and-fabric/"
       ]
@@ -48,26 +48,34 @@
       "id": "agents",
       "group": 1,
       "title": "Built for developers and AI agents",
-      "description": "Readable terminal output for developers, and structured `--json` results, previews and no prompts for AI agents. A guide covers running an agent against a development workspace.",
+      "description": "Use readable terminal output or structured JSON results from Check, Build, Load, Test and Health. The guide shows how to give an agent a development workspace, preview changes and run without prompts.",
       "urls": [
         "https://docs.weaverstack.dev/reference/ai-agents/"
       ]
     },
     {
+      "id": "execute",
+      "group": 1,
+      "title": "Query your Fabric data from the terminal",
+      "description": "Use weaver execute to inspect a Warehouse, Lakehouse or model with T-SQL, Spark SQL, Python or DAX. Read the results without switching tools. Submitted SQL and Python can also change data.",
+      "urls": [
+        "https://docs.weaverstack.dev/reference/cli/execute/"
+      ]
+    },
+    {
       "id": "fabric-dag",
       "group": 2,
-      "title": "One dependency graph across Fabric",
-      "description": "Order selected managed Lakehouse work, Warehouse T-SQL and dependent Semantic Model refreshes in one DAG.",
+      "title": "Keep work in the right order",
+      "description": "Run Lakehouse work, Warehouse SQL and dependent Power BI model refreshes in one connected workflow.",
       "urls": [
-        "https://docs.weaverstack.dev/estate/connected-items/",
-        "https://docs.weaverstack.dev/semantic-models/managed-sources/"
+        "https://docs.weaverstack.dev/estate/connected-items/"
       ]
     },
     {
       "id": "generated-warehouse",
       "group": 2,
-      "title": "Generated Warehouse pipelines",
-      "description": "A SELECT becomes a Table with generated staging, declared-key matching, row-change reconciliation and recorded results.",
+      "title": "Turn a SQL query into a working table",
+      "description": "Give Weaver a SELECT and a key. It creates the table and loading steps, tracks changes and records the results.",
       "urls": [
         "https://docs.weaverstack.dev/warehouse/first-project/"
       ]
@@ -75,8 +83,8 @@
     {
       "id": "managed-lakehouse",
       "group": 2,
-      "title": "Managed Lakehouse pipelines",
-      "description": "Materialise Files, Python and Spark SQL into managed Delta Tables without hand-building another orchestration project.",
+      "title": "Turn Python and SQL into Lakehouse tables",
+      "description": "Use Python and Spark SQL to load files and update Delta Tables, without building a separate pipeline to connect them.",
       "urls": [
         "https://docs.weaverstack.dev/lakehouse/python/"
       ]
@@ -84,8 +92,8 @@
     {
       "id": "dependency-discovery",
       "group": 2,
-      "title": "Dependency discovery",
-      "description": "Python imports and supported T-SQL references supply dependencies; Spark SQL uses explicit declarations.",
+      "title": "Find what depends on what",
+      "description": "Weaver can read dependencies from Python imports and supported T-SQL references. With Spark SQL, you specify them.",
       "urls": [
         "https://docs.weaverstack.dev/estate/connected-items/"
       ]
@@ -93,18 +101,17 @@
     {
       "id": "incremental-changes",
       "group": 2,
-      "title": "Incremental inserts, updates and deletes",
-      "description": "Apply insert/update candidates and explicit delete keys under the declared policy, without rebuilding every target.",
+      "title": "Load only what has changed",
+      "description": "Apply inserts, updates and explicit deletes using rules you choose, without rebuilding every target.",
       "urls": [
-        "https://docs.weaverstack.dev/warehouse/incremental/",
-        "https://docs.weaverstack.dev/lakehouse/incremental/"
+        "https://docs.weaverstack.dev/warehouse/incremental/"
       ]
     },
     {
       "id": "bookmarks",
       "group": 2,
-      "title": "Per-consumer bookmarks",
-      "description": "Each loadable Table or Folder keeps its own clean processing boundary, even when consumers share a source.",
+      "title": "Pick up where each table left off",
+      "description": "Each table or folder tracks its own progress through the source data, even when several share the same source.",
       "urls": [
         "https://docs.weaverstack.dev/lakehouse/incremental/"
       ]
@@ -112,20 +119,46 @@
     {
       "id": "data-tests",
       "group": 2,
-      "title": "Tests and Assumptions",
-      "description": "Compare expected and actual results or catch rule-breaking rows through supported Python, SQL and DAX validations.",
+      "title": "Test data and calculations",
+      "description": "Compare actual and expected results or find invalid rows using Python, SQL and DAX.",
       "urls": [
-        "https://docs.weaverstack.dev/warehouse/tests/",
-        "https://docs.weaverstack.dev/semantic-models/validation/"
+        "https://docs.weaverstack.dev/warehouse/tests/"
       ]
     },
     {
       "id": "quality-guards",
       "group": 2,
       "title": "Data-quality safeguards",
-      "description": "Record rejected input and refuse proposed update/delete changes that exceed active stability thresholds.",
+      "description": "Keep rejected rows and stop unusually large proposed updates or deletes before they reach your tables.",
       "urls": [
         "https://docs.weaverstack.dev/advanced/partial-failures-rejected-data-and-thresholds/"
+      ]
+    },
+    {
+      "id": "selection",
+      "group": 2,
+      "title": "Run a table, a branch or an item",
+      "description": "Preview the work you intend to run. Select an item for its ordered loads, or name an object and explicitly include the upstream or downstream work you need.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/selective-runs/"
+      ]
+    },
+    {
+      "id": "recovery",
+      "group": 2,
+      "title": "Keep a failed step from stopping unrelated work",
+      "description": "Choose fault-tolerant loading to let independent branches continue after a failure. Completed changes remain in place; inspect the failed step before retrying it.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/recovery/"
+      ]
+    },
+    {
+      "id": "stale",
+      "group": 2,
+      "title": "Catch up after a source changes",
+      "description": "Use load --stale to rerun loads that need attention, then test --stale for validations that are no longer current. You can recover the affected work without repeating the whole project.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/recovery/#rerun-failed-or-stale-load-work"
       ]
     },
     {
@@ -140,8 +173,8 @@
     {
       "id": "builtin-annotations",
       "group": 3,
-      "title": "Built-in modelling annotations",
-      "description": "Hide foreign keys, generate measure selectors and apply supported model rules through native TMDL annotations.",
+      "title": "Built-in modelling rules",
+      "description": "Automatically hide foreign keys and create measure selectors using standard TMDL annotations.",
       "urls": [
         "https://docs.weaverstack.dev/reference/power-bi/annotations/"
       ]
@@ -149,8 +182,8 @@
     {
       "id": "custom-annotations",
       "group": 3,
-      "title": "Custom Python annotations",
-      "description": "Implement project-specific modelling conventions in trusted Python when native policy and built-ins are not enough.",
+      "title": "Write your own modelling rules in Python",
+      "description": "Add your own Python rules when you need more than Weaver's built-in modelling options.",
       "urls": [
         "https://docs.weaverstack.dev/semantic-models/custom-annotations/"
       ]
@@ -158,8 +191,8 @@
     {
       "id": "composition",
       "group": 3,
-      "title": "Semantic Model composition",
-      "description": "Reuse a native model foundation to produce audience variants without maintaining complete copies.",
+      "title": "Reuse models without copying them",
+      "description": "Start from a shared model and create versions for different audiences without maintaining complete copies.",
       "urls": [
         "https://docs.weaverstack.dev/semantic-models/composition/"
       ]
@@ -167,8 +200,8 @@
     {
       "id": "dax-reconciliation",
       "group": 3,
-      "title": "DAX validation and SQL reconciliation",
-      "description": "Check DAX measures against independent expectations, including SQL calculations over managed Lakehouse or Warehouse sources.",
+      "title": "Unit testing for Semantic Models",
+      "description": "Unit test DAX measures against independent expected results, including SQL calculations over managed Lakehouse or Warehouse sources.",
       "urls": [
         "https://docs.weaverstack.dev/semantic-models/validation/"
       ]
@@ -176,8 +209,8 @@
     {
       "id": "report-binding",
       "group": 3,
-      "title": "Verified Report deployment",
-      "description": "Deploy the same authored Report to different destinations, resolving and verifying its intended model and workspace binding.",
+      "title": "Connect Reports to the right models",
+      "description": "Deploy the same Report to different workspaces. Weaver checks that it connects to the intended Power BI model.",
       "urls": [
         "https://docs.weaverstack.dev/reports/environments/"
       ]
@@ -185,8 +218,8 @@
     {
       "id": "catalogue",
       "group": 4,
-      "title": "Central Fabric Catalogue",
-      "description": "Query installed definitions, signatures, metadata, dependencies and operational state in one Fabric Warehouse.",
+      "title": "See all your work in one place",
+      "description": "Weaver keeps its Catalogue of deployed items, dependencies and run results in an ordinary Fabric Warehouse. There's no separate monitoring service to run.",
       "urls": [
         "https://docs.weaverstack.dev/core-concepts/catalogue/"
       ]
@@ -194,8 +227,8 @@
     {
       "id": "health",
       "group": 4,
-      "title": "Unified Health",
-      "description": "See current, stale, pending, failed or inconsistent work across the registered managed estate.",
+      "title": "See what is up to date or needs attention",
+      "description": "See what is up to date, waiting, failed or inconsistent across your managed Fabric work.",
       "urls": [
         "https://docs.weaverstack.dev/estate/catalogue-and-health/"
       ]
@@ -203,145 +236,10 @@
     {
       "id": "history",
       "group": 4,
-      "title": "Logging and statistics",
-      "description": "Inspect workflow history, Load counts, timings, row changes and recorded outcomes.",
+      "title": "See run history and results",
+      "description": "See what ran, how long it took, row counts, data changes and recorded results.",
       "urls": [
         "https://docs.weaverstack.dev/advanced/row-auditing-and-operational-history/"
-      ]
-    },
-    {
-      "id": "recovery",
-      "group": 4,
-      "title": "Fault-tolerant execution",
-      "description": "Retain completed effects, record failures and blocked work, and optionally continue independent Load branches.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/recovery/"
-      ]
-    },
-    {
-      "id": "selection",
-      "group": 4,
-      "title": "Selective execution",
-      "description": "Select installed Load work by whole-name regex, deliberately add ancestors/descendants and preview the selection.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/selective-runs/"
-      ]
-    },
-    {
-      "id": "concurrency",
-      "group": 4,
-      "title": "Controlled concurrency",
-      "description": "Cap one invocation or tune per-resource limits while scheduling independent work in dependency order.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/concurrency/"
-      ]
-    },
-    {
-      "id": "dashboard-deploy",
-      "group": 4,
-      "title": "One command",
-      "description": "weaver catalogue-dashboard deploys the semantic model and Report beside the catalogue, and brings them up to date on the next run.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/catalogue-dashboard/#deploy-the-dashboard"
-      ]
-    },
-    {
-      "id": "dashboard-live",
-      "group": 4,
-      "title": "Live over Direct Lake",
-      "description": "The dashboard reads the catalogue over Direct Lake, so its pages reflect the latest recorded results. Import mode reads more than ten catalogues.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/catalogue-dashboard/#what-it-reads"
-      ]
-    },
-    {
-      "id": "dashboard-yours",
-      "group": 4,
-      "title": "Free to tweak",
-      "description": "It is an ordinary Power BI Report. Tweak it to fit your needs, or throw it away and build your own over the catalogue.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/catalogue-dashboard/"
-      ]
-    },
-    {
-      "id": "environments",
-      "group": 6,
-      "title": "One project, multiple environments",
-      "description": "Keep source files and logical identities while workspace configuration selects physical item and model destinations.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/environments/"
-      ]
-    },
-    {
-      "id": "incremental-build",
-      "group": 6,
-      "title": "Incremental Build",
-      "description": "Reconcile changed source-data definitions and affected selected descendants, retaining certified unchanged source work.",
-      "urls": [
-        "https://docs.weaverstack.dev/advanced/incremental-build-selection/"
-      ]
-    },
-    {
-      "id": "build-preview",
-      "group": 6,
-      "title": "Build previews",
-      "description": "Inspect selected actions, physical targets and destructive effects through a read-only Build plan.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/development-cycle/"
-      ]
-    },
-    {
-      "id": "bundles",
-      "group": 6,
-      "title": "Controlled deployment bundles",
-      "description": "Review and hand off frozen, destination-specific installation plans without replanning during Install.",
-      "urls": [
-        "https://docs.weaverstack.dev/advanced/build-bundles-and-controlled-installation/"
-      ]
-    },
-    {
-      "id": "publication-readiness",
-      "group": 6,
-      "title": "Cross-engine publication and readiness",
-      "description": "Order supported OneLake publication and SQL endpoint-readiness barriers before dependent cross-engine consumers.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/connected-items/"
-      ]
-    },
-    {
-      "id": "data-protection",
-      "group": 6,
-      "title": "Protect important data",
-      "description": "Keep irreplaceable sources outside managed targets and use Build replacement guards for protected owned objects.",
-      "urls": [
-        "https://docs.weaverstack.dev/advanced/protecting-data/"
-      ]
-    },
-    {
-      "id": "workflow",
-      "group": 1,
-      "title": "Run several steps from a notebook",
-      "description": "In Python, `with weaver.workflow():` runs Build, Load, Test and Health on one Session under one workflow ID, in a Fabric notebook or on a desktop.",
-      "urls": [
-        "https://docs.weaverstack.dev/core-concepts/sessions-and-workflows/"
-      ]
-    },
-    {
-      "id": "stale",
-      "group": 4,
-      "title": "Rerun only what is behind",
-      "description": "Load and Test with --stale run only the objects that failed, are pending or are behind their upstream, so recovery repeats as little work as possible.",
-      "urls": [
-        "https://docs.weaverstack.dev/estate/recovery/#rerun-failed-or-stale-load-work"
-      ]
-    },
-    {
-      "id": "execute",
-      "group": 4,
-      "title": "Query an item without changing state",
-      "description": "weaver execute runs a T-SQL, Spark SQL, Python or DAX query against one Lakehouse, Warehouse or semantic model and returns the result. It records nothing in the catalogue.",
-      "urls": [
-        "https://docs.weaverstack.dev/reference/cli/execute/"
       ]
     },
     {
@@ -357,25 +255,88 @@
       "id": "dashboard-export",
       "group": 4,
       "title": "Static pages for sharing",
-      "description": "Export every page as static HTML, from the CLI or a notebook, so results can be shared and opened without a running Fabric capacity.",
+      "description": "Export a snapshot of the deployed model's data as HTML, from the CLI or a notebook. A downloaded local copy opens without a running Fabric capacity.",
       "urls": [
         "https://docs.weaverstack.dev/estate/catalogue-dashboard/#export-static-pages"
       ]
     },
     {
-      "id": "across-catalogues",
+      "id": "environments",
       "group": 6,
-      "title": "Work across teams' catalogues",
-      "description": "Give Health, Load or Test several teams' catalogues. Weaver joins them through the shortcuts between workspaces, so a failure is traced across teams and a load runs as one graph.",
+      "title": "One project, multiple environments",
+      "description": "Use the same files in development and production. A configuration file sets which workspaces, Fabric items and Power BI models they belong to.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/environments/"
+      ]
+    },
+    {
+      "id": "incremental-build",
+      "group": 6,
+      "title": "Update only what changed",
+      "description": "Update changed source definitions and the work that depends on them, while leaving unchanged parts in place.",
+      "urls": [
+        "https://docs.weaverstack.dev/advanced/incremental-build-selection/"
+      ]
+    },
+    {
+      "id": "build-preview",
+      "group": 6,
+      "title": "See changes before applying them",
+      "description": "Preview what will change, where it will go and whether anything will be replaced or deleted.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/development-cycle/"
+      ]
+    },
+    {
+      "id": "bundles",
+      "group": 6,
+      "title": "Review deployments before applying them",
+      "description": "Prepare a fixed deployment plan, review it and apply it later without changing the plan.",
+      "urls": [
+        "https://docs.weaverstack.dev/advanced/build-bundles-and-controlled-installation/"
+      ]
+    },
+    {
+      "id": "data-protection",
+      "group": 6,
+      "title": "Protect important data",
+      "description": "Keep irreplaceable sources outside managed targets and use Build replacement guards for protected owned objects.",
+      "urls": [
+        "https://docs.weaverstack.dev/advanced/protecting-data/"
+      ]
+    },
+    {
+      "id": "across-catalogues",
+      "group": 7,
+      "title": "Connect the work without merging the projects",
+      "description": "Supply the catalogues for the teams involved. Health follows their recorded dependencies; Load and Test coordinate the work you select and write each result to its owning catalogue.",
       "urls": [
         "https://docs.weaverstack.dev/estate/across-catalogues/"
       ]
     },
     {
+      "id": "concurrency",
+      "group": 7,
+      "title": "Run independent branches together",
+      "description": "Set concurrency limits for the run and its resources. Weaver can overlap independent Spark and Warehouse work while keeping dependent steps in order.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/concurrency/"
+      ]
+    },
+    {
+      "id": "publication-readiness",
+      "group": 7,
+      "title": "Coordinate the hand-off between engines",
+      "description": "When your Warehouse reads a loaded Lakehouse table, Weaver waits for its SQL endpoint refresh. A shortcut reading another team's Warehouse table also waits for the source's OneLake publication.",
+      "urls": [
+        "https://docs.weaverstack.dev/estate/connected-items/"
+      ]
+    },
+    {
       "id": "cycles",
-      "group": 6,
-      "title": "Teams that read one another's data",
-      "description": "Workspaces can read one another's data in a loop. Weaver orders the loop, reports it and still traces a failure to every object in it.",
+      "group": 7,
+      "title": "Keep reciprocal team dependencies workable",
+      "description": "If teams read each other's results, Weaver reports the cycle and runs selected objects once in a consistent order. A reader closing the loop uses the producer's available result from an earlier run.",
       "urls": [
         "https://docs.weaverstack.dev/estate/across-catalogues/#cycles"
       ]

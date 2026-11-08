@@ -84,7 +84,7 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 .name-parts strong { display: block; color: var(--blue); font: 12px var(--mono); }
 .name-parts span { display: block; margin-top: 8px; font: 700 15px var(--mono); overflow-wrap: anywhere; }
 .name-figure figcaption { margin-top: 13px; color: var(--muted); font-size: 13px; }
-.strategy-figure { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 26px 0 42px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
+.strategy-figure { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 26px 0 42px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
 .strategy-figure div { padding: 18px; background: var(--paper); }
 .strategy-figure strong { display: block; color: var(--blue); font: 12px var(--mono); }
 .strategy-figure span { display: block; margin: 8px 0 5px; font-weight: 750; }
@@ -152,15 +152,15 @@ table.benchmark th { color: var(--ink); background: var(--paper-deep); }
 <h2 id="the-two-missing-pieces">3. The two missing pieces</h2>
 <p>An organisation-wide dependency graph needs only two things beyond what Fabric provides.</p>
 <figure class="strategy-figure" aria-label="What a dependency graph needs">
-<div><strong>01</strong><span>Dependencies</span><small>Which five-part names each object reads, including across workspaces</small></div><div><strong>02</strong><span>Operational status</span><small>When each object last loaded, and whether it succeeded</small></div><div><strong>03</strong><span>Concurrency</span><small>Run independent work together once dependencies clear</small></div>
+<div><strong>01</strong><span>Dependencies</span><small>Which five-part names each object reads, including across workspaces</small></div><div><strong>02</strong><span>Operational status</span><small>When each object last loaded, and whether it succeeded</small></div>
 </figure>
 <h3 id="dependencies-between-names">3.1 Dependencies between five-part names</h3>
 <p>Each object's upstream must be recorded as the five-part names it reads. Within a workspace this is ordinary lineage. Across workspaces it is the shortcut: a shortcut names the item and path it reads, and the item's Fabric ID identifies the workspace and team that own it. Matching that ID against another team's records connects the two graphs, with nothing declared for the join.</p>
 <h3 id="operational-status-of-names">3.2 Operational status of five-part names</h3>
 <p>Each object must also record its operational state: when it last loaded, whether that load succeeded, and when its upstream last changed. With that, a failed table can be traced to every object that read it, and an object that loaded successfully before its upstream was repaired can be identified as behind.</p>
 <p>Neither piece needs a central store. If each team records both for its own objects, any team can read the records of the teams it depends on and assemble the part of the graph it cares about, or the whole organisation's.</p>
-<h3 id="concurrency">3.3 Concurrency</h3>
-<p>Once the graph exists, loading across it is a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
+<h3 id="concurrency">3.3 A bonus: concurrency</h3>
+<p>Concurrency is not needed for the graph, but the graph makes it possible. Once the graph exists, loading across it is a scheduling problem. Independent branches in different workspaces should run together, while each reader waits only for its own upstream, including the SQL analytics endpoint refresh or OneLake publication between them. The techniques are the same as within one estate, described in <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">Performance Engineering on Microsoft Fabric</a>.</p>
 
 <h2 id="experimental-setup">4. Experimental setup</h2>
 <p>The experiment built 50 real Fabric workspaces on an FTL64 trial capacity. Each workspace had its own catalogue, its own project and its own configuration. Every team was initialised, built and loaded independently before the experiment began.</p>

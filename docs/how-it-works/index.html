@@ -206,11 +206,11 @@ Schema:
 <div><dt>Process only changes</dt><dd>Track where each table left off, including new, changed and removed rows.</dd></div>
 <div><dt>Run independent work together</dt><dd>Run steps at the same time when they do not depend on each other.</dd></div>
 <div><dt>Recover from failures</dt><dd>Record failures without losing completed work.</dd></div>
-<div><dt>Check data and calculations</dt><dd>Check the data, not just the execution.</dd></div>
+<div><dt>Check data and calculations</dt><dd>Validate stored data and model calculations.</dd></div>
 <div><dt>Apply modelling standards</dt><dd>Apply standards across Semantic Models.</dd></div>
 </dl>
 <p class="architecture-statement">Weaver creates the loading code, runs supported work in the right order and applies your testing and modelling rules.</p>
-<p class="small">Python imports and supported T-SQL references establish dependencies; Spark SQL needs explicit declarations. Incremental policies use bookmarks and authored change/delete logic, not automatic detection of every source change.</p>
+<p>Weaver infers dependencies from Python imports and supported T-SQL references; declare dependencies explicitly for Spark SQL. You define how each source supplies new, changed and deleted records. Weaver uses bookmarks to track processing progress and applies the changes through its loading routines.</p>
 </div></section>
 <section class="section"><div class="wrap">
 <h2>One set of commands</h2>
@@ -220,11 +220,11 @@ Schema:
 <li><strong>TEST</strong><span>Verify the results.</span></li>
 <li><strong>HEALTH</strong><span>See what needs attention.</span></li>
 </ol>
+<p>Build deploys Reports and connects them to their semantic models. Load refreshes the models that supply their data.</p>
 <div class="secondary-operations">
 <p><a href="https://docs.weaverstack.dev/reference/operation-behaviour/mirror/"><strong>MIRROR</strong></a>: develop against existing data without copying everything.</p>
-<p><a href="https://docs.weaverstack.dev/reference/operation-behaviour/wipe/"><strong>WIPE</strong></a>: destructively reset selected physical destinations.</p>
+<p><a href="https://docs.weaverstack.dev/reference/operation-behaviour/wipe/"><strong>WIPE</strong></a> empties the selected data destinations, including unmanaged contents inside them. Review its target and catalogue reset scope before running it.</p>
 </div>
-<p class="small">Reports are Build-only, with no independent Load or Test. Mirror borrows Lakehouse/Warehouse data. Wipe includes unmanaged contents within selected Lakehouses/Warehouses and normally the resolved Catalogue; named Semantic Model resets retain it. Reports cannot be wiped.</p>
 <p><a class="text-link" href="https://docs.weaverstack.dev/core-concepts/build-load-and-test/">Operations and their boundaries →</a></p>
 </div></section>
 <section class="section"><div class="wrap">
@@ -234,7 +234,7 @@ Schema:
 <div><h3>Production</h3><code>Warehouse/Curated</code><span class="mapping-arrow" aria-hidden="true">↓</span><strong>Curated</strong></div>
 </div>
 <p class="architecture-statement">Same files. Different workspaces.</p>
-<p>A workspace configuration file sets where your Fabric items go. Weaver records those destinations when you build. Changing the file alone does not move deployed items or change external connections.</p>
+<p>Use workspace configuration to choose the destinations for a deployment. Run Build with that configuration to deploy the project and record its targets. Manage changes to existing connections through the relevant Fabric setup.</p>
 <p>Run Weaver from desktop Python, inside a Fabric Notebook, or both.</p>
 <p><a class="text-link" href="https://docs.weaverstack.dev/estate/environments/">Work across environments →</a></p>
 </div></section>

@@ -118,3 +118,36 @@ No merge/publication authorised. Retain draft PR status.
 2. Review product tone #274 then release product #275; the demo helper in #275 is a local generation dependency for #17, not a reason to publish the product first.
 3. Validate both final trees together using the helper from #275 and the frozen runtime. Review article #273 alongside them.
 4. When separately authorised, publish developer destinations before product links to those destinations. Runtime/package release availability must be reconciled with installation copy before public launch.
+
+## Final reviewed content and file inventory
+
+| Existing draft | Final reviewed content head | Base retained |
+|---|---|---|
+| product #273 | `abf7606fe107404f3d0d9b47b3f7a7baa838e9b8` | main |
+| product #274 | `485f4a89e3c6936f72b34274720b89f09600b342` (unchanged) | main |
+| product #275 | `1f5aa471` (final product/checker content; this report-only delivery commit follows it) | docs/site-tone |
+| developer #16 | `7bc1ccb04397458961f12ba10ed1cee4167b9fbf` | main |
+| developer #17 | `121ce2f8164614544ecd25afefe5f23a82545fbd` | docs/permissions |
+
+Final delivery readback records the full #275 reporting-commit hash in the user response; a tracked report cannot include its own commit hash. Runtime remains frozen at `efc046e7cf066daefd27f9268413ae05c3ed64e4`. The detached integration checkout combines the exact article/product content above for local testing only, without changing remote bases.
+
+Changed product files relative to the starting draft: `PROSE.md`; `docs/features/index.html`; `docs/get-started/index.html`; `acceptance/features-unification/claims.json`; `tests/test_features_story_invariant.py`; `tools/check_product_site.py`; `tools/test_check_product_site.py`; and the three files in `acceptance/docs-0.11-editorial/`. Article changes: `docs/guides/index.html` and `docs/guides/organising-microsoft-fabric-workspaces/index.html`.
+
+Developer #16 changes installation and permissions. Developer #17 changes canonical PROSE; catalogue/dependencies/mirrors/sessions concepts; across-catalogues/Dashboard/connected-items/Mirror/operate journeys; incremental-build and materialisation guidance; Lakehouse runtime; AI/Execute/Initialise/Health/Load/Power BI/Test/Assumption references; release summary and legacy JSON routes; route inventory and validators; and its acceptance evidence. Complete exact paths are reproducible with `git diff --name-only 3239dd004c52327c1319a0275c49ae6bacc9336c..121ce2f8164614544ecd25afefe5f23a82545fbd`.
+
+Final commands (product interpreter: `~/dev/weaverstack/.venv/bin/python`):
+
+```bash
+python -m pytest -q tests/test_features_story_invariant.py tests/test_performance_guide_weaver_links_invariant.py tests/test_website_routing_invariant.py tests/test_test_architecture_invariant.py
+# 12 passed
+python -m pytest tools/test_check_product_site.py -q
+# 12 passed
+python tools/check_product_site.py --developer-site ~/dev/weaverstack-docs-editorial17/site
+# pass, also from the detached combined article/product tree
+```
+
+Developer full bundle: `run_validation.py` and `validation.json` in its acceptance directory contain all 20 exact commands/stdout/return codes; parent rerun returned 20/20. The report there lists the eight frozen-runtime pytest modules; parent rerun returned 296 passed. Product/article snippets were checked with `build_parser().parse_args`, never handler dispatch.
+
+Final rendered article results at 390px: page width 390px, table 640px inside its 356px labelled, focusable scrolling region. Desktop results use sensible Question/Answer proportions; the inherited numeric no-wrap rule no longer makes the question consume half the table. Features Dashboard illustrations and Workspaces/Items captions were inspected. Full keyboard/clipboard/console exhaustiveness is not claimed.
+
+Review preview: a private local preview served only the integrated product `docs/`.

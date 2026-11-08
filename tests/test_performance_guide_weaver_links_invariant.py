@@ -77,13 +77,26 @@ def test_performance_guide_makes_weaver_visible_before_the_conclusion():
 
 
 @weaver_test()
-def test_feature_scale_story_links_to_the_guide_after_advanced_features():
+def test_feature_scale_story_links_to_the_guide_after_development_and_coordination():
     page = FEATURES.read_text(encoding="utf-8")
     guide = 'href="/guides/fabric-performance-optimisation/"'
 
     assert '<h3 id="scale-title">Measured at 3,000 objects</h3>' in page
-    assert "<h2>Several workspaces" in page
+    scale = page.split('<section class="section feature-group" id="scale"', 1)[1].split(
+        '<section class="section feature-cta"', 1
+    )[0]
+    for capability in (
+        "across-catalogues",
+        "concurrency",
+        "publication-readiness",
+        "cycles",
+    ):
+        assert f'data-feature="{capability}"' in scale
+    assert scale.index('data-feature="across-catalogues"') < scale.index(
+        'id="scale-title"'
+    )
     assert page.count(guide) == 1
+    assert page.index('id="development"') < page.index('id="scale"')
     assert page.index('id="advanced"') < page.index('id="scale"')
     assert page.index('id="scale"') < page.index(guide)
     assert page.index(guide) < page.index('class="section feature-cta"')

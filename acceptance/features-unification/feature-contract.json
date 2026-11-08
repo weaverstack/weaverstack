@@ -1,11 +1,11 @@
 {
   "groups": {
-    "start-simple": "Start with what you know",
-    "data-engineering": "Build reliable data pipelines",
-    "power-bi": "Power BI semantic models and Reports",
-    "visibility": "Find out what happened, and what needs attention",
-    "development": "Develop and review changes",
-    "scale": "Scale and coordinate across teams"
+    "start-simple": "Native Python, SQL and Power BI",
+    "data-engineering": "Data engineering",
+    "power-bi": "Power BI",
+    "visibility": "Operational visibility",
+    "development": "Development and production",
+    "scale": "Enterprise scale"
   },
   "features": [
     {

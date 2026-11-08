@@ -61,7 +61,8 @@ def test_warehouse_visibility_is_one_feature_story():
     assert "#operations" not in jumps
     assert jumps.count("#visibility") == 1
     assert '<section class="section feature-group" id="operations"' not in features
-    assert "<h2>Operational visibility</h2>" in visibility
+    assert 'data-feature="health"' in visibility
+    assert 'data-feature="history"' in visibility
     estate_line = (
         "When a load fails, you need to know what ran, what failed and which "
         "downstream work needs attention."
@@ -72,4 +73,7 @@ def test_warehouse_visibility_is_one_feature_story():
         'data-spotlight="catalogue-dashboard"'
     )
     assert 'data-feature="catalogue"' in visibility
-    assert 'data-feature="dashboard-deploy"' in visibility
+    assert "<code>weaver catalogue-dashboard</code>" in visibility
+    assert 'data-feature="dashboard-deploy"' not in features
+    for capability in ("recovery", "stale", "selection", "execute", "concurrency"):
+        assert f'data-feature="{capability}"' not in visibility

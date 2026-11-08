@@ -46,8 +46,8 @@ configuration, and give the reader a useful result and next step.
 
 ### Product website
 
-Preserve **Making Fabric easier to use** and the closing line **Making Fabric
-easier to use, and safer to scale.** The Story page keeps its personal history
+Use **Making Fabric easier to use, and safer to scale** as the homepage mission
+line and retain it in the closing proposition. The Story page keeps its personal history
 and voice. Other headings name a task, capability or result.
 
 Lead with Microsoft Fabric. Present items in this order: Lakehouse, Warehouse,

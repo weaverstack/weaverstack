@@ -56,19 +56,27 @@ def test_a_desktop_exports_every_page_to_a_folder(dashboard, weaver_session, tmp
         assert 'id="wd-data"' in html and "page" in html
 
 
-@weaver_test(hosted=True, resources={"onelake", "rest"})
-def test_a_notebook_exports_every_page_to_onelake(
-    dashboard, livy_session, fabric_workspace, fabric_target_lakehouse, weaver_session
-):
-    """Run in Fabric, as a scheduled notebook runs it, writing to a Lakehouse."""
+@pytest.fixture
+def export_folder(fabric_workspace, fabric_target_lakehouse, weaver_session):
+    """The folder as a notebook names it in Spark, and as the desktop reads it."""
 
     from weaver.targets import ItemRef
 
-    # A notebook names OneLake as Spark does; the desktop reads it back over DFS.
     lakehouse = ItemRef(fabric_target_lakehouse.name)
     resolver = weaver_session.resolver(fabric_workspace)
-    folder = f"{resolver.spark_root(lakehouse)}/Files/_dashboard_export"
-    readable = resolver.files_root(lakehouse).join("_dashboard_export").value
+    return (
+        f"{resolver.spark_root(lakehouse)}/Files/_dashboard_export",
+        resolver.files_root(lakehouse).join("_dashboard_export").value,
+    )
+
+
+@weaver_test(hosted=True, resources={"onelake"})
+def test_a_notebook_exports_every_page_to_onelake(
+    dashboard, livy_session, fabric_workspace, weaver_session, export_folder
+):
+    """Run in Fabric, as a scheduled notebook runs it, writing to a Lakehouse."""
+
+    folder, readable = export_folder
     payload = livy_session.run(
         "import weaver\n"
         "result = weaver.export_catalogue_dashboard(\n"

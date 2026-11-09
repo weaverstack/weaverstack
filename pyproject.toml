@@ -65,6 +65,7 @@ Homepage = "https://weaverstack.dev"
 Documentation = "https://docs.weaverstack.dev"
 Source = "https://github.com/weaverstack/weaverstack"
 Issues = "https://github.com/weaverstack/weaverstack/issues"
+Changelog = "https://github.com/weaverstack/weaverstack/blob/main/CHANGELOG.md"
 
 # VERSION at the repository root is the one authored version. A build derives
 # the wheel version from it (see hatch_build.py): a development checkout gets a

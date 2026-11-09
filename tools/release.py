@@ -67,6 +67,18 @@ def require_release_branch() -> None:
         )
 
 
+def require_release_notes(version: str) -> None:
+    """Require the `CHANGELOG.md` section the GitHub Release shows."""
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    from release_notes import CHANGELOG, ReleaseNotesError, section
+
+    try:
+        section(CHANGELOG.read_text(encoding="utf-8"), version)
+    except ReleaseNotesError as exc:
+        raise ReleaseError(str(exc)) from None
+
+
 def tag_state(tag: str) -> str:
     """Require the release tag to be unused or already point at HEAD.
 
@@ -100,6 +112,7 @@ def release() -> int:
 
     require_clean_tree()
     require_release_branch()
+    require_release_notes(version)
     state = tag_state(tag)
 
     if state == "pushed":

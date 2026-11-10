@@ -63,7 +63,7 @@ def test_the_declaration_matches_the_table_contract(table):
     # of every load, Prohibit rebuild out of every drop, and no load procedure
     # means the catalogue's own DML is the only writer.
     assert document.static is True, table.name
-    assert document.prohibit_rebuild is True, table.name
+    assert document.prohibit_rebuild is (table.name != "ColumnDataType"), table.name
     assert document.has_load_procedure is False, table.name
 
     expected_not_null = {

@@ -2,7 +2,7 @@
 
 from ..catalogue.semantic import json_text
 from ..catalogue.state import Catalogue
-from ..catalogue.tables import SEMANTIC_TABLES
+from ..catalogue.tables import COLUMN_DATA_TYPE, SEMANTIC_TABLES
 from ..declaration.model import WeaverDocumentId
 from ..semantic_models.definition import encode_parts
 from ..semantic_models.references import source_identity
@@ -132,6 +132,9 @@ def publication_catalogues(current, desired, selected_models):
     rows = {item: dict(tables) for item, tables in desired.rows.items()}
     before = {item: dict(tables) for item, tables in current.rows.items()}
     for item, tables in rows.items():
+        tables[COLUMN_DATA_TYPE.name] = current.rows.get(item, {}).get(
+            COLUMN_DATA_TYPE.name, ()
+        )
         if item.item_type != "SemanticModel":
             continue
         for table in SEMANTIC_TABLES:

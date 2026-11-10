@@ -894,6 +894,8 @@ def test_the_bundle_freezes_the_attachment_the_build_already_required(tmp_path):
                 "tsql_batch",
                 "load_file",
                 "runtime_state",
+                "column_types",
+                "await_endpoint_objects",
             )
         },
     ).install(bundle)

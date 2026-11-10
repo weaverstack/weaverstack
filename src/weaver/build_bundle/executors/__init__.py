@@ -11,6 +11,7 @@ create-or-alter scripts.
 from __future__ import annotations
 
 from .base import ActionExecutor, InstallationContext, ResolvedTarget, SkippedExecution
+from .column_types import ColumnTypesExecutor
 from .copy_files import CopyFilesExecutor
 from .endpoint_objects import EndpointObjectsExecutor
 from .folder import FolderExecutor
@@ -34,6 +35,7 @@ from .wipe import LakehouseWipeExecutor
 
 def default_executors() -> dict[str, ActionExecutor]:
     return {
+        ColumnTypesExecutor.name: ColumnTypesExecutor(),
         ReportDefinitionExecutor.name: ReportDefinitionExecutor(),
         ReportReadbackExecutor.name: ReportReadbackExecutor(),
         SemanticModelExecutor.name: SemanticModelExecutor(),

@@ -90,6 +90,8 @@ def estate(tmp_path):
             # A build establishes explicit lifecycle state, so every build
             # carries a reconciliation action.
             "runtime_state",
+            "column_types",
+            "await_endpoint_objects",
         )
     }
     return {

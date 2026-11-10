@@ -1144,5 +1144,6 @@ def test_builtin_weaver_item_builds_through_the_same_planner(tmp_path):
     # Every catalogue table: the projected dictionaries, and the runtime tables
     # a run maintains rather than projection.
     assert len(physical) == len(CATALOGUE_TABLES)
-    assert bundle.plan.sequences[-1].description == "publish item registry last"
+    assert bundle.plan.sequences[-2].description == "publish item registry last"
+    assert bundle.plan.sequences[-1].description == "Read installed SQL column types"
     assert bundle.plan.targets[0].logical_item_name == "_weaver"

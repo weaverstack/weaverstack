@@ -32,6 +32,7 @@ from .tables import (
     BOOKMARK_SENTINEL,
     BORROWED_TABLES,
     BUILD_DATETIME,
+    COLUMN_DATA_TYPE,
     CURRENT_STATE_TABLES,
     INSTALLATION,
     LINEAGE_TABLES,
@@ -633,6 +634,7 @@ class InstalledMirror:
 INTRODUCED_TABLES = frozenset(
     {
         TEST_DICTIONARY.name,
+        COLUMN_DATA_TYPE.name,
         BOOKMARK.name,
         LOAD_STATUS.name,
         TEST_STATUS.name,
@@ -873,8 +875,23 @@ def read_catalogue_state(catalogue: Any, items) -> Catalogue:
     scopes = InstallationScopes(
         tuple(InstallationScope(item.item_type, item.item_name) for item in wanted)
     )
-    # Current-state rows are read for invalidation but never projected.
-    by_table = read_installations(catalogue, scopes=scopes, tables=READ_FOR_BUILD)
+    # Rebuilding the shared observation table must carry every owner's last
+    # complete inventory. Only this derived table is read outside item scope;
+    # those rows add neither Installation bindings nor Registry certification.
+    from .builtin import BUILTIN_ITEM
+
+    whole_inventory = BUILTIN_ITEM in wanted
+    by_table = read_installations(
+        catalogue,
+        scopes=scopes,
+        tables=tuple(
+            table
+            for table in READ_FOR_BUILD
+            if table != COLUMN_DATA_TYPE or not whole_inventory
+        ),
+    )
+    if whole_inventory:
+        by_table[COLUMN_DATA_TYPE.name] = read_table(catalogue, COLUMN_DATA_TYPE)
 
     # Seed empty requested items so downstream code distinguishes unbuilt from
     # out of scope.
@@ -888,6 +905,12 @@ def read_catalogue_state(catalogue: Any, items) -> Catalogue:
                 str(row.get(SCOPE_ITEM_NAME) or ""),
             )
             scoped = grouped.get(item)
+            if (
+                scoped is None
+                and whole_inventory
+                and table_name == COLUMN_DATA_TYPE.name
+            ):
+                scoped = grouped.setdefault(item, {COLUMN_DATA_TYPE.name: []})
             if scoped is None:
                 # A widened predicate must not pull another installation into scope.
                 raise BuildError(
@@ -1033,14 +1056,20 @@ def reconcile_catalogue_state(
             if not rules:
                 filtered[table.name] = tuple(rows)
                 continue
-            filtered[table.name] = tuple(
-                row
-                for row in rows
-                if not any(
-                    rule.owns(row, identity)
-                    for identity, document in stale.items()
-                    for rule in claim_rules_for_object_type(document.object_type)
-                    if rule.table == table
+            # Observed columns remain the last complete result until the planner
+            # either removes this owner or successfully replaces its observation.
+            filtered[table.name] = (
+                tuple(rows)
+                if table == COLUMN_DATA_TYPE
+                else tuple(
+                    row
+                    for row in rows
+                    if not any(
+                        rule.owns(row, identity)
+                        for identity, document in stale.items()
+                        for rule in claim_rules_for_object_type(document.object_type)
+                        if rule.table == table
+                    )
                 )
             )
             if table.name in state.materialised:

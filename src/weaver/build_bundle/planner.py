@@ -12,7 +12,7 @@ from typing import Mapping
 
 from ..catalogue.claims import without_claims
 from ..catalogue.state import Catalogue
-from ..catalogue.tables import ROLE_SHORTCUT
+from ..catalogue.tables import COLUMN_DATA_TYPE, ROLE_SHORTCUT
 from ..declaration.model import (
     LAKEHOUSE,
     SEMANTIC_MODEL,
@@ -210,7 +210,12 @@ def generate_item_build_bundle(
     decertified = removed | selected_for_build
     # Publication must compare against the post-deletion catalogue. Otherwise an
     # unchanged projection could compare equal and leave a rebuilt row deleted.
-    deleted_claims = collect_claims(catalogue, decertified, stale_claims=stale_claims)
+    deleted_claims = tuple(
+        claim
+        for claim in collect_claims(catalogue, decertified, stale_claims=stale_claims)
+        if claim.rule.table != COLUMN_DATA_TYPE
+        or claim.identity not in selected_for_build
+    )
     catalogue_after_deletions = without_claims(catalogue, deleted_claims)
 
     catalogue_before = render_catalogue_before_build(
@@ -296,6 +301,10 @@ def generate_item_build_bundle(
 
     _refuse_selected_omissions(omitted)
 
+    from .column_types import preserve_rebuilt_column_inventory
+
+    stages = list(preserve_rebuilt_column_inventory(stages, catalogue_after_deletions))
+
     selected_models = {
         identity
         for identity in selected_for_build
@@ -336,10 +345,19 @@ def generate_item_build_bundle(
             current=catalogue_after_deletions,
             selected_models=selected_models,
             publication=publication,
+            borrowed_columns=set(catalogue.mirrors) - selected_for_build,
+            regenerate_columns=WeaverDocumentId.parse(
+                f"{BUILTIN_ITEM}/_.ColumnDataType"
+            )
+            in selected_for_build,
+            collect_columns=(
+                BUILTIN_ITEM in target_by_item
+                or WeaverDocumentId.parse(f"{BUILTIN_ITEM}/_.ColumnDataType")
+                in catalogue.registered
+            ),
         ),
     ]
-    # Publication certifies only physical work that succeeded, and the Registry
-    # is published last.
+    # Registry certifies physical work before derived column observation reads it.
     previous = PHYSICAL_COMPLETE
     for index, stage in enumerate(stage for stage in published if stage is not None):
         stages.append(

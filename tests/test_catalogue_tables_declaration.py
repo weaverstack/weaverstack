@@ -46,6 +46,7 @@ def test_projected_catalogue_tables_have_the_declared_order():
         "FolderDictionary",
         "TableDictionary",
         "ColumnDictionary",
+        "ColumnDataType",
         "KeyDictionary",
         "ForeignKeyDictionary",
         "TestDictionary",
@@ -160,6 +161,38 @@ def test_every_column_declares_a_type_and_a_description(each: CatalogueTable):
     for column in each.columns:
         assert column.type in ("string", "boolean", "timestamp", "bigint"), column.name
         assert column.description, f"{each.name}.{column.name}"
+
+
+@weaver_test()
+def test_column_types_are_reconstructible_catalogue_data():
+    from weaver.catalogue.state import INTRODUCED_TABLES
+    from weaver.catalogue.tables import CATALOGUE_TABLES, is_protected
+    from weaver.fragments import CATALOGUE, fragment_files
+
+    assert "ColumnDataType" in {each.name for each in CATALOGUE_TABLES}
+    observed = table("ColumnDataType")
+    assert observed.key == (
+        "item_type",
+        "item_name",
+        "schema_name",
+        "object_name",
+        "column_name",
+    )
+    assert "ColumnDataType" in INTRODUCED_TABLES
+    assert not is_protected("_", "ColumnDataType")
+    source = fragment_files(CATALOGUE)["_.ColumnDataType.sql"].decode()
+    assert "Table ID: _.ColumnDataType" in source
+    assert "Prohibit rebuild: true" not in source
+    assert "Has load procedure: false" in source
+
+
+@weaver_test()
+def test_column_inventory_is_read_by_build_not_by_every_load():
+    from weaver.catalogue.state import READ_FOR_BUILD
+    from weaver.catalogue.tables import COLUMN_DATA_TYPE, READABLE_TABLES
+
+    assert COLUMN_DATA_TYPE in READ_FOR_BUILD
+    assert COLUMN_DATA_TYPE not in READABLE_TABLES
 
 
 # --- the individual shapes ---------------------------------------------------

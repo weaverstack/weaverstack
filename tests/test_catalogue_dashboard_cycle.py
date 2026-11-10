@@ -113,6 +113,7 @@ MEASURES = {
         "Log data",
         "Statistic data",
         "Metadata data",
+        "Column type data",
         "Semantic data",
         "Estate data",
     },
@@ -154,6 +155,43 @@ def measures(parts):
                 measure.expression,
             )
     return found
+
+
+@weaver_test()
+def test_er_payload_carries_compact_sql_columns_not_execution(tmp_path):
+    found = measures(dashboard_model(tmp_path).parts)
+    entity = found["Entity dictionary page"][2]
+    assert "[Column type data]" in entity
+    assert "[Lineage data]" not in entity
+    assert "[Mirror data]" not in entity
+    assert "[Node data]" not in entity
+    metadata = found["Metadata data"][2]
+    assert not re.search(r",\s*\)", metadata), (
+        "Every DAX projection argument must have a value"
+    )
+    for removed in (
+        "'Folder dictionary",
+        "'Test dictionary",
+        "[Lineage]",
+        "[Is incremental]",
+        "[Is static]",
+        "[Prohibit rebuild]",
+    ):
+        assert removed not in metadata
+    inventory = found["Column type data"][2]
+    assert "ENC(" not in inventory
+    assert '"columnowners"' in inventory and '"columntypes"' in inventory
+    assert '"owner"' in inventory and '"ordinal"' in inventory
+    assert "2000000" in inventory and '"toolarge"' in inventory
+    assert '"size"' in inventory and '"budget"' in inventory
+    for name in (
+        "Row insert datetime",
+        "Row update datetime",
+        "Row delete datetime",
+        "Row signature",
+    ):
+        assert name in inventory
+        assert name in metadata
 
 
 @weaver_test()

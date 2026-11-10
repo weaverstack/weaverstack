@@ -55,6 +55,7 @@ VALID_EXECUTORS = frozenset(
         "materialise_mirror",
         "semantic_model",
         "semantic_catalogue",
+        "column_types",
         "semantic_readback",
         "report_definition",
         "report_readback",
@@ -66,6 +67,7 @@ VALID_EXECUTORS = frozenset(
 _EXECUTOR_EXTENSION = {
     "semantic_model": ".semantic_model.json",
     "semantic_catalogue": ".semantic_catalogue.json",
+    "column_types": ".column-types.json",
     "semantic_readback": ".semantic_readback.json",
     "report_definition": ".report_definition.json",
     "report_readback": ".report_readback.json",

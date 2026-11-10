@@ -33,6 +33,7 @@ from weaver.catalogue.tables import (
     HISTORY_TABLES,
     LINEAGE_TABLES,
     LOG,
+    OBSERVED_TABLES,
     PROJECTED_TABLES,
     READABLE_TABLES,
     RUNTIME_TABLES,
@@ -77,7 +78,7 @@ def test_a_run_reads_the_bookmark_and_writes_the_rest():
     """
 
     assert set(READABLE_TABLES) == (
-        (set(PROJECTED_TABLES) - set(LINEAGE_TABLES))
+        (set(PROJECTED_TABLES) - set(LINEAGE_TABLES) - set(OBSERVED_TABLES))
         | set(BORROWED_TABLES)
         | {BOOKMARK}
     )

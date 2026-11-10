@@ -1,9 +1,9 @@
-// The ER diagram: declared keys and relationships around the selected tables.
+// The ER diagram: compact keys and relationships; inspection zooms, never filters.
 // A table's parents are the tables it references, on the primary key side, and
 // its children the tables referencing it. Relationship graphs may contain
 // cycles; every walk keeps a visited set.
 
-var ER = { NODES: 80, EXPANDED: 120, WRAP: 8, BOX: 220, HEAD: 34, ROW: 18, GAP_X: 64, GAP_ROW: 120, COLUMNS: 8 };
+var ER = { NODES: 80, EXPANDED: 120, WRAP: 8, BOX: 220, HEAD: 34, ROW: 18, GAP_X: 64, GAP_ROW: 120 };
 
 /* The declared tables and relationships of the Lakehouses and Warehouses, or
    of one of them: a relationship belongs to an item when either end is in it.
@@ -15,11 +15,12 @@ function erGraph(m, item) {
   var only = item instanceof Set ? item : item && item !== "all" ? new Set([item]) : null;
   function node(id) {
     if (nodes.has(id)) return;
-    var parts = id.split("|"), owner = m.byIdentity.get(id) || null, declared = md.tables.get(id);
+    var parts = id.split("|"), declared = md.tables.get(id), owner = entityNode(m, id, declared);
     // Primary keys travel with the table; the key table holds the others.
     var keys = declared && declared.primarykey ? [{ type: "Primary key", columns: splitList(declared.primarykey) }] : [];
     nodes.set(id, { id: id, label: owner ? owner.label : parts[1] + "." + parts[2], item: parts[0],
       columns: (md.columns.get(id) || []).map(function (c) { return c.column; }),
+      inventory: md.types.get(id) || null,
       keys: keys.concat((md.keys.get(id) || []).map(function (k) { return { type: k.type, columns: splitList(k.columns) }; })),
       owner: owner, refs: [], back: [] });
   }
@@ -87,7 +88,7 @@ function erWindow(g, selection, up, down, expanded) {
     var n = g.nodes.get(id), at = null;
     childrenOf(n).forEach(function (c) { if (rank.has(c)) at = at === null ? rank.get(c) - 1 : Math.min(at, rank.get(c) - 1); });
     if (at === null) parentsOf(n).forEach(function (p) { if (rank.has(p)) at = at === null ? rank.get(p) + 1 : Math.max(at, rank.get(p) + 1); });
-    if (at === null) return;
+    if (at === null) at = 0;
     rank.set(id, at); added.add(id);
   });
   var more = new Map(), hidden = new Set();
@@ -101,11 +102,16 @@ function erWindow(g, selection, up, down, expanded) {
     edges: g.edges.filter(function (e) { return rank.has(e.from) && rank.has(e.to); }) };
 }
 
+/* Inspection changes the viewport, never the diagram's relationship scope. */
+function erFocusWindow(g, id, expanded) {
+  var reveal = (expanded || []).filter(function (each) { return each !== id; });
+  if (id) reveal.unshift(id);
+  return erWindow(g, [], 0, 0, reveal);
+}
+
 function unique(list) { return list.filter(function (x, i) { return list.indexOf(x) === i; }); }
 
-/* A box's rows: its key and foreign key columns, the anchors its relationships
-   attach to. With columns, it also lists further columns up to ER.COLUMNS;
-   otherwise it counts them. */
+/* Physical columns keep their SQL order; absent inventory falls back to notes. */
 function erRows(n, edges, columns) {
   var keyCols = [], fkCols = [], rows = [];
   n.keys.forEach(function (k) { k.columns.forEach(function (c) { if (keyCols.indexOf(c) < 0) keyCols.push(c); }); });
@@ -113,10 +119,13 @@ function erRows(n, edges, columns) {
     if (e.from === n.id) e.fromColumns.forEach(function (c) { if (fkCols.indexOf(c) < 0) fkCols.push(c); });
     if (e.to === n.id) e.toColumns.forEach(function (c) { if (keyCols.indexOf(c) < 0 && fkCols.indexOf(c) < 0) keyCols.push(c); });
   });
+  if (columns && n.inventory) return { rows: n.inventory.map(function (c) {
+    return { name: c.column, mark: keyCols.indexOf(c.column) >= 0 ? "key" : fkCols.indexOf(c.column) >= 0 ? "fk" : "", datatype: c.datatype, nullable: c.nullable };
+  }), hidden: 0 };
   keyCols.forEach(function (c) { rows.push({ name: c, mark: "key" }); });
   fkCols.forEach(function (c) { if (keyCols.indexOf(c) < 0) rows.push({ name: c, mark: "fk" }); });
-  var rest = n.columns.filter(function (c) { return keyCols.indexOf(c) < 0 && fkCols.indexOf(c) < 0; });
-  var room = columns ? Math.max(0, ER.COLUMNS - rows.length) : 0;
+  var rest = (n.inventory ? n.inventory.map(function (c) { return c.column; }) : n.columns).filter(function (c) { return keyCols.indexOf(c) < 0 && fkCols.indexOf(c) < 0; });
+  var room = columns ? rest.length : 0;
   rest.slice(0, room).forEach(function (c) { rows.push({ name: c, mark: "" }); });
   return { rows: rows, hidden: rest.length - Math.min(room, rest.length) };
 }
@@ -154,7 +163,7 @@ function erLayout(g, win, columns) {
 }
 
 /* The ER page's workspace, framed as the Orchestration graph is: s holds
-   the selection, depths, expansions and viewport. options.item limits it to the
+   the inspection, expansions and viewport. options.item limits it to the
    relationships of a set of items; options.tools come first in its toolbar; options.onPick
    hears a table chosen in the diagram, options.describe fills the details, and
    options.matches(term) lists the tables a wildcard term selects. */
@@ -162,8 +171,7 @@ function erWorkspace(body, m, s, options) {
   var g = erGraph(m, options.item);
   s.selection = (s.selection || []).filter(function (id) { return g.nodes.has(id); });
   s.expanded = (s.expanded || []).filter(function (id) { return g.nodes.has(id); });
-  if (s.up === undefined) s.up = 1;
-  if (s.down === undefined) s.down = 1;
+  if (s.focusVersion !== 1) { s.focusVersion = 1; s.view = null; s.moved = {}; }
   s.moved = s.moved || {};
   s.patterns = s.patterns || [];
   var matched = new Map();
@@ -179,7 +187,7 @@ function erWorkspace(body, m, s, options) {
   }
   var f = workspaceFrame(s, function () {}), drawing = el("div", { "class": "wd-er-drawing" }), zoom = null, notice = null;
   function focus() { return s.selection[s.selection.length - 1] || null; }
-  function setPatterns(list) { s.patterns = list; s.expanded = []; s.moved = {}; s.view = null; notice = null; draw(); saveState(); }
+  function setPatterns(list) { s.patterns = list; notice = null; draw(); if (zoom) zoom.fitBoxes(seeds()); saveState(); }
   /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
   function select(id, adding) {
     if (!id) { s.selection = []; s.patterns = []; }
@@ -187,8 +195,10 @@ function erWorkspace(body, m, s, options) {
       var at = s.selection.indexOf(id);
       if (at >= 0) s.selection.splice(at, 1); else s.selection.push(id);
     } else s.selection = [id];
-    s.expanded = []; s.moved = {}; s.view = null; notice = null;
+    if (id) s.expanded = [id].concat(s.expanded.filter(function (each) { return each !== id; })).slice(0, ER.NODES + ER.EXPANDED);
+    notice = null;
     draw();
+    if (id && zoom) zoom.fitBoxes([id]);
     saveState();
   }
   function expand(id, side) {
@@ -198,7 +208,7 @@ function erWorkspace(body, m, s, options) {
     draw(id, before);
     saveState();
   }
-  function win() { return erWindow(g, seeds(), s.up, s.down, s.expanded); }
+  function win() { return erFocusWindow(g, focus(), seeds().concat(s.expanded)); }
   function status(w) {
     f.line.textContent = "";
     var parts = [];
@@ -247,13 +257,13 @@ function erWorkspace(body, m, s, options) {
     status(w);
     renderChips();
     if (!w) { drawing.appendChild(empty("Search for a table, or select one, to draw its relationships.")); zoom = null; return; }
-    var lay = erLayout(g, w, !!s.columns), boxes = lay.boxes, current = focus();
+    var lay = erLayout(g, w, false), boxes = lay.boxes, current = focus(), highlighted = new Set(seeds());
     Object.keys(s.moved).forEach(function (id) { var b = boxes.get(id); if (b) { b.x = s.moved[id].x; b.y = s.moved[id].y; } });
     var svg = sv("svg", { "class": "wd-er-svg", role: "img", "aria-label": "Relationship diagram" }), stage = sv("g"), lines = sv("g");
     svg.appendChild(stage);
     stage.appendChild(lines);
     var drawn = w.edges.map(function (e) {
-      var r = route(e, boxes), lit = w.seeds.has(e.from) || w.seeds.has(e.to), d = { e: e };
+      var r = route(e, boxes), lit = highlighted.has(e.from) || highlighted.has(e.to), d = { e: e };
       d.path = lines.appendChild(sv("path", { "class": "wd-er-edge" + (e.active ? "" : " wd-er-inactive") + (lit ? " wd-er-focus" : ""), d: r.d },
         [sv("title", {}, [(e.label ? e.label + ": " : "") + g.nodes.get(e.from).label + " (" + e.fromColumns.join(", ") + ") → " + g.nodes.get(e.to).label + " (" + e.toColumns.join(", ") + ")" + (e.active ? "" : " · inactive")])]));
       if (r.from) {
@@ -271,7 +281,7 @@ function erWorkspace(body, m, s, options) {
       });
     }
     boxes.forEach(function (box, id) {
-      var n = g.nodes.get(id), seed = w.seeds.has(id);
+      var n = g.nodes.get(id), seed = highlighted.has(id);
       var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + changeClass(n.owner) + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
       group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
       group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
@@ -281,9 +291,9 @@ function erWorkspace(body, m, s, options) {
         [n.owner.change === CHANGE.CHANGED ? "Δ" : "+", sv("title", {}, [CHANGE_TEXT[n.owner.change]])]));
       box.rows.forEach(function (r, i) {
         group.appendChild(sv("text", { "class": "wd-er-col" + (r.mark ? " wd-er-" + r.mark : ""), x: 12, y: ER.HEAD + i * ER.ROW + 13 },
-          [(r.mark === "key" ? "⚿ " : r.mark === "fk" ? "↗ " : "   ") + clipText(r.name, 30)]));
+          [(r.mark === "key" ? "⚿ " : r.mark === "fk" ? "↗ " : "   ") + clipText(r.name, 30), sv("title", {}, [r.name + (r.datatype ? " · " + r.datatype + (r.nullable === "1" ? " · nullable" : " · not null") : "")])]));
       });
-      if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + (box.rows.length ? " more" : "") + (box.hidden === 1 ? " described column" : " described columns")]));
+      if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + (box.rows.length ? " more" : "") + (n.inventory ? (box.hidden === 1 ? " column" : " columns") : (box.hidden === 1 ? " described column" : " described columns"))]));
       // Parents left out above the box, children below; they move with it.
       var more = w.more.get(id);
       if (more && more.up.length) group.appendChild(marker(box, id, "up", more.up.length));
@@ -342,10 +352,6 @@ function erWorkspace(body, m, s, options) {
     if (options.onPick && s.selection.indexOf(id) >= 0) options.onPick(id);
   }
   f.mount(body, (options.tools || []).concat([
-    segmented("Parents", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
-    segmented("Children", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
-    segmented("Boxes", ["keys", "columns"], s.columns ? "columns" : "keys", function (v) { s.columns = v === "columns"; draw(); saveState(); },
-      function (v) { return v === "keys" ? "Keys" : "Columns"; }),
     el("span", { "class": "wd-grow" }),
     el("div", { "class": "wd-zoom" }, [
       el("button", { "class": "wd-icon", type: "button", title: "Zoom out", "aria-label": "Zoom out", onclick: function () { if (zoom) zoom.zoomBy(0.8); } }, ["−"]),

@@ -12,6 +12,7 @@ from typing import Mapping
 from ..declaration.model import AREAS, WeaverDocumentId
 from ..errors import BuildError
 from .tables import (
+    COLUMN_DATA_TYPE,
     COLUMN_DICTIONARY,
     DEPENDENCY,
     FOLDER_DICTIONARY,
@@ -123,11 +124,13 @@ CATALOGUE_CLAIMS_BY_OBJECT_TYPE: Mapping[str, tuple[CatalogueClaimRule, ...]] = 
     ),
     "table": (
         _COMMON_OBJECT_RULES[0],
+        CatalogueClaimRule(COLUMN_DATA_TYPE),
         CatalogueClaimRule(TABLE_DICTIONARY),
         *_COMMON_OBJECT_RULES[1:],
     ),
     "view": (
         _COMMON_OBJECT_RULES[0],
+        CatalogueClaimRule(COLUMN_DATA_TYPE),
         CatalogueClaimRule(TABLE_DICTIONARY),
         *_COMMON_OBJECT_RULES[1:],
     ),

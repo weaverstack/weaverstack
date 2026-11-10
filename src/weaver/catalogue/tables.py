@@ -575,6 +575,45 @@ COLUMN_DICTIONARY = CatalogueTable(
     ),
 )
 
+COLUMN_DATA_TYPE = CatalogueTable(
+    name="ColumnDataType",
+    description="Observed SQL-endpoint columns of installed tables and views.",
+    key=(*ITEM_SCOPE_COLUMNS, "schema_name", "object_name", "column_name"),
+    columns=(
+        *_scope(),
+        *_object(),
+        CatalogueColumn("column_name", not_null=True, description="The column."),
+        CatalogueColumn(
+            "column_ordinal",
+            BIGINT,
+            not_null=True,
+            description="The SQL column ordinal.",
+        ),
+        CatalogueColumn("data_type", not_null=True, description="The SQL data type."),
+        CatalogueColumn(
+            "max_length", BIGINT, description="Maximum bytes; -1 denotes max."
+        ),
+        CatalogueColumn(
+            "numeric_precision", BIGINT, description="SQL numeric precision."
+        ),
+        CatalogueColumn(
+            "numeric_scale", BIGINT, description="SQL numeric or temporal scale."
+        ),
+        CatalogueColumn(
+            "is_nullable",
+            BOOLEAN,
+            not_null=True,
+            description="Whether SQL permits nulls.",
+        ),
+        CatalogueColumn(
+            "is_identity", BOOLEAN, description="Whether SQL generates identity values."
+        ),
+        _signature("the observed column schema"),
+    ),
+)
+
+OBSERVED_TABLES = (COLUMN_DATA_TYPE,)
+
 KEY_DICTIONARY = CatalogueTable(
     name="KeyDictionary",
     description=(
@@ -1148,6 +1187,7 @@ DICTIONARY_TABLES = (
     FOLDER_DICTIONARY,
     TABLE_DICTIONARY,
     COLUMN_DICTIONARY,
+    COLUMN_DATA_TYPE,
     KEY_DICTIONARY,
     FOREIGN_KEY_DICTIONARY,
     TEST_DICTIONARY,
@@ -1627,7 +1667,11 @@ CATALOGUE_TABLES = PROJECTED_TABLES + RUNTIME_TABLES
 #: written by runs but only read by builds; see ``state.READ_FOR_BUILD``. The
 #: lineage tables restate the graph a run derives from the rest.
 READABLE_TABLES = (
-    tuple(table for table in PROJECTED_TABLES if table not in LINEAGE_TABLES)
+    tuple(
+        table
+        for table in PROJECTED_TABLES
+        if table not in LINEAGE_TABLES + OBSERVED_TABLES
+    )
     + BORROWED_TABLES
     + (BOOKMARK,)
 )
@@ -1635,16 +1679,18 @@ READABLE_TABLES = (
 TABLES_BY_NAME = {table.name: table for table in CATALOGUE_TABLES + BORROWED_TABLES}
 
 
-#: The ``_`` schema tables no build may drop, folded for comparison. Every
-#: catalogue table holds state a rebuild cannot reproduce: projected rows belong
+#: The ``_`` schema tables no build may drop, folded for comparison. These
+#: catalogue tables hold state a rebuild cannot reproduce: projected rows belong
 #: to installations a scoped build has no authority over, and the runtime tables
 #: hold a run's own record of what it did and how far it got. All of them are
 #: declared ``Prohibit rebuild``, so selection never offers one; this is the
-#: guard behind that declaration. ``_.Mirror`` is here because nothing declares
+#: guard behind that declaration. ColumnDataType is reconstructible and excluded.
+#: ``_.Mirror`` is here because nothing declares
 #: it, so an item-scoped prune would find it in the ``_`` inventory unclaimed.
 _PROTECTED = frozenset(
     f"{CATALOGUE_SCHEMA}.{table.name}".casefold()
     for table in CATALOGUE_TABLES + BORROWED_TABLES
+    if table not in OBSERVED_TABLES
 )
 
 

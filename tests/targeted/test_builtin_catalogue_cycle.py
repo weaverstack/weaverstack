@@ -42,9 +42,11 @@ class RecordingExecutor:
     def __init__(self, name: str) -> None:
         self.name = name
         self.seen: list[str] = []
+        self.payloads = {}
 
     def execute(self, action, payload, context):
         self.seen.append(action.id)
+        self.payloads[action.id] = payload
         return {"executor": self.name}
 
 
@@ -80,6 +82,10 @@ def estate(tmp_path):
             "tsql_batch",
             "load_file",
             "runtime_state",
+            "column_types",
+            "start_sql_endpoint_table_refresh",
+            "await_sql_endpoint_refresh",
+            "await_endpoint_objects",
         )
     }
     return {
@@ -90,7 +96,7 @@ def estate(tmp_path):
     }
 
 
-def _build(estate):
+def _build(estate, *, changed=False):
     """One ordinary build against an entirely empty catalogue."""
 
     bindings = effective_item_bindings(
@@ -105,12 +111,48 @@ def _build(estate):
         )
         for binding in bindings.entries
     }
+    catalogue = Catalogue(rows={})
+    if changed:
+        from weaver.declaration.metadata import TABLE
+
+        catalogue = Catalogue(
+            rows={
+                item: {
+                    name: tuple(
+                        dict(row, signature="previous-shape")
+                        if name == "Registry" and item != BUILTIN
+                        else row
+                        for row in rows
+                    )
+                    for name, rows in tables.items()
+                }
+                for item, tables in Catalogue.from_repository(
+                    estate["repository"]
+                ).rows.items()
+            }
+        )
+        inventories = {
+            binding.item: target_inventory(
+                target_id=binding.to_bound_target().id,
+                kind=binding.to_bound_target().kind,
+                target_name=binding.to_bound_target().name,
+                tables=tuple(
+                    identity.object_id.qualified
+                    for identity, document in estate[
+                        "repository"
+                    ].source_documents.items()
+                    if identity.item == binding.item and document.kind == TABLE
+                ),
+                schemas=("_",) if binding.item == BUILTIN else ("DWG",),
+            )
+            for binding in bindings.entries
+        }
     result = build_item_repository(
         estate["repository"],
         bindings=bindings,
         # Nothing persisted, nothing present: the bootstrap state, stated as
         # state rather than arranged by a privileged step.
-        state=BuildState(catalogue=Catalogue(rows={}), target_inventories=inventories),
+        state=BuildState(catalogue=catalogue, target_inventories=inventories),
         session=estate["session"],
         executors=estate["executors"],
         source_store=estate["store"],
@@ -159,6 +201,57 @@ def test_the_catalogue_warehouse_can_also_host_an_authored_item():
 
     assert bindings.by_item[BUILTIN].target.item == curated.target.item
     assert set(bindings.by_item) == {BUILTIN, curated.item}
+
+
+@weaver_test()
+def test_column_inventory_runs_after_registry_publication(estate):
+    from weaver.graph import Graph
+
+    _bindings, result = _build(estate)
+    actions = [a for _, _, a in result.plan.actions()]
+    observed = [a for a in actions if a.executor == "column_types"]
+    assert len(observed) == 1
+    collector = observed[0]
+    graph = Graph(
+        (a.id for a in actions), ((dep, a.id) for a in actions for dep in a.depends_on)
+    )
+    registry = next(a for a in actions if a.kind == "publish_registry")
+    dictionaries = next(a for a in actions if a.id == "publish-catalogue")
+    assert dictionaries.id in graph.ancestors(collector.id)
+    assert registry.id in graph.ancestors(collector.id)
+    for action in actions:
+        if action.kind == BUILD_TABLE:
+            assert action.id in graph.ancestors(collector.id)
+    spec = json.loads(estate["executors"]["column_types"].payloads[collector.id])
+    assert "Lakehouse/Sales" in spec["items"]
+    assert collector.resources == (
+        f"warehouse:{next(t.item_id for t in result.plan.targets if t.id == collector.target_id)}",
+    )
+
+
+@weaver_test()
+@pytest.mark.parametrize("changed", [False, True])
+def test_column_inventory_retains_and_waits_for_lakehouse_endpoint_refresh(
+    estate, changed
+):
+    from weaver.graph import Graph
+
+    _, result = _build(estate, changed=changed)
+    actions = [a for _, _, a in result.plan.actions()]
+    graph = Graph(
+        (a.id for a in actions), ((d, a.id) for a in actions for d in a.depends_on)
+    )
+    collector = next(a for a in actions if a.executor == "column_types")
+    refresh = next(a for a in actions if a.kind == "await_sql_endpoint_refresh")
+    visible = next(a for a in actions if a.executor == "await_endpoint_objects")
+    assert refresh.id in graph.ancestors(visible.id)
+    assert visible.id in graph.ancestors(collector.id)
+    started = next(
+        a for a in actions if a.executor == "start_sql_endpoint_table_refresh"
+    )
+    assert started.payload.endswith(".endpoint-tables.json")
+    payload = json.loads(estate["executors"][visible.executor].payloads[visible.id])
+    assert payload["objects"] == [["Sales_LH", "DWG", "Customer"]]
 
 
 # --- and the ordinary planner creates the catalogue from nothing --------------
@@ -230,7 +323,11 @@ def test_empty_registry_recovers_existing_protected_catalogue_tables(estate, tmp
         and action.resource_node_id.startswith(f"{BUILTIN}/")
         and action.kind in {DROP_TABLE, BUILD_TABLE}
     ]
-    assert [action.resource_node_id for action in physical] == [f"{BUILTIN}/{missing}"]
+    assert {(action.kind, action.resource_node_id) for action in physical} == {
+        (BUILD_TABLE, f"{BUILTIN}/{missing}"),
+        (DROP_TABLE, f"{BUILTIN}/_.ColumnDataType"),
+        (BUILD_TABLE, f"{BUILTIN}/_.ColumnDataType"),
+    }
     retained = {
         identity
         for identity in build_metadata(bundle.plan).selection.prohibited
@@ -238,7 +335,7 @@ def test_empty_registry_recovers_existing_protected_catalogue_tables(estate, tmp
     }
     assert {identity.object_id.qualified for identity in retained} == set(
         catalogue_tables
-    ) - {missing}
+    ) - {missing, "_.ColumnDataType"}
 
     registry = next(
         action
@@ -302,7 +399,9 @@ def test_a_build_creates_the_graph_tables_an_older_catalogue_lacks(estate, tmp_p
         and action.resource_node_id.startswith(f"{BUILTIN}/")
         and action.kind in {DROP_TABLE, BUILD_TABLE}
     }
-    assert created == {f"{BUILTIN}/{name}" for name in introduced}
+    assert created == {
+        f"{BUILTIN}/{name}" for name in introduced | {"_.ColumnDataType"}
+    }
 
 
 @weaver_test()

@@ -40,6 +40,7 @@ RELATIONS = {
     "Table dictionary": "TableDictionary",
     "Folder dictionary": "FolderDictionary",
     "Column dictionary": "ColumnDictionary",
+    "Column data type": "ColumnDataType",
     "Key dictionary": "KeyDictionary",
     "Foreign key dictionary": "ForeignKeyDictionary",
     "Semantic model": "SemanticModel",
@@ -51,8 +52,9 @@ RELATIONS = {
     "Mirror": "Mirror",
 }
 #: Relations a catalogue holds only once something has happened to it: a
-#: catalogue that has never been a mirror has no ``_.Mirror``.
-OPTIONAL = frozenset({"Mirror"})
+#: catalogue that has never been a mirror has no ``_.Mirror``; an older one has
+#: no observed column inventory until its next ordinary Build.
+OPTIONAL = frozenset({"Mirror", "ColumnDataType"})
 
 #: The table behind the Filters pane: one row per installed object, and per
 #: item with none, as deployment read the catalogues.

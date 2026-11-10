@@ -748,47 +748,29 @@ table 'Dashboard measures'
         ```
         displayFolder: Data
 
-    /// Declared schemas, tables, views, folders, columns, keys, relationships and validations.
+    /// Registered tables/views and their relational dictionary, without execution state.
     measure 'Metadata data' = ```
         VAR _f = UNICHAR(57345)
         VAR _r = UNICHAR(57346)
         VAR _t = UNICHAR(57347)
         VAR _q = UNICHAR(57348)
         VAR _schemas = CATALOGUES('Schema dictionary', "@item", 'Schema dictionary'[Item type] & "/" & 'Schema dictionary'[Item name], "@schema", 'Schema dictionary'[Schema name], "@description", LEFT('Schema dictionary'[Description], 1000))
-        VAR _tables = CATALOGUES(
+        VAR _rawTables = CATALOGUES(
             'Table dictionary',
             "@item", 'Table dictionary'[Item type] & "/" & 'Table dictionary'[Item name],
             "@schema", 'Table dictionary'[Schema name],
             "@object", 'Table dictionary'[Object name],
             "@type", 'Table dictionary'[Object type],
             "@description", LEFT('Table dictionary'[Description], 1000),
-            "@lineage", LEFT('Table dictionary'[Lineage], 1000),
-            "@primarykey", 'Table dictionary'[Primary key],
-            "@notnull", 'Table dictionary'[Not null columns],
-            "@identity", 'Table dictionary'[Identity column],
-            "@incremental", IF('Table dictionary'[Is incremental], "1"),
-            "@static", IF('Table dictionary'[Is static], "1"),
-            "@prohibit", IF('Table dictionary'[Prohibit rebuild], "1")
-        )
-        VAR _folders = CATALOGUES(
-            'Folder dictionary',
-            "@item", 'Folder dictionary'[Item type] & "/" & 'Folder dictionary'[Item name],
-            "@schema", 'Folder dictionary'[Schema name],
-            "@object", 'Folder dictionary'[Object name],
-            "@description", LEFT('Folder dictionary'[Description], 1000),
-            "@lineage", LEFT('Folder dictionary'[Lineage], 1000),
-            "@filekey", 'Folder dictionary'[File key],
-            "@incremental", IF('Folder dictionary'[Is incremental], "1"),
-            "@static", IF('Folder dictionary'[Is static], "1")
+            "@primarykey", 'Table dictionary'[Primary key]
         )
         VAR _columns = CATALOGUES(
-            'Column dictionary',
+            'Column dictionary' WHERE NOT(SUBSTITUTE('Column dictionary'[Column name], "_", " ") IN {"Row insert datetime", "Row update datetime", "Row delete datetime", "Row signature"}),
             "@item", 'Column dictionary'[Item type] & "/" & 'Column dictionary'[Item name],
             "@schema", 'Column dictionary'[Schema name],
             "@object", 'Column dictionary'[Object name],
             "@column", 'Column dictionary'[Column name],
-            "@description", LEFT('Column dictionary'[Description], 400),
-            "@identity", IF('Column dictionary'[Is identity], "1")
+            "@description", LEFT('Column dictionary'[Description], 400)
         )
         VAR _keys = CATALOGUES(
             'Key dictionary' WHERE 'Key dictionary'[Key type] <> "Primary key",
@@ -809,39 +791,28 @@ table 'Dashboard measures'
             "@primaryobject", 'Foreign key dictionary'[Primary object name],
             "@primarycolumns", 'Foreign key dictionary'[Primary column set]
         )
-        VAR _validations = CATALOGUES(
-            'Test dictionary',
-            "@item", 'Test dictionary'[Item type] & "/" & 'Test dictionary'[Item name],
-            "@schema", 'Test dictionary'[Schema name],
-            "@object", 'Test dictionary'[Object name],
-            "@type", 'Test dictionary'[Test type],
-            "@description", LEFT('Test dictionary'[Description], 1000),
-            "@primarykey", 'Test dictionary'[Primary key]
-        )
+        VAR _registered = CATALOGUES('Registry' WHERE 'Registry'[Object role] = "Data", "@item", 'Registry'[Item type] & "/" & 'Registry'[Item name], "@schema", 'Registry'[Schema name], "@object", 'Registry'[Object name])
+        VAR _tables = FILTER(_rawTables, VAR _code = [@code] VAR _item = [@item] VAR _schema = [@schema] VAR _object = [@object] RETURN ([@type] = "Table" || [@type] = "View") && COUNTROWS(FILTER(_registered, [@code] = _code && [@item] = _item && [@schema] = _schema && [@object] = _object)) > 0)
+        VAR _registeredPointers = CATALOGUES('Registry' WHERE 'Registry'[Object role] = "Shortcut", "@item", 'Registry'[Item type] & "/" & 'Registry'[Item name], "@schema", 'Registry'[Schema name], "@object", 'Registry'[Object name])
+        VAR _rawPointers = CATALOGUES('Shortcut' WHERE 'Shortcut'[Shortcut type] IN {"Table", "View", "Schema"}, "@item", 'Shortcut'[Item type] & "/" & 'Shortcut'[Item name], "@schema", 'Shortcut'[Schema name], "@object", 'Shortcut'[Object name], "@type", 'Shortcut'[Shortcut type])
+        VAR _pointers = FILTER(_rawPointers, VAR _code = [@code] VAR _item = [@item] VAR _schema = [@schema] VAR _object = [@object] RETURN COUNTROWS(FILTER(_registeredPointers, [@code] = _code && [@item] = _item && [@schema] = _schema && [@object] = _object)) > 0)
+        VAR _borrowed = CATALOGUES('Mirror' WHERE 'Mirror'[Row delete datetime] >= DATE(9999, 12, 31), "@item", 'Mirror'[Item type] & "/" & 'Mirror'[Item name], "@schema", 'Mirror'[Schema name], "@object", 'Mirror'[Object name])
         RETURN
             _t & "schemas" & _f & "item" & _f & "schema" & _f & "description"
             & CONCATENATEX(_schemas, _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@description], "")
-            & _t & "tables" & _f & "item" & _f & "schema" & _f & "object" & _f & "type" & _f & "description" & _f & "lineage" & _f & "primarykey" & _f & "notnull" & _f & "identity" & _f & "incremental" & _f & "static" & _f & "prohibitrebuild"
+            & _t & "tables" & _f & "item" & _f & "schema" & _f & "object" & _f & "type" & _f & "description" & _f & "primarykey"
             & CONCATENATEX(
                 _tables,
                 _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object]
-                    & _f & [@type] & _f & [@description] & _f & [@lineage]
-                    & _f & [@primarykey] & _f & [@notnull] & _f & [@identity]
-                    & _f & [@incremental] & _f & [@static] & _f & [@prohibit],
+                    & _f & [@type] & _f & [@description]
+                    & _f & [@primarykey]
+                   ,
                 ""
             )
-            & _t & "folders" & _f & "item" & _f & "schema" & _f & "object" & _f & "description" & _f & "lineage" & _f & "filekey" & _f & "incremental" & _f & "static"
-            & CONCATENATEX(
-                _folders,
-                _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object]
-                    & _f & [@description] & _f & [@lineage] & _f & [@filekey]
-                    & _f & [@incremental] & _f & [@static],
-                ""
-            )
-            & _t & "columns" & _f & "item" & _f & "schema" & _f & "object" & _f & "column" & _f & "description" & _f & "identity"
+            & _t & "columns" & _f & "item" & _f & "schema" & _f & "object" & _f & "column" & _f & "description"
             & CONCATENATEX(
                 _columns,
-                _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object] & _f & [@column] & _f & [@description] & _f & [@identity],
+                _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object] & _f & [@column] & _f & [@description],
                 ""
             )
             & _t & "keys" & _f & "item" & _f & "schema" & _f & "object" & _f & "type" & _f & "columns"
@@ -853,12 +824,29 @@ table 'Dashboard measures'
                     & _f & [@primaryitem] & _q & [@code] & _f & [@primaryschema] & _f & [@primaryobject] & _f & [@primarycolumns],
                 ""
             )
-            & _t & "validations" & _f & "item" & _f & "schema" & _f & "object" & _f & "type" & _f & "description" & _f & "primarykey"
-            & CONCATENATEX(
-                _validations,
-                _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object] & _f & [@type] & _f & [@description] & _f & [@primarykey],
-                ""
-            )
+            & _t & "borrowed" & _f & "item" & _f & "schema" & _f & "object"
+            & CONCATENATEX(_borrowed, _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object], "")
+            & _t & "entityshortcuts" & _f & "item" & _f & "schema" & _f & "object" & _f & "type"
+            & CONCATENATEX(_pointers, _r & [@item] & _q & [@code] & _f & [@schema] & _f & [@object] & _f & [@type], "")
+        ```
+        displayFolder: Data
+
+    /// Full SQL columns use one owner identity per object; audit fields stay in the catalogue.
+    measure 'Column type data' = ```
+        VAR _t = UNICHAR(57347)
+        VAR _f = UNICHAR(57345)
+        VAR _r = UNICHAR(57346)
+        VAR _q = UNICHAR(57348)
+        VAR _inventory = CATALOGUES('Column data type' WHERE NOT(SUBSTITUTE('Column data type'[Column name], "_", " ") IN {"Row insert datetime", "Row update datetime", "Row delete datetime", "Row signature"}), "@item", 'Column data type'[Item type] & "/" & 'Column data type'[Item name], "@schema", 'Column data type'[Schema name], "@object", 'Column data type'[Object name], "@column", 'Column data type'[Column name], "@ordinal", 'Column data type'[Column ordinal], "@datatype", 'Column data type'[Data type], "@nullable", 'Column data type'[Is nullable], "@identity", 'Column data type'[Is identity])
+        VAR _owners = DISTINCT(SELECTCOLUMNS(_inventory, "@key", [@code] & _f & [@item] & _f & [@schema] & _f & [@object], "@code", [@code], "@item", [@item], "@schema", [@schema], "@object", [@object]))
+        VAR _ranked = ADDCOLUMNS(_owners, "@owner", RANKX(_owners, [@key], , ASC, DENSE))
+        VAR _ownerRows = ADDCOLUMNS(_ranked, "@row", _r & [@owner] & _f & [@item] & _q & [@code] & _f & [@schema] & _f & [@object])
+        VAR _columnRows = ADDCOLUMNS(_inventory, "@row", VAR _key = [@code] & _f & [@item] & _f & [@schema] & _f & [@object] VAR _owner = MAXX(FILTER(_ranked, [@key] = _key), [@owner]) RETURN _r & _owner & _f & [@column] & _f & [@ordinal] & _f & [@datatype] & _f & IF([@nullable], "1", "0") & _f & IF([@identity], "1", "0"))
+        VAR _ownerHeader = _t & "columnowners" & _f & "owner" & _f & "item" & _f & "schema" & _f & "object"
+        VAR _columnHeader = _t & "columntypes" & _f & "owner" & _f & "column" & _f & "ordinal" & _f & "datatype" & _f & "nullable" & _f & "identity"
+        VAR _size = LEN(_ownerHeader) + LEN(_columnHeader) + SUMX(_ownerRows, LEN([@row])) + SUMX(_columnRows, LEN([@row]))
+        RETURN IF(_size > 2000000, _t & "toolarge" & _f & "size" & _f & "budget" & _r & _size & _f & "2000000",
+            _ownerHeader & CONCATENATEX(_ownerRows, [@row], "") & _columnHeader & CONCATENATEX(_columnRows, [@row], ""))
         ```
         displayFolder: Data
 
@@ -1078,7 +1066,7 @@ table 'Dashboard measures'
         displayFolder: Pages
 
     /// The Entity dictionary page for HTML Content.
-    measure 'Entity dictionary page' = PAGE("entities", [Catalogue data] & [Lineage data] & [Mirror data] & [Metadata data])
+    measure 'Entity dictionary page' = PAGE("entities", [Catalogue data] & [Metadata data] & [Column type data])
         displayFolder: Pages
 
     /// The Semantic model page for HTML Content.

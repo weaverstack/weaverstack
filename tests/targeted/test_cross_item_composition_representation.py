@@ -227,5 +227,14 @@ def test_the_catalogue_is_published_after_both_sides_are_built(plan):
     assert all(
         runs_before(plan, action.id, published)
         for _s, _b, action in plan.actions()
-        if action.id not in {published, "complete-build"}
+        if action.id
+        not in {
+            published,
+            "complete-build",
+            "collect-column-types",
+            "await-column-endpoint-objects",
+        }
     )
+    assert runs_before(plan, published, "collect-column-types")
+    assert runs_before(plan, published, "await-column-endpoint-objects")
+    assert runs_before(plan, "await-column-endpoint-objects", "collect-column-types")

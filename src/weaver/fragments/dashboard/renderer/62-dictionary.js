@@ -1,15 +1,19 @@
 // The declared metadata, indexed once, and the Dictionary page.
 
+function auditColumn(name) {
+  return ["row insert datetime", "row update datetime", "row delete datetime", "row signature"].indexOf(String(name || "").toLowerCase().replace(/_/g, " ")) >= 0;
+}
+
 function metadata(m) {
   if (m.meta) return m.meta;
   var t = function (name) { return m.tables[name] || []; };
   function keep(r) { return !isInternal(m, r.item, r.schema); }
-  var md = { tables: new Map(), folders: new Map(), schemas: [], columns: new Map(), keys: new Map(), validations: new Map(),
+  var md = { tables: new Map(), folders: new Map(), schemas: [], borrowed: new Set(), columns: new Map(), types: new Map(), keys: new Map(), validations: new Map(),
     foreignKeys: [], references: new Map(), referencedBy: new Map(), models: new Map(), hasMetadata: !!m.tables.tables, hasSemantic: !!m.tables.models };
   t("tables").filter(keep).forEach(function (r) { md.tables.set(identityKey(r.item, r.schema, r.object), r); });
   t("folders").filter(keep).forEach(function (r) { md.folders.set(identityKey(r.item, r.schema, r.object), r); });
   md.schemas = t("schemas").filter(keep);
-  t("columns").filter(keep).forEach(function (r) { addTo(md.columns, identityKey(r.item, r.schema, r.object), r); });
+  t("columns").filter(keep).filter(function (r) { return !auditColumn(r.column); }).forEach(function (r) { addTo(md.columns, identityKey(r.item, r.schema, r.object), r); });
   t("keys").filter(keep).forEach(function (r) { addTo(md.keys, identityKey(r.item, r.schema, r.object), r); });
   t("validations").filter(keep).forEach(function (r) { md.validations.set(identityKey(r.item, r.schema, r.object), r); });
   t("foreignkeys").filter(keep).forEach(function (r) {
@@ -19,6 +23,15 @@ function metadata(m) {
     addTo(md.references, fk.from, fk); addTo(md.referencedBy, fk.to, fk);
   });
   md.columns.forEach(function (list) { list.sort(function (a, b) { return compare(a.column, b.column); }); });
+  var owners = new Map(t("columnowners").map(function (r) { return [r.owner, identityKey(r.item, r.schema, r.object)]; }));
+  t("columntypes").forEach(function (r) {
+    var id = owners.get(r.owner);
+    if (!id || !md.tables.has(id) || auditColumn(r.column)) return;
+    var note = (md.columns.get(id) || []).filter(function (c) { return c.column === r.column; })[0];
+    addTo(md.types, id, Object.assign({}, r, { ordinal: num(r.ordinal), description: note ? note.description : "" }));
+  });
+  md.types.forEach(function (list) { list.sort(function (a, b) { return a.ordinal - b.ordinal; }); });
+  t("borrowed").forEach(function (r) { md.borrowed.add(identityKey(r.item, r.schema, r.object)); });
 
   function model(item) {
     var it = m.items.get(item);
@@ -75,8 +88,7 @@ function modelTables(mo, order) {
   return list;
 }
 
-/* Every searchable entry: items, objects, declared columns and, for semantic
-   models, tables, columns and measures. */
+/* Searchable items and objects, plus semantic tables, columns and measures. */
 function dictionaryEntries(m) {
   if (m.entries) return m.entries;
   var md = metadata(m), out = [];
@@ -87,12 +99,7 @@ function dictionaryEntries(m) {
   m.nodes.forEach(function (n) {
     out.push({ kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc, item: n.item, ref: n, qualified: qualified(n) });
   });
-  md.columns.forEach(function (list, id) {
-    var owner = m.byIdentity.get(id);
-    list.forEach(function (c) {
-      out.push({ kind: "Column", label: c.column, meta: "Column · " + (owner ? owner.label : c.schema + "." + c.object) + " · " + shownItem(c.item), desc: c.description || "", item: c.item, ref: c, owner: owner });
-    });
-  });
+
   md.models.forEach(function (mo) {
     mo.tables.forEach(function (tb) {
       out.push({ kind: "Semantic table", label: tb.name, meta: "Semantic table · " + mo.name, desc: tb.description || "", item: mo.item, ref: tb });
@@ -131,37 +138,61 @@ function searchEntries(entries, query, kind) {
     }
     found.push({ e: e, score: terms.length ? score : 0 });
   });
-  // With no search, items and objects come before the columns and measures inside them.
+  // Items and objects come before semantic columns and measures.
   found.sort(function (a, b) {
     return b.score - a.score || entryRank(a.e) - entryRank(b.e) || compare(a.e.label, b.e.label) || compare(a.e.meta, b.e.meta);
   });
   return found.map(function (f) { return f.e; });
 }
 
-var ENTRY_RANK = { "Item": 0, "Semantic table": 2, "Column": 3, "Semantic column": 3, "Measure": 3 };
+var ENTRY_RANK = { "Item": 0, "Semantic table": 2, "Semantic column": 3, "Measure": 3 };
 
 function entryRank(e) { return e.kind in ENTRY_RANK ? ENTRY_RANK[e.kind] : 1; }
 
-var ENTITY_KINDS = ["All", "Item", "Table", "View", "Folder", "Shortcut", "Test", "Assumption", "Column"];
+function entityNode(m, id, declared) {
+  var parts = id.split("|"), existing = m.byIdentity.get(id);
+  if (existing) return existing;
+  var shortcut = (m.tables.entityshortcuts || []).some(function (r) {
+    return r.item === parts[0] && (/^schema$/i.test(r.type)
+      ? (r.schema ? r.schema + "/" : "") + r.object === parts[1]
+      : r.schema === parts[1] && r.object === parts[2]);
+  });
+  return { id: id, key: id, item: parts[0], schema: parts[1], object: parts[2],
+    label: parts[1].replace(/^Tables\//, "") + "." + parts[2],
+    kind: shortcut ? KIND.SHORTCUT : declared && /^view$/i.test(declared.type) ? KIND.VIEW : KIND.TABLE,
+    desc: declared && declared.description || "", change: metadata(m).borrowed.has(id) ? CHANGE.BORROWED : null };
+}
+
+function entityEntries(m) {
+  var md = metadata(m), out = [];
+  erGraph(m, "all").nodes.forEach(function (node) {
+    var n = node.owner, declared = md.tables.get(node.id);
+    var e = { kind: n.kind === KIND.SHORTCUT ? "Shortcut" : declared && /^view$/i.test(declared.type) ? "View" : "Table",
+      label: n.label, meta: shownItem(n.item), desc: declared && declared.description || "", item: n.item, ref: n };
+    e.lower = e.label.toLowerCase(); e.nameLower = n.object.toLowerCase(); e.metaLower = e.meta.toLowerCase(); e.descLower = e.desc.toLowerCase();
+    out.push(e);
+  });
+  return out;
+}
+
+var ENTITY_KINDS = ["All", "Table", "View", "Shortcut"];
 var SEMANTIC_TYPES = ["SemanticModel", "Report"];
 
 /* The meaning of the landed and curated data: the declared relationships
    between Lakehouse and Warehouse objects, and their dictionary. The Semantic
    model page is its counterpart for models. */
 function entitiesPage(body, m) {
-  var s = pageState("entities"), md = metadata(m);
-  s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
+  var s = pageState("entities");
+  s.kind = ENTITY_KINDS.indexOf(s.kind) >= 0 ? s.kind : "All"; s.query = s.query || ""; s.er = s.er || {};
   var pick = pageItems(m, "entities", DETAIL_KINDS, false), chosen = pick.set;
-  var entries = dictionaryEntries(m).filter(function (e) {
-    return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
-  });
+  var allEntries = entityEntries(m), scope = erGraph(m, chosen).nodes;
+  var entries = allEntries.filter(function (e) { return scope.has(e.ref.id); });
   var counts = {};
   entries.forEach(function (e) { counts[e.kind] = (counts[e.kind] || 0) + 1; });
-  // Columns are listed when asked for; the default list is of items and objects.
-  var browsed = entries.filter(function (e) { return e.kind !== "Column"; });
+
   var picker = pick.chooser;
   var search = searchBox({
-    placeholder: "Search " + fmt(entries.length) + " tables, views, folders and columns · * matches any text · Shift adds",
+    placeholder: "Search " + fmt(entries.length) + " tables and views · * matches any text · Shift adds",
     find: function (q) {
       return q.trim() ? searchEntries(entries, q, "All").slice(0, 12).map(function (e) { return { kind: e.kind, label: e.label, meta: e.meta, desc: e.desc, entry: e }; }) : [];
     },
@@ -170,41 +201,43 @@ function entitiesPage(body, m) {
   });
 
   var er = erWorkspace(body, m, s.er, { item: chosen, tools: [picker, search], describe: renderSide,
-    // A wildcard term selects the objects it names; a column's table joins only by name.
+    // A wildcard term selects the objects it names.
     matches: function (q) { return searchEntries(entries, q, "All").filter(function (e) { return e.ref && e.ref.key; }).map(function (e) { return e.ref.id; }); },
     onPick: function (id) {
     var entry = tableEntry(id);
     s.selected = entry ? entryId(entry) : null;
-    renderSide(); renderList(); renderDetail();
+    renderSide(); renderList();
     saveState();
   } });
 
   var facets = el("div", { "class": "wd-facets", role: "radiogroup", "aria-label": "Entry kind" });
-  var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(browsed.length) + " entries by name, kind or description; choose Column for columns · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
-  var list = el("div", { "class": "wd-entry-list", role: "listbox" }), detail = el("div", { "class": "wd-entry-detail" }), note = el("div", { "class": "wd-status-line" });
-  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, pageKey(m), el("div", { "class": "wd-dictionary" }, [list, detail])]));
+  var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(entries.length) + " entries by name, kind or description · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
+  var list = el("div", { "class": "wd-entry-list", role: "listbox" }), note = el("div", { "class": "wd-status-line" });
+  var detail = el("div", { "class": "wd-entry-detail", "aria-label": "Table definition" });
+  body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note,
+    el("div", { "class": "wd-dictionary" }, [list, detail])]));
   function tableEntry(id) { return entries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0] || null; }
   function tableOf(e) {
     if (e.ref && e.ref.key) return e.ref.id;
-    if (e.kind === "Column") return identityKey(e.ref.item, e.ref.schema, e.ref.object);
+
     return null;
   }
-  function current() { return entries.filter(function (e) { return entryId(e) === s.selected; })[0] || null; }
+  function current() { return allEntries.filter(function (e) { return entryId(e) === s.selected; })[0] || null; }
   function renderFacets() {
     facets.textContent = "";
     ENTITY_KINDS.forEach(function (k) {
       if (k !== "All" && !counts[k]) return;
       facets.appendChild(el("button", { type: "button", role: "radio", "class": "wd-facet", "aria-checked": String(s.kind === k),
         onclick: function () { s.kind = k; renderFacets(); renderList(); saveState(); } },
-        [k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? browsed.length : counts[k]) })]));
+        [k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? entries.length : counts[k]) })]));
     });
   }
   function renderList() {
-    var found = searchEntries(s.kind === "Column" ? entries : browsed, s.query, s.kind), shown = found.slice(0, 100);
+    var found = searchEntries(entries, s.query, s.kind), shown = found.slice(0, 100);
     list.textContent = "";
     note.textContent = found.length > 100 ? "Showing the first 100 of " + fmt(found.length) + " matches. Refine the filter to narrow them." : fmt(found.length) + (found.length === 1 ? " match" : " matches");
     shown.forEach(function (e) {
-      var n = e.ref && e.ref.key ? e.ref : e.owner;
+      var n = e.ref;
       list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry" + changeClass(n), "aria-selected": String(s.selected === entryId(e)),
         onclick: function () { choose(e, false); } }, [
         el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label, e.ref && e.ref.key ? changeMark(e.ref) : null]),
@@ -214,114 +247,75 @@ function entitiesPage(body, m) {
     });
     if (!shown.length) list.appendChild(empty("Nothing matches. Try fewer words, or another kind."));
   }
-  /* An entry chosen anywhere on the page shows in both details panels, and its
-     table in the diagram when the table has relationships. */
+  /* One selection: SQL columns beside the graph, meaning and links below it. */
   function choose(e, adding) {
     s.selected = entryId(e);
     var id = tableOf(e);
     if (id && er.has(id)) er.select(id, adding);
     else if (id) er.say(e.label + " is not a declared table in the items shown");
-    renderSide(); renderList(); renderDetail();
+    renderSide(); renderList();
     saveState();
   }
   function renderSide(panel) {
     panel = panel || er.side;
     var e = current();
-    if (e) entryDetail(panel, m, md, e, function (other) { choose(other, false); });
-    else { panel.textContent = ""; panel.appendChild(empty("Search for a table, or select one in the diagram, to see its definition, keys and columns.")); }
+    if (e) entityDetail(panel, m, e, function (other) { choose(other, false); }, "columns");
+    else { panel.textContent = ""; panel.appendChild(empty("Select a table to preview its SQL columns.")); }
+    if (detail) {
+      if (e) entityDetail(detail, m, e, function (other) { choose(other, false); }, "summary");
+      else { detail.textContent = ""; detail.appendChild(empty("Select a table to see its definition, keys and relationships.")); }
+    }
   }
-  function renderDetail() {
-    var e = current();
-    if (e) entryDetail(detail, m, md, e, function (other) { choose(other, false); });
-    else { detail.textContent = ""; detail.appendChild(empty("Select an entry to see its definition, keys, columns and lineage.")); }
-  }
+
   input.addEventListener("input", function () { s.query = input.value; renderList(); saveState(); });
-  renderFacets(); renderList(); renderDetail();
+  renderFacets(); renderList(); renderSide();
 }
 
 function entryId(e) {
   if (e.kind === "Item") return "item|" + e.item;
   if (e.ref && e.ref.key) return "node|" + e.ref.key;
-  if (e.kind === "Column") return "col|" + identityKey(e.ref.item, e.ref.schema, e.ref.object) + "|" + e.ref.column;
+
   if (e.kind === "Semantic table") return "smt|" + e.item + "|" + e.ref.name;
   return e.kind + "|" + e.item + "|" + (e.table ? e.table.name : "") + "|" + e.label;
 }
 
-function entryDetail(panel, m, md, e, select) {
+function entityDetail(panel, m, e, select, mode) {
   panel.textContent = "";
-  var entries = dictionaryEntries(m);
-  function find(kind, test) { return entries.filter(function (x) { return x.kind === kind && test(x); })[0]; }
-  function openNode(key) {
-    var x = entries.filter(function (y) { return y.ref && y.ref.key === key; })[0];
-    if (x) select(x);
+  var md = metadata(m), n = e.ref, declared = md.tables.get(n.id) || {}, entries = entityEntries(m);
+  panel.appendChild(el("div", { "class": "wd-eyebrow", text: e.kind }));
+  panel.appendChild(el("h2", { "class": "wd-detail-title", text: e.label }));
+  panel.appendChild(el("div", { "class": "wd-muted", text: shownItem(e.item) }));
+  if (mode !== "columns" && declared.description) panel.appendChild(el("p", { "class": "wd-desc", text: declared.description }));
+  var keys = (declared.primarykey ? [{ type: "Primary key", columns: declared.primarykey }] : []).concat(md.keys.get(n.id) || []);
+  if (mode !== "columns" && keys.length) {
+    panel.appendChild(el("h3", { "class": "wd-h3", text: "Keys" }));
+    panel.appendChild(el("ul", { "class": "wd-list wd-mono" }, keys.map(function (k) { return el("li", { text: k.type + " (" + k.columns + ")" }); })));
   }
-  if (e.kind === "Item") {
-    var it = e.ref;
-    panel.appendChild(el("div", { "class": "wd-eyebrow", text: it.type }));
-    panel.appendChild(el("h2", { "class": "wd-detail-title", text: it.name }));
-    var facts = el("dl", { "class": "wd-facts" });
-    [["Fabric item", it.target], ["Workspace", it.workspace], ["Weaver version", it.version], ["Objects", fmt(it.nodes.length)]].forEach(function (f) {
-      if (f[1]) { facts.appendChild(el("dt", { text: f[0] })); facts.appendChild(el("dd", { text: f[1] })); }
-    });
-    panel.appendChild(facts);
-    var schemas = md.schemas.filter(function (r) { return r.item === it.label; });
-    if (schemas.length) {
-      panel.appendChild(el("h3", { "class": "wd-h3", text: "Schemas" }));
-      panel.appendChild(el("dl", { "class": "wd-columns" }, schemas.reduce(function (a, r) { return a.concat([el("dt", { text: r.schema }), el("dd", { text: r.description || "" })]); }, [])));
+  if (mode !== "summary") {
+    var columns = md.types.get(n.id), notes = md.columns.get(n.id) || [];
+    if (!columns) {
+      panel.appendChild(el("p", { "class": "wd-note", text: "SQL column inventory unavailable. Build this item to collect it." }));
+      columns = notes;
     }
-    panel.appendChild(el("h3", { "class": "wd-h3", text: "Objects" }));
-    panel.appendChild(el("ul", { "class": "wd-list" }, it.nodes.slice(0, 200).map(function (n) { return el("li", {}, [nodeLink(m, n.key, openNode)]); })));
-    return;
-  }
-  if (e.ref && e.ref.key) {
-    var n = e.ref;
-    details(panel, m, n.key, { onOpen: openNode, columns: md.columns });
-    var declared = md.tables.get(n.id) || md.folders.get(n.id), validation = md.validations.get(n.id);
-    if (declared) {
-      var facts2 = el("dl", { "class": "wd-facts" });
-      [["Primary key", declared.primarykey], ["Not null", declared.notnull], ["Identity column", declared.identity], ["File key", declared.filekey],
-        ["Incremental", declared.incremental ? "Yes" : null], ["Prohibit rebuild", declared.prohibitrebuild ? "Yes" : null]].forEach(function (f) {
-        if (f[1]) { facts2.appendChild(el("dt", { text: f[0] })); facts2.appendChild(el("dd", { "class": "wd-mono", text: f[1] })); }
-      });
-      panel.insertBefore(facts2, panel.querySelector(".wd-h3"));
-      if (declared.lineage) panel.insertBefore(el("p", { "class": "wd-lineage-text" }, [el("b", { text: "Lineage. " }), declared.lineage]), facts2.nextSibling);
+    if (columns.length) {
+      panel.appendChild(el("h3", { "class": "wd-h3", text: (md.types.has(n.id) ? "Columns" : "Described columns") + " · " + columns.length }));
+      panel.appendChild(dataTable([
+        { key: "ordinal", title: "#", value: function (c) { return c.ordinal; }, numeric: true, sortable: false },
+        { key: "column", title: "Column", value: function (c) { return c.column; }, sortable: false },
+        { key: "datatype", title: "SQL type", value: function (c) { return c.datatype || "—"; }, sortable: false },
+        { key: "nullable", title: "Nullable", value: function (c) { return c.nullable === null || c.nullable === undefined ? "—" : c.nullable === "1" ? "Yes" : "No"; }, sortable: false },
+        { key: "description", title: "Description", value: function (c) { return c.description || ""; }, sortable: false }
+      ], columns, { limit: columns.length, sort: null }));
     }
-    if (validation && validation.primarykey) panel.appendChild(el("p", { "class": "wd-muted", text: "Correlation key: " + validation.primarykey }));
-    var keys = md.keys.get(n.id) || [], refs = md.references.get(n.id) || [], back = md.referencedBy.get(n.id) || [];
-    if (keys.length || refs.length || back.length) {
-      panel.appendChild(el("h3", { "class": "wd-h3", text: "Keys and relationships" }));
-      panel.appendChild(el("ul", { "class": "wd-list wd-mono" }, keys.map(function (k) { return el("li", { text: k.type + " (" + k.columns + ")" }); })
-        .concat(refs.map(function (r) { return el("li", { text: "(" + r.fromColumns.join(", ") + ") → " + r.to.split("|").slice(1).join(".") + " (" + r.toColumns.join(", ") + ")" }); }))
-        .concat(back.map(function (r) { return el("li", { text: r.from.split("|").slice(1).join(".") + " (" + r.fromColumns.join(", ") + ") → (" + r.toColumns.join(", ") + ")" }); }))));
-    }
-    if (n.kind === KIND.MODEL) {
-      var mo = md.models.get(n.item);
-      if (mo) semanticSummary(panel, m, mo, function (tb) { var x = find("Semantic table", function (y) { return y.ref === tb; }); if (x) select(x); });
-    }
-    return;
   }
-  if (e.kind === "Column") {
-    panel.appendChild(el("div", { "class": "wd-eyebrow", text: "Declared column" }));
-    panel.appendChild(el("h2", { "class": "wd-detail-title", text: e.ref.column }));
-    panel.appendChild(el("p", { "class": e.ref.description ? "wd-desc" : "wd-desc wd-muted", text: e.ref.description || "No description is declared." }));
-    if (e.ref.identity) panel.appendChild(el("p", { "class": "wd-muted", text: "Weaver's managed surrogate column." }));
-    if (e.owner) panel.appendChild(el("p", {}, ["Of ", nodeLink(m, e.owner.key, openNode)]));
-    panel.appendChild(el("p", { "class": "wd-note", text: "The dictionary describes declared columns; it does not inventory every physical column." }));
-    return;
-  }
-  var tb = e.kind === "Semantic table" ? e.ref : e.table;
-  if (e.kind === "Semantic column" || e.kind === "Measure") {
-    panel.appendChild(el("div", { "class": "wd-eyebrow", text: e.kind }));
-    panel.appendChild(el("h2", { "class": "wd-detail-title", text: e.label }));
-    panel.appendChild(el("div", { "class": "wd-muted", text: tb.name + " · " + tb.model.name }));
-    panel.appendChild(el("p", { "class": e.ref.description ? "wd-desc" : "wd-desc wd-muted", text: e.ref.description || "No description." }));
-    var f3 = el("dl", { "class": "wd-facts" });
-    [["Data type", e.ref.datatype], ["Kind", e.ref.columntype], ["Source column", e.ref.sourcecolumn], ["Format", e.ref.format]].forEach(function (f) {
-      if (f[1]) { f3.appendChild(el("dt", { text: f[0] })); f3.appendChild(el("dd", { text: f[1] })); }
-    });
-    panel.appendChild(f3);
-    if (e.ref.expression) panel.appendChild(el("pre", { "class": "wd-code", text: e.ref.expression }));
-    return;
-  }
-  semanticTableDetail(panel, m, tb, openNode);
+  if (mode !== "columns") [["References", md.references.get(n.id) || [], true], ["Referenced by", md.referencedBy.get(n.id) || [], false]].forEach(function (group) {
+    if (!group[1].length) return;
+    panel.appendChild(el("h3", { "class": "wd-h3", text: group[0] + " · " + group[1].length }));
+    panel.appendChild(el("ul", { "class": "wd-list wd-mono" }, group[1].map(function (r) {
+      var target = group[2] ? r.to : r.from, other = entries.filter(function (x) { return x.ref.id === target; })[0];
+      var mapping = "(" + r.fromColumns.join(", ") + ") → (" + r.toColumns.join(", ") + ")";
+      return el("li", {}, [other ? el("button", { "class": "wd-link", type: "button", onclick: function () { select(other); } }, [other.label]) : target,
+        " · " + shownItem(target.split("|")[0]) + " " + mapping]);
+    })));
+  });
 }

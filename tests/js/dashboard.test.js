@@ -71,7 +71,83 @@ function model(text) {
   return D.buildModel(parsed.tables, parsed.problems);
 }
 
+test("ER bottom detail and column preview are complementary and omit orchestration", () => {
+  assert.equal(typeof D.entityDetail, "function");
+  class Element {
+    constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.text = ""; }
+    setAttribute(k, v) { this.attrs[k] = v; }
+    appendChild(child) { this.children.push(child); return child; }
+    addEventListener() {}
+    set textContent(value) { this.text = value; this.children = []; }
+    get textContent() { return this.text + this.children.map(c => c.textContent).join(" "); }
+  }
+  global.document = { createElement: tag => new Element(tag), createTextNode: text => ({textContent: text}) };
+  try {
+    const W = "Warehouse/Curated", m = model(estate({page: "entities", extra:
+      table("tables", ["item", "schema", "object", "type", "description", "primarykey"], [[W, "Sales", "Region", "Table", "The region meaning", "ID"]]) +
+      table("columnowners", ["owner", "item", "schema", "object"], [["7", W, "Sales", "Region"]]) +
+      table("columntypes", ["owner", "column", "ordinal", "datatype", "nullable", "identity"], [["7", "ID", 1, "bigint", "0", "0"], ["7", "Unnoted", 2, "date", "1", "0"]]) +
+      table("foreignkeys", ["item", "schema", "object", "columns", "primaryitem", "primaryschema", "primaryobject", "primarycolumns"], [[W, "Sales", "ByRegion", "RegionID", W, "Sales", "Region", "ID"]])
+    }));
+    const panel = new Element("aside"), entry = D.entityEntries(m).find(e => e.ref.object === "Region");
+    D.entityDetail(panel, m, entry, () => {}, "columns");
+    assert.match(panel.textContent, /Unnoted/);
+    assert.match(panel.textContent, /bigint/);
+    assert.match(panel.textContent, /date/);
+    assert.doesNotMatch(panel.textContent, /The region meaning|Primary key|Referenced by/);
+    const detail = new Element("section");
+    D.entityDetail(detail, m, entry, () => {}, "summary");
+    assert.match(detail.textContent, /The region meaning/);
+    assert.match(detail.textContent, /Primary key/);
+    assert.match(detail.textContent, /Referenced by/);
+    assert.match(detail.textContent, /Sales.ByRegion/);
+    assert.doesNotMatch(detail.textContent, /Unnoted|SQL type/);
+    assert.doesNotMatch(detail.textContent, /Reads|Read by|Readiness|Last load|Built|Prohibit rebuild|Tests and Assumptions/);
+    assert.doesNotMatch(panel.textContent, /Reads|Read by|Readiness|Last load|Built|Prohibit rebuild|Tests and Assumptions/);
+  } finally { delete global.document; }
+});
+
+test("ER hides Weaver audit columns while retaining ordinary SQL columns", () => {
+  const W = "Warehouse/Curated", names = ["ID", "Row insert datetime", "Row update datetime", "Row delete datetime", "Row signature", "row_insert_datetime", "row_update_datetime", "row_delete_datetime", "row_signature", "Business date"];
+  const m = model(estate({page: "entities", nodes: [], extra:
+    table("tables", ["item", "schema", "object", "type", "primarykey"], [[W, "Sales", "Entity", "Table", "ID"]]) +
+    table("columnowners", ["owner", "item", "schema", "object"], [["1", W, "Sales", "Entity"]]) +
+    table("columntypes", ["owner", "column", "ordinal", "datatype", "nullable", "identity"], names.map((name, i) => ["1", name, i + 1, "bigint", "0", "0"])) +
+    table("columns", ["item", "schema", "object", "column", "description"], [[W, "Sales", "Entity", "Row signature", "Generated audit"], [W, "Sales", "Entity", "Business date", "Business meaning"]])
+  }));
+  const id = W + "|Sales|Entity";
+  assert.deepEqual(D.metadata(m).types.get(id).map(c => c.column), ["ID", "Business date"]);
+  assert.deepEqual(D.metadata(m).columns.get(id).map(c => c.column), ["Business date"]);
+  const g = D.erGraph(m, "all"), w = D.erWindow(g, [id], 0, 0, []);
+  assert.deepEqual(D.erLayout(g, w, true).boxes.get(id).rows.map(r => r.name), ["ID", "Business date"]);
+});
+
 // --- payload ---------------------------------------------------------------------
+
+test("ER columns use the complete ordinal inventory without indexing physical columns", () => {
+  const W = "Warehouse/Curated";
+  const cols = Array.from({length: 14}, (_, i) => ["1", "Field" + (i + 1), 14 - i, "varchar(100)", i % 2 ? "1" : "0", "0"]);
+  const m = model(estate({page: "entities", nodes: [], extra:
+    table("tables", ["item", "schema", "object", "type", "description", "primarykey"], [[W, "Sales", "Complete", "Table", "Meaning", "Field1"]]) +
+    table("columnowners", ["owner", "item", "schema", "object"], [["1", W, "Sales", "Complete"]]) +
+    table("columntypes", ["owner", "column", "ordinal", "datatype", "nullable", "identity"], cols) +
+    table("columns", ["item", "schema", "object", "column", "description"], [[W, "Sales", "Complete", "Field14", "A note"]])
+  }));
+  assert.equal(typeof D.entityEntries, "function");
+  const entries = D.entityEntries(m);
+  assert.deepEqual(entries.map(e => e.kind), ["Table"]);
+  assert.equal(D.searchEntries(entries, "Field14", "All").length, 0);
+  const graph = D.erGraph(m, "all"), id = W + "|Sales|Complete";
+  const win = D.erWindow(graph, [id], 0, 0, []);
+  const rows = D.erLayout(graph, win, true).boxes.get(id).rows;
+  assert.equal(rows.length, 14);
+  assert.equal(rows[0].name, "Field14");
+  assert.equal(rows[13].name, "Field1");
+  assert.equal(rows[13].mark, "key");
+  assert.equal(D.metadata(m).types.get(id)[0].datatype, "varchar(100)");
+  assert.equal(D.metadata(m).types.get(id)[0].description, "A note");
+  assert.deepEqual(D.erLayout(graph, win, false).boxes.get(id).rows.map(r => r.name), ["Field1"]);
+});
 
 test("the payload parses tables, nulls and the escaped <", () => {
   const text = table("t", ["a", "b"], [["x" + D.LESS + "/script>", ""], ["y", "2"]]);
@@ -412,6 +488,24 @@ test("the ER diagram keeps a table with no relationship, and caps the unselected
   assert.equal(rowsUsed.size, Math.ceil(D.ER.NODES / D.ER.WRAP));
 });
 
+test("Columns mode shows every recorded column beyond eight rows", () => {
+  const item = "Warehouse/Curated", id = item + "|Sales|Region";
+  const names = Array.from({ length: 12 }, (_, i) => "Field" + i);
+  const extra = table("tables", ["item", "schema", "object", "type", "primarykey"], [
+    [item, "Sales", "Region", "Table", "Region ID"]]) +
+    table("columns", ["item", "schema", "object", "column", "description", "identity"],
+      names.map((name) => [item, "Sales", "Region", name, "A field", ""]));
+  const g = D.erGraph(model(estate({ extra })), item);
+  const win = D.erWindow(g, [id], 0, 0, []);
+  const keys = D.erLayout(g, win, false).boxes.get(id);
+  assert.deepEqual(keys.rows.map((r) => r.name), ["Region ID"]);
+  assert.equal(keys.hidden, names.length);
+  const columns = D.erLayout(g, win, true).boxes.get(id);
+  assert.deepEqual(columns.rows.map((r) => r.name).sort(), ["Region ID", ...names].sort());
+  assert.equal(columns.hidden, 0);
+  assert.ok(columns.h > keys.h);
+});
+
 test("every second column of an item sits half a row lower", () => {
   const nodes = [], edgeRows = [];
   for (let i = 0; i < 4; i++) nodes.push(["n" + i, "Warehouse/Chain", "S", "T" + i, "Table", "S.T" + i, 9, ""]);
@@ -443,14 +537,17 @@ test("a * in a search term matches any run of characters across the whole name",
     ["Sales.Customer", "Sales.Customer", "Sales/Customers"]);
 });
 
-test("dictionary search ranks names before descriptions and finds columns", () => {
+test("dictionary search ranks objects without indexing their columns", () => {
   const extra = table("columns", ["item", "schema", "object", "column", "description", "identity"], [
     ["Warehouse/Curated", "Sales", "Region", "Region ID", "The region's key.", ""]]) + SEMANTIC;
   const m = model(estate({ extra }));
+  m.tables.smcolumns.push({ item: "SemanticModel/Sales", table: "Customer", column: "Name", description: "Customer name" });
   const entries = D.dictionaryEntries(m);
   const found = D.searchEntries(entries, "region", "All").map((e) => e.kind + ":" + e.label);
   assert.equal(found[0], "Table:Sales.Region");
-  assert.ok(found.includes("Column:Region ID"));
+  assert.ok(!entries.some((e) => e.kind === "Column"));
+  assert.deepEqual(D.metadata(m).columns.get("Warehouse/Curated|Sales|Region").map((c) => c.column), ["Region ID"]);
+  assert.ok(entries.some((e) => e.kind === "Semantic column"));
   assert.deepEqual(D.searchEntries(entries, "customer records", "All").map((e) => e.label), ["Sales/Customers"]);
 });
 
@@ -1057,4 +1154,36 @@ test("two items one workspace shows alike are told apart by their Fabric item", 
   D.buildModel(p.tables, p.problems);
   assert.equal(D.shownItem(O("Warehouse/Mart", 1)), "SPOKE/Warehouse/Mart (Mart_WH)");
   assert.equal(D.shownItem(O("Warehouse/Mart", 2)), "SPOKE/Warehouse/Mart (Mirror_WH)");
+});
+
+test("ER focus preserves the diagram and reveals an offscreen node without filtering", () => {
+  assert.equal(typeof D.erFocusWindow, "function");
+  const nodes = new Map(Array.from({length: 100}, (_, i) => {
+    const id = "n" + String(i).padStart(3, "0");
+    return [id, {id, label: id, refs: [], back: []}];
+  }));
+  const g = {nodes, edges: []}, before = D.erFocusWindow(g, null, []);
+  const picked = D.erFocusWindow(g, "n099", []);
+  assert.equal(before.rank.size, 80);
+  assert.equal(picked.rank.size, 81);
+  assert.ok(picked.rank.has("n099"));
+  for (const id of before.rank.keys()) assert.ok(picked.rank.has(id), "A picked node must not hide " + id);
+  assert.equal(picked.seeds.size, 0, "Focus is not a relationship-window filter");
+});
+
+test("ER-only metadata preserves Shortcut foreign-key endpoints without Lineage nodes", () => {
+  for (const [schema, object, type] of [["Ref", "Customer", "Table"], ["", "Ref", "Schema"]]) {
+    const W = "Warehouse/Curated", S = table;
+    const m = model([
+      S("items", ["item", "target"], [[W, "Curated"]]),
+      S("tables", ["item", "schema", "object", "type", "primarykey"], [[W, "DWG", "Fact", "Table", "ID"]]),
+      S("entityshortcuts", ["item", "schema", "object", "type"], [[W, schema, object, type]]),
+      S("foreignkeys", ["item", "schema", "object", "columns", "primaryitem", "primaryschema", "primaryobject", "primarycolumns"], [[W, "DWG", "Fact", "CustomerID", W, "Ref", "Customer", "ID"]])
+    ].join(""));
+    assert.equal(m.nodes.size, 0);
+    const graph = D.erGraph(m, W), target = graph.nodes.get(W + "|Ref|Customer");
+    assert.equal(graph.edges.length, 1);
+    assert.equal(target.owner.kind, "Shortcut");
+    assert.equal(D.entityEntries(m).find(e => e.ref.id === target.id).kind, "Shortcut");
+  }
 });

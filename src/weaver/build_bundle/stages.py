@@ -227,6 +227,7 @@ _TDS = frozenset(
         "tsql_batch",
         "runtime_state",
         "semantic_catalogue",
+        "column_types",
         "await_endpoint_objects",
     }
 )

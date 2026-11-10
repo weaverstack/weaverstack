@@ -341,14 +341,34 @@ def render_catalogue_after_build(
     selected_models=(),
     warn=None,
     publication=None,
+    regenerate_columns=False,
+    collect_columns=False,
+    borrowed_columns=(),
 ) -> tuple[PlannedStage, ...]:
-    """Publish dictionaries and Installation in one batch, Registry last.
+    """Publish dictionaries and Installation, then Registry, then SQL columns.
 
-    TDS writes are readable when committed; no SQL endpoint refresh closes the
-    build.
+    Registry follows physical work. Column observation separately waits for
+    scoped Lakehouse endpoint refresh and SQL object visibility.
     """
 
+    from .column_types import column_types_stage
     from .semantic import semantic_stage
+
+    selected_ids = tuple(selected_ids)
+    sql_items = tuple(
+        item for item in target_by_item if item.item_type in {"Warehouse", "Lakehouse"}
+    )
+    from ..declaration.metadata import TABLE
+
+    endpoints = {
+        identity: target_by_item[identity.item].name
+        for identity in selected_ids
+        if identity.item in sql_items
+        and identity.item.item_type == "Lakehouse"
+        and identity not in borrowed_columns
+        and (document := repository.source_documents.get(identity)) is not None
+        and document.kind == TABLE
+    }
 
     if publication is None:
         publication = planned_publication(
@@ -360,7 +380,7 @@ def render_catalogue_after_build(
             warn=warn,
         )
 
-    # Registry is its own final action; table plans carry the ordering.
+    # Registry closes publication before derived SQL columns read certification.
     catalogue_statements: list[str] = [
         statement
         for table_plan in (*publication.dictionaries, publication.installation)
@@ -385,6 +405,14 @@ def render_catalogue_after_build(
             statements=registry_statements,
             catalogue_target=catalogue_target,
         ),
+        column_types_stage(
+            sql_items,
+            catalogue_target=catalogue_target,
+            regenerate=regenerate_columns,
+            endpoints=endpoints,
+        )
+        if collect_columns and sql_items
+        else None,
     )
     observed = tuple(
         semantic_stage(

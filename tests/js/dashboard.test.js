@@ -183,7 +183,7 @@ test("an item on its own shows all of it, and lineage stays inside it", () => {
   assert.deepEqual(Array.from(whole.shown).sort(), Array.from(curated).sort());
   assert.equal(whole.focus, null);
   assert.ok(!whole.truncated);
-  assert.deepEqual(whole.more.get("s").up, ["c"]);
+  assert.equal(whole.more.has("s"), false, "another item's producer is outside the window, not expandable");
   const walked = D.focusWindow(m, ["b"], -1, -1, [], curated);
   assert.ok(!walked.shown.has("c") && !walked.shown.has("m"));
   assert.ok(walked.shown.has("s") && walked.shown.has("v"));
@@ -1037,9 +1037,9 @@ test("choosing other items drops what the page held for the previous ones", () =
   assert.deepEqual(s.expanded, []);
   assert.deepEqual(s.moved, {});
   // The same items again change nothing.
-  s.expanded = [O("hm", 1)];
+  s.expanded = [O("h", 1)];
   D.scopeSelection(m, s, [hub]);
-  assert.deepEqual(s.expanded, [O("hm", 1)]);
+  assert.deepEqual(s.expanded, [O("h", 1)]);
 });
 
 test("a run knows the items it touched, so choosing items narrows the runs", () => {

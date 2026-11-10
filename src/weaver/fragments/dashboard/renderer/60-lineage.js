@@ -11,11 +11,12 @@ var DEPTHS = [0, 1, 2, -1];
 function graphWorkspace(body, m, options) {
   var s = pageState(options.page);
   var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
+  var within = options.items ? new Set(scoped) : null, searchable = within ? subModel(m, within) : m;
   scopeSelection(m, s, options.items || null);
   if (s.up === undefined) s.up = 1;
   if (s.down === undefined) s.down = 1;
   var matched = new Map();
-  function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(m, q)); return matched.get(q); }
+  function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(searchable, q)); return matched.get(q); }
   /* The selected objects and every match of each wildcard term. */
   function seeds() {
     if (!s.selection.length && !s.patterns.length && scoped.length) return scoped.slice();
@@ -30,6 +31,7 @@ function graphWorkspace(body, m, options) {
 
   /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
   function select(key, adding) {
+    if (key && within && !within.has(key)) return;
     if (!key) { s.selection = []; s.patterns = []; }
     else if (adding) {
       var at = s.selection.indexOf(key);
@@ -59,7 +61,9 @@ function graphWorkspace(body, m, options) {
   }
   function moved(key, p) { s.moved[key] = { x: p.x, y: p.y }; saveState(); }
   function apply(refit) {
-    var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null, !s.selection.length && !s.patterns.length) : null;
+    var seed = seeds(), filtering = !!(s.selection.length || s.patterns.length);
+    var bounds = filtering && !seed.length ? new Set() : within;
+    var win = seed.length || bounds ? focusWindow(m, seed, s.up, s.down, s.expanded, bounds, !filtering) : null;
     var lay = win ? layoutEstate(subModel(m, win.shown), WINDOW_GEOMETRY) : layoutEstate(m);
     Object.keys(s.moved).forEach(function (k) { var p = lay.pos.get(k); if (p) { p.x = s.moved[k].x; p.y = s.moved[k].y; } });
     view.setWindow(win, lay);
@@ -91,7 +95,7 @@ function graphWorkspace(body, m, options) {
   if (options.above) body.appendChild(options.above);
   f.mount(body, [
     options.chooser,
-    nodeSearch(m, select, addPattern),
+    nodeSearch(searchable, select, addPattern),
     segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
     segmented("Colour", ["load", "kind"], s.mode, function (v) {
@@ -127,9 +131,12 @@ function scopeSelection(m, s, items) {
   s.moved = s.moved || {};
   s.patterns = s.patterns || [];
   var scope = items ? items.slice().sort().join("\n") : null;
-  if (s.scope !== undefined && s.scope !== scope && items) {
-    var inside = new Set(keysOf(m, items));
+  var inside = items ? new Set(keysOf(m, items)) : null;
+  if (inside) {
     s.selection = s.selection.filter(function (k) { return inside.has(k); });
+    s.expanded = s.expanded.filter(function (k) { return inside.has(k); });
+  }
+  if (s.scope !== undefined && s.scope !== scope && items) {
     s.patterns = s.patterns.filter(function (q) { return nodeMatches(m, q).some(function (k) { return inside.has(k); }); });
     s.expanded = []; s.moved = {};
   }

@@ -71,7 +71,7 @@ function model(text) {
   return D.buildModel(parsed.tables, parsed.problems);
 }
 
-test("ER bottom detail and column preview are complementary and omit orchestration", () => {
+test("ER bottom dictionary includes all column descriptions without reference lists", () => {
   assert.equal(typeof D.entityDetail, "function");
   class Element {
     constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.text = ""; }
@@ -86,22 +86,26 @@ test("ER bottom detail and column preview are complementary and omit orchestrati
     const W = "Warehouse/Curated", m = model(estate({page: "entities", extra:
       table("tables", ["item", "schema", "object", "type", "description", "primarykey"], [[W, "Sales", "Region", "Table", "The region meaning", "ID"]]) +
       table("columnowners", ["owner", "item", "schema", "object"], [["7", W, "Sales", "Region"]]) +
-      table("columntypes", ["owner", "column", "ordinal", "datatype", "nullable", "identity"], [["7", "ID", 1, "bigint", "0", "0"], ["7", "Unnoted", 2, "date", "1", "0"]]) +
+      table("columntypes", ["owner", "column", "ordinal", "datatype", "nullable", "identity"], [["7", "ID", 1, "bigint", "0", "0"], ["7", "Unnoted", 2, "date", "1", "0"]].concat(Array.from({length: 12}, (_, i) => ["7", "Extra" + (i + 3), i + 3, "bigint", "1", "0"]))) +
+      table("columns", ["item", "schema", "object", "column", "description"], [[W, "Sales", "Region", "ID", "Business region identifier"]]) +
       table("foreignkeys", ["item", "schema", "object", "columns", "primaryitem", "primaryschema", "primaryobject", "primarycolumns"], [[W, "Sales", "ByRegion", "RegionID", W, "Sales", "Region", "ID"]])
     }));
     const panel = new Element("aside"), entry = D.entityEntries(m).find(e => e.ref.object === "Region");
-    D.entityDetail(panel, m, entry, () => {}, "columns");
+    D.entityDetail(panel, m, entry, "columns");
     assert.match(panel.textContent, /Unnoted/);
     assert.match(panel.textContent, /bigint/);
     assert.match(panel.textContent, /date/);
-    assert.doesNotMatch(panel.textContent, /The region meaning|Primary key|Referenced by/);
+    assert.match(panel.textContent, /Extra14/);
+    assert.doesNotMatch(panel.textContent, /The region meaning|Primary key|References|Referenced by|Business region identifier/);
     const detail = new Element("section");
-    D.entityDetail(detail, m, entry, () => {}, "summary");
+    D.entityDetail(detail, m, entry, "details");
     assert.match(detail.textContent, /The region meaning/);
     assert.match(detail.textContent, /Primary key/);
-    assert.match(detail.textContent, /Referenced by/);
-    assert.match(detail.textContent, /Sales.ByRegion/);
-    assert.doesNotMatch(detail.textContent, /Unnoted|SQL type/);
+    assert.match(detail.textContent, /Business region identifier/);
+    assert.match(detail.textContent, /Unnoted/);
+    assert.match(detail.textContent, /Extra14/);
+    assert.match(detail.textContent, /SQL type/);
+    assert.doesNotMatch(detail.textContent, /References|Referenced by|Sales.ByRegion/);
     assert.doesNotMatch(detail.textContent, /Reads|Read by|Readiness|Last load|Built|Prohibit rebuild|Tests and Assumptions/);
     assert.doesNotMatch(panel.textContent, /Reads|Read by|Readiness|Last load|Built|Prohibit rebuild|Tests and Assumptions/);
   } finally { delete global.document; }

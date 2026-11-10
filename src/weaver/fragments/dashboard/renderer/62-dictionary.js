@@ -247,7 +247,7 @@ function entitiesPage(body, m) {
     });
     if (!shown.length) list.appendChild(empty("Nothing matches. Try fewer words, or another kind."));
   }
-  /* One selection: SQL columns beside the graph, meaning and links below it. */
+  /* One selection: SQL preview beside the graph, full column dictionary below it. */
   function choose(e, adding) {
     s.selected = entryId(e);
     var id = tableOf(e);
@@ -259,11 +259,11 @@ function entitiesPage(body, m) {
   function renderSide(panel) {
     panel = panel || er.side;
     var e = current();
-    if (e) entityDetail(panel, m, e, function (other) { choose(other, false); }, "columns");
+    if (e) entityDetail(panel, m, e, "columns");
     else { panel.textContent = ""; panel.appendChild(empty("Select a table to preview its SQL columns.")); }
     if (detail) {
-      if (e) entityDetail(detail, m, e, function (other) { choose(other, false); }, "summary");
-      else { detail.textContent = ""; detail.appendChild(empty("Select a table to see its definition, keys and relationships.")); }
+      if (e) entityDetail(detail, m, e, "details");
+      else { detail.textContent = ""; detail.appendChild(empty("Select a table to see its definition, keys and column descriptions.")); }
     }
   }
 
@@ -279,9 +279,9 @@ function entryId(e) {
   return e.kind + "|" + e.item + "|" + (e.table ? e.table.name : "") + "|" + e.label;
 }
 
-function entityDetail(panel, m, e, select, mode) {
+function entityDetail(panel, m, e, mode) {
   panel.textContent = "";
-  var md = metadata(m), n = e.ref, declared = md.tables.get(n.id) || {}, entries = entityEntries(m);
+  var md = metadata(m), n = e.ref, declared = md.tables.get(n.id) || {};
   panel.appendChild(el("div", { "class": "wd-eyebrow", text: e.kind }));
   panel.appendChild(el("h2", { "class": "wd-detail-title", text: e.label }));
   panel.appendChild(el("div", { "class": "wd-muted", text: shownItem(e.item) }));
@@ -291,31 +291,20 @@ function entityDetail(panel, m, e, select, mode) {
     panel.appendChild(el("h3", { "class": "wd-h3", text: "Keys" }));
     panel.appendChild(el("ul", { "class": "wd-list wd-mono" }, keys.map(function (k) { return el("li", { text: k.type + " (" + k.columns + ")" }); })));
   }
-  if (mode !== "summary") {
-    var columns = md.types.get(n.id), notes = md.columns.get(n.id) || [];
-    if (!columns) {
-      panel.appendChild(el("p", { "class": "wd-note", text: "SQL column inventory unavailable. Build this item to collect it." }));
-      columns = notes;
-    }
-    if (columns.length) {
-      panel.appendChild(el("h3", { "class": "wd-h3", text: (md.types.has(n.id) ? "Columns" : "Described columns") + " · " + columns.length }));
-      panel.appendChild(dataTable([
-        { key: "ordinal", title: "#", value: function (c) { return c.ordinal; }, numeric: true, sortable: false },
-        { key: "column", title: "Column", value: function (c) { return c.column; }, sortable: false },
-        { key: "datatype", title: "SQL type", value: function (c) { return c.datatype || "—"; }, sortable: false },
-        { key: "nullable", title: "Nullable", value: function (c) { return c.nullable === null || c.nullable === undefined ? "—" : c.nullable === "1" ? "Yes" : "No"; }, sortable: false },
-        { key: "description", title: "Description", value: function (c) { return c.description || ""; }, sortable: false }
-      ], columns, { limit: columns.length, sort: null }));
-    }
+  var columns = md.types.get(n.id), notes = md.columns.get(n.id) || [];
+  if (!columns) {
+    panel.appendChild(el("p", { "class": "wd-note", text: "SQL column inventory unavailable. Build this item to collect it." }));
+    columns = notes;
   }
-  if (mode !== "columns") [["References", md.references.get(n.id) || [], true], ["Referenced by", md.referencedBy.get(n.id) || [], false]].forEach(function (group) {
-    if (!group[1].length) return;
-    panel.appendChild(el("h3", { "class": "wd-h3", text: group[0] + " · " + group[1].length }));
-    panel.appendChild(el("ul", { "class": "wd-list wd-mono" }, group[1].map(function (r) {
-      var target = group[2] ? r.to : r.from, other = entries.filter(function (x) { return x.ref.id === target; })[0];
-      var mapping = "(" + r.fromColumns.join(", ") + ") → (" + r.toColumns.join(", ") + ")";
-      return el("li", {}, [other ? el("button", { "class": "wd-link", type: "button", onclick: function () { select(other); } }, [other.label]) : target,
-        " · " + shownItem(target.split("|")[0]) + " " + mapping]);
-    })));
-  });
+  if (columns.length) {
+    panel.appendChild(el("h3", { "class": "wd-h3", text: (md.types.has(n.id) ? "Columns" : "Described columns") + " · " + columns.length }));
+    var fields = [
+      { key: "ordinal", title: "#", value: function (c) { return c.ordinal; }, numeric: true, sortable: false },
+      { key: "column", title: "Column", value: function (c) { return c.column; }, sortable: false },
+      { key: "datatype", title: "SQL type", value: function (c) { return c.datatype || "—"; }, sortable: false },
+      { key: "nullable", title: "Nullable", value: function (c) { return c.nullable === null || c.nullable === undefined ? "—" : c.nullable === "1" ? "Yes" : "No"; }, sortable: false }
+    ];
+    if (mode !== "columns") fields.push({ key: "description", title: "Description", value: function (c) { return c.description || ""; }, sortable: false });
+    panel.appendChild(dataTable(fields, columns, { limit: columns.length, sort: null }));
+  }
 }

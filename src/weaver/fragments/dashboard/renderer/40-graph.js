@@ -338,7 +338,7 @@ GraphView.prototype.fitAll = function (animate) {
 
 /* Zoom to what is shown: the window's own layout, or the estate. */
 GraphView.prototype.fitWindow = function (animate) {
-  if (!this.win) return this.fitAll(animate);
+  if (!this.win || !this.win.shown.size) return this.fitAll(animate);
   this.fitKeys(Array.from(this.win.shown), animate);
 };
 

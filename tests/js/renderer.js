@@ -6,11 +6,12 @@ const path = require("node:path");
 
 const folder = path.join(__dirname, "../../src/weaver/fragments/dashboard/renderer");
 
-function load(root = {}) {
+function load(root = {}, document) {
   const body = fs.readdirSync(folder).filter((name) => name.endsWith(".js")).sort()
     .map((name) => fs.readFileSync(path.join(folder, name), "utf8")).join("\n");
   const module = { exports: {} };
-  new Function("root", "module", '"use strict";\n' + body)(root, module);
+  const ui = "\nmodule.exports.ui = { erWorkspace, graphWorkspace, GraphView };";
+  new Function("root", "module", "document", '"use strict";\n' + body + ui)(root, module, document);
   return module.exports;
 }
 

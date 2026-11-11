@@ -156,7 +156,7 @@ function erLayout(g, win, columns) {
 /* The ER page's workspace, framed as the Orchestration graph is: s holds
    the selection, depths, expansions and viewport. options.item limits it to the
    relationships of a set of items; options.tools come first in its toolbar; options.onPick
-   hears a table chosen in the diagram, options.describe fills the details, and
+   hears a table chosen in a selection chip, options.describe fills the details, and
    options.matches(term) lists the tables a wildcard term selects. */
 function erWorkspace(body, m, s, options) {
   var g = erGraph(m, options.item);
@@ -289,7 +289,7 @@ function erWorkspace(body, m, s, options) {
       if (more && more.up.length) group.appendChild(marker(box, id, "up", more.up.length));
       if (more && more.down.length) group.appendChild(marker(box, id, "down", more.down.length));
       draggable(group, box, id, reroute);
-      group.addEventListener("keydown", function (ev) { if (ev.key === "Enter") pickBox(id, ev.shiftKey || ev.metaKey || ev.ctrlKey); });
+      group.addEventListener("keydown", function (ev) { if (ev.key === "Enter") focusBox(id); });
       stage.appendChild(group);
     });
     drawing.appendChild(svg);
@@ -297,7 +297,7 @@ function erWorkspace(body, m, s, options) {
     if (pin && screen) zoom.pin(pin, screen);
   }
   /* A mouse or pen drag moves a box and the edges meeting it; a press that
-     does not move selects it. */
+     does not move zooms to it without changing the selection. */
   function draggable(group, box, id, reroute) {
     var drag = null;
     group.addEventListener("pointerdown", function (ev) {
@@ -322,7 +322,7 @@ function erWorkspace(body, m, s, options) {
       group.classList.remove("wd-dragging");
       if (ev.type !== "pointerup") return;
       if (was.moved) { s.moved[id] = { x: box.x, y: box.y }; saveState(); }
-      else pickBox(id, ev.shiftKey || ev.metaKey || ev.ctrlKey);
+      else focusBox(id);
     }
     group.addEventListener("pointerup", end);
     group.addEventListener("pointercancel", end);
@@ -337,9 +337,9 @@ function erWorkspace(body, m, s, options) {
     badge.addEventListener("keydown", function (ev) { ev.stopPropagation(); if (ev.key === "Enter") expand(id, side); });
     return badge;
   }
-  function pickBox(id, adding) {
-    select(id, adding);
-    if (options.onPick && s.selection.indexOf(id) >= 0) options.onPick(id);
+  function focusBox(id) {
+    if (zoom) zoom.fitBoxes([id]);
+    saveState();
   }
   f.mount(body, (options.tools || []).concat([
     segmented("Parents", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),

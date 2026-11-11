@@ -84,6 +84,7 @@ body { background: #f7f7f6; }
 .wd-select { height: 32px; max-width: 420px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
 .wd-link { display: inline-flex; align-items: center; max-width: 100%; padding: 0; border: 0; background: none; color: var(--blue-dark); text-align: left; cursor: pointer; font-weight: 600; }
 .wd-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.wd-reference { display: inline-flex; align-items: center; max-width: 100%; color: var(--muted); }
 .wd-link-meta { margin-left: 4px; color: var(--muted); font-weight: 400; }
 
 /* --- panels, tiles, banners ------------------------------------------------ */

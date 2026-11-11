@@ -156,7 +156,7 @@ function erLayout(g, win, columns) {
 /* The ER page's workspace, framed as the Orchestration graph is: s holds
    the selection, depths, expansions and viewport. options.item limits it to the
    relationships of a set of items; options.tools come first in its toolbar; options.onPick
-   hears a table chosen in a selection chip, options.describe fills the details, and
+   hears a table chosen in the diagram or a selection chip, options.describe fills the details, and
    options.matches(term) lists the tables a wildcard term selects. */
 function erWorkspace(body, m, s, options) {
   var g = erGraph(m, options.item);
@@ -178,7 +178,7 @@ function erWorkspace(body, m, s, options) {
     return out;
   }
   var f = workspaceFrame(s, function () {}), drawing = el("div", { "class": "wd-er-drawing" }), zoom = null, notice = null;
-  function focus() { return s.selection[s.selection.length - 1] || null; }
+  function focus() { return g.nodes.has(s.focus) ? s.focus : s.selection[s.selection.length - 1] || null; }
   function setPatterns(list) { s.patterns = list; s.expanded = []; s.moved = {}; s.view = null; notice = null; draw(); saveState(); }
   /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
   function select(id, adding) {
@@ -187,6 +187,7 @@ function erWorkspace(body, m, s, options) {
       var at = s.selection.indexOf(id);
       if (at >= 0) s.selection.splice(at, 1); else s.selection.push(id);
     } else s.selection = [id];
+    s.focus = s.selection[s.selection.length - 1] || null;
     s.expanded = []; s.moved = {}; s.view = null; notice = null;
     draw();
     saveState();
@@ -215,7 +216,7 @@ function erWorkspace(body, m, s, options) {
   }
   function renderChips() {
     selectionChips(f.chips, s.selection, focus(), function (id) { var n = g.nodes.get(id); return { kind: n.owner ? n.owner.kind : "Table", label: n.label, title: n.item + " · " + n.label }; },
-      function (id) { if (options.onPick) options.onPick(id); if (zoom) zoom.fitBoxes([id]); }, function (id, adding) { select(id, adding); if (id && options.onPick && s.selection.indexOf(id) >= 0) options.onPick(id); },
+      function (id) { focusBox(id, true); }, function (id, adding) { select(id, adding); if (id && options.onPick && s.selection.indexOf(id) >= 0) options.onPick(id); },
       { list: s.patterns, count: function (q) { return matches(q).length; }, remove: function (q) { setPatterns(s.patterns.filter(function (p) { return p !== q; })); } });
   }
   /* An edge's path and its two cardinality marks, from where its boxes are now. */
@@ -272,7 +273,7 @@ function erWorkspace(body, m, s, options) {
     }
     boxes.forEach(function (box, id) {
       var n = g.nodes.get(id), seed = w.seeds.has(id);
-      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + changeClass(n.owner) + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
+      var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + changeClass(n.owner) + (id === current ? " wd-er-box-current" : ""), "data-er-id": id, transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
       group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
       group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
       group.appendChild(sv("text", { "class": "wd-er-title", x: 12, y: 17 }, [clipText(n.label, 28)]));
@@ -297,7 +298,7 @@ function erWorkspace(body, m, s, options) {
     if (pin && screen) zoom.pin(pin, screen);
   }
   /* A mouse or pen drag moves a box and the edges meeting it; a press that
-     does not move zooms to it without changing the selection. */
+     does not move opens its details without changing the graph's selection. */
   function draggable(group, box, id, reroute) {
     var drag = null;
     group.addEventListener("pointerdown", function (ev) {
@@ -337,8 +338,12 @@ function erWorkspace(body, m, s, options) {
     badge.addEventListener("keydown", function (ev) { ev.stopPropagation(); if (ev.key === "Enter") expand(id, side); });
     return badge;
   }
-  function focusBox(id) {
-    if (zoom) zoom.fitBoxes([id]);
+  function focusBox(id, explicitZoom) {
+    s.focus = id;
+    drawing.querySelectorAll(".wd-er-box").forEach(function (box) { box.classList.toggle("wd-er-box-current", box.getAttribute("data-er-id") === id); });
+    renderChips();
+    if (zoom) zoom.fitBoxes([id], !explicitZoom);
+    if (options.onPick) options.onPick(id);
     saveState();
   }
   f.mount(body, (options.tools || []).concat([
@@ -389,10 +394,15 @@ function sv(tag, attrs, children) {
 
 /* Pan and zoom for an SVG stage, with the same gestures as the graph. */
 function panZoom(svg, stage, s, bounds, boxes) {
+  var tallest = 0;
+  boxes.forEach(function (b) { tallest = Math.max(tallest, b.h); });
   function box() { return svg.getBoundingClientRect(); }
   function apply() { stage.setAttribute("transform", "translate(" + s.view.x + " " + s.view.y + ") scale(" + s.view.k + ")"); }
-  function fitRect(r) {
-    var b = box(), k = Math.min(1.1, Math.max(0.15, Math.min(b.width / r.w, b.height / r.h)));
+  function fitScale(b, w, h) { return Math.min(1.1, Math.max(0.15, Math.min(b.width / w, b.height / h))); }
+  function fitRect(r, onlyIfSmall) {
+    var b = box(), k = fitScale(b, r.w, r.h);
+    // One readable threshold for every box in this diagram and viewport.
+    if (onlyIfSmall && s.view && s.view.k >= Math.min(0.8, fitScale(b, ER.BOX + 400, tallest + 320))) return;
     s.view = { k: k, x: b.width / 2 - (r.x + r.w / 2) * k, y: b.height / 2 - (r.y + r.h / 2) * k };
     apply();
   }
@@ -424,10 +434,10 @@ function panZoom(svg, stage, s, bounds, boxes) {
   return {
     fit: fit,
     zoomBy: function (f) { if (!s.view) return; var b = box(); zoomAt(f, b.width / 2, b.height / 2); },
-    fitBoxes: function (ids) {
+    fitBoxes: function (ids, onlyIfSmall) {
       var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       ids.forEach(function (id) { var b = boxes.get(id); if (b) { x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + ER.BOX); y1 = Math.max(y1, b.y + b.h); } });
-      if (x0 < Infinity) fitRect({ x: x0 - 200, y: y0 - 160, w: x1 - x0 + 400, h: y1 - y0 + 320 });
+      if (x0 < Infinity) fitRect({ x: x0 - 200, y: y0 - 160, w: x1 - x0 + 400, h: y1 - y0 + 320 }, onlyIfSmall);
     },
     screenOf: function (id) { var b = boxes.get(id); return b && s.view ? { x: b.x * s.view.k + s.view.x, y: b.y * s.view.k + s.view.y } : null; },
     pin: function (id, screen) { var b = boxes.get(id); if (!b || !s.view) return; s.view = { k: s.view.k, x: screen.x - b.x * s.view.k, y: screen.y - b.y * s.view.k }; apply(); }

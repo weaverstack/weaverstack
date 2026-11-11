@@ -27,7 +27,7 @@ function fixture(pageState = {}) {
   return { D, m, root, doc, flush, body: new Element("div") };
 }
 
-test("ER pointer activation zooms without selecting, redrawing or calling onPick", () => {
+test("ER pointer activation opens details without changing the graph selection or drawing", () => {
   const { D, m, body, flush } = fixture();
   const s = {}, picks = [];
   D.ui.erWorkspace(body, m, s, { onPick: (id) => picks.push(id) }); flush();
@@ -38,8 +38,8 @@ test("ER pointer activation zooms without selecting, redrawing or calling onPick
   assert.deepEqual(s.patterns, before.patterns);
   assert.deepEqual(s.expanded, before.expanded);
   assert.deepEqual(s.moved, before.moved);
-  assert.deepEqual(picks, []);
-  assert.equal(body.querySelector("svg"), svg, "zoom must preserve diagram and edges");
+  assert.deepEqual(picks, ["Warehouse/A|HigherEducation|Input"]);
+  assert.equal(body.querySelector("svg"), svg, "activation must preserve diagram and edges");
   assert.equal(body.querySelectorAll(".wd-er-box").length, boxes.length);
   assert.ok(s.view.k > before.view.k, "click zooms toward the activated node");
 });
@@ -146,23 +146,169 @@ test("an empty item set draws no objects and retains a finite viewport", () => {
   assert.ok(Object.values(s.view).every(Number.isFinite));
 });
 
-test("ER Enter zooms without replacing an existing selection or detail", () => {
-  const { D, m, body, flush } = fixture();
-  const s = {}, picks = [], controller = D.ui.erWorkspace(body, m, s, { onPick: (id) => picks.push(id) });
-  controller.select("Warehouse/A|HigherEducation|Input"); flush();
-  s.view = { k: 0.3, x: 0, y: 0 };
-  const selection = s.selection.slice(), svg = body.querySelector("svg"), view = { ...s.view };
-  const boxes = body.querySelectorAll(".wd-er-box");
-  boxes[boxes.length - 1].fire("keydown", { key: "Enter", ctrlKey: true });
-  assert.deepEqual(s.selection, selection);
-  assert.deepEqual(picks, []);
-  assert.equal(body.querySelector("svg"), svg);
-  assert.notDeepEqual(s.view, view);
+for (const k of [0.8, 2.2]) {
+  for (const activation of ["pointer", "Enter"]) {
+    test(`ER ${activation} at readable scale ${k} changes details without moving the viewport`, () => {
+      const { D, m, body, flush } = fixture(), s = {}, picks = [];
+      D.ui.erWorkspace(body, m, s, { onPick: (id) => picks.push(id) }); flush();
+      s.view = { k, x: 123, y: -45 };
+      const view = { ...s.view }, svg = body.querySelector("svg"), boxes = body.querySelectorAll(".wd-er-box");
+      for (const box of [boxes[0], boxes[1], boxes[1]]) {
+        if (activation === "Enter") box.fire("keydown", { key: "Enter" });
+        else { box.fire("pointerdown"); box.fire("pointerup"); }
+        assert.deepEqual(s.view, view, "readable and manually panned views must stay exact");
+        assert.equal(body.querySelector("svg"), svg);
+      }
+      assert.deepEqual(picks, ["Warehouse/A|HigherEducation|Input", "Warehouse/B|HigherEducation|Input", "Warehouse/B|HigherEducation|Input"]);
+      assert.deepEqual(s.selection, [], "detail focus must not filter or rebuild the diagram");
+    });
+  }
+}
+
+test("ER activation zooms once from an overview, then preserves the viewport on a narrow screen", () => {
+  const { D, m, body, flush } = fixture(), s = {};
+  D.ui.erWorkspace(body, m, s, {});
+  const svg = body.querySelector("svg");
+  svg.getBoundingClientRect = () => ({ width: 360, height: 280 });
+  flush();
+  const before = { ...s.view }, boxes = body.querySelectorAll(".wd-er-box");
+  boxes[0].fire("pointerdown"); boxes[0].fire("pointerup");
+  assert.ok(s.view.k > before.k);
+  assert.ok(s.view.k < 0.8, "a narrow viewport cannot reach desktop reading scale");
+  const view = { ...s.view };
+  for (const box of [boxes[0], boxes[1]]) {
+    box.fire("pointerdown"); box.fire("pointerup");
+    assert.deepEqual(s.view, view, "a viewport-limited focus must not jump on the next activation");
+  }
 });
 
-test("ER dragging moves a box but neither selects nor zooms, and cancellation does nothing", () => {
+test("ER narrow-screen activation stays stable between unequal-height boxes and can refocus after zooming out", () => {
+  const { D, m, body, flush } = fixture(), s = { columns: true };
+  m.tables.columns = Array.from({ length: 8 }, (_, i) => ({ item: "Warehouse/A", schema: "HigherEducation", object: "Input", column: "Column" + i }));
+  D.ui.erWorkspace(body, m, s, {});
+  const svg = body.querySelector("svg");
+  svg.getBoundingClientRect = () => ({ width: 360, height: 280 });
+  flush();
+  const boxes = body.querySelectorAll(".wd-er-box"), tall = boxes[0], compact = boxes[1];
+  assert.notEqual(tall.querySelector("rect").getAttribute("height"), compact.querySelector("rect").getAttribute("height"));
+  tall.fire("keydown", { key: "Enter" });
+  const focused = { ...s.view };
+  compact.fire("keydown", { key: "Enter" });
+  assert.deepEqual(s.view, focused, "the readable threshold must not depend on the next node's height");
+  body.querySelectorAll("button").find((b) => b.getAttribute("title") === "Zoom out").fire("click");
+  const overview = { ...s.view };
+  tall.fire("keydown", { key: "Enter" });
+  assert.ok(s.view.k > overview.k, "manual zoom-out must allow another focus zoom");
+  assert.deepEqual(s.view, focused);
+  assert.equal(body.querySelector("svg"), svg);
+});
+
+test("ER details focus highlights the activated node without replacing graph seeds", () => {
   const { D, m, body, flush } = fixture(), s = {};
   D.ui.erWorkspace(body, m, s, {}); flush();
+  const boxes = body.querySelectorAll(".wd-er-box");
+  boxes[0].fire("pointerdown"); boxes[0].fire("pointerup");
+  assert.equal(s.focus, "Warehouse/A|HigherEducation|Input");
+  assert.ok(boxes[0].classList.contains("wd-er-box-current"));
+  boxes[1].fire("keydown", { key: "Enter" });
+  assert.equal(s.focus, "Warehouse/B|HigherEducation|Input");
+  assert.ok(!boxes[0].classList.contains("wd-er-box-current"));
+  assert.ok(boxes[1].classList.contains("wd-er-box-current"));
+  assert.deepEqual(s.selection, []);
+});
+
+test("ER chip and diagram navigation share detail focus without changing membership", () => {
+  const { D, m, body, flush } = fixture(), s = {}, picks = [];
+  const controller = D.ui.erWorkspace(body, m, s, { onPick: (id) => picks.push(id) }); flush();
+  const a = "Warehouse/A|HigherEducation|Input", b = "Warehouse/B|HigherEducation|Input";
+  controller.select(a); controller.select(b, true); flush();
+  const svg = body.querySelector("svg"), boxes = body.querySelectorAll(".wd-er-box"), seeds = [...s.selection];
+  function current(id) {
+    assert.equal(s.focus, id);
+    assert.deepEqual(boxes.filter((box) => box.classList.contains("wd-er-box-current")).map((box) => box.getAttribute("data-er-id")), [id]);
+    const chips = body.querySelectorAll(".wd-chip-select");
+    assert.deepEqual(chips.filter((chip) => chip.classList.contains("wd-current")).map((chip) => chip.querySelector(".wd-chip-name").getAttribute("title")), [id.split("|")[0] + " · HigherEducation.Input"]);
+    assert.deepEqual(s.selection, seeds);
+    assert.equal(body.querySelector("svg"), svg);
+    assert.equal(body.querySelectorAll(".wd-er-box").length, boxes.length);
+  }
+  s.view = { k: 1.4, x: 30, y: 40 };
+  const view = { ...s.view };
+  boxes.find((box) => box.getAttribute("data-er-id") === a).fire("keydown", { key: "Enter" });
+  current(a);
+  assert.deepEqual(s.view, view);
+  body.querySelectorAll(".wd-chip-name").find((chip) => chip.getAttribute("title") === "Warehouse/B · HigherEducation.Input").fire("click");
+  current(b);
+  assert.notDeepEqual(s.view, view, "chip navigation retains its explicit zoom");
+  const chipView = { ...s.view }, boxA = boxes.find((box) => box.getAttribute("data-er-id") === a);
+  boxA.fire("pointerdown"); boxA.fire("pointerup");
+  current(a);
+  assert.deepEqual(s.view, chipView);
+  assert.deepEqual(picks, [a, b, a]);
+});
+
+test("ER node activation updates the entity page's side and bottom details", () => {
+  const { D, m, body, root, flush } = fixture();
+  D.ui.entitiesPage(body, m); flush();
+  const svg = body.querySelector("svg"), boxes = body.querySelectorAll(".wd-er-box");
+  for (const key of ["a", "f"]) {
+    const box = boxes.find((b) => b.getAttribute("data-er-id") === m.nodes.get(key).id);
+    box.fire("pointerdown"); box.fire("pointerup");
+    for (const selector of [".wd-side", ".wd-entry-detail"]) {
+      assert.equal(body.querySelector(selector).querySelector(".wd-detail-title").textContent, m.nodes.get(key).label);
+    }
+    assert.equal(root.__WD_STATE.entities.selected, "node|" + key);
+    assert.equal(body.querySelector("svg"), svg);
+    assert.equal(body.querySelectorAll(".wd-er-box").length, boxes.length);
+  }
+});
+
+for (const activation of ["pointer", "Enter"]) {
+  test(`ER ${activation} opens cross-item endpoint details without changing the chosen items`, () => {
+    const { D, m, body, root, flush } = fixture();
+    m.items.forEach((it) => { it.type = "Warehouse"; });
+    m.tables.foreignkeys = [{ item: "Warehouse/A", schema: "HigherEducation", object: "Input", columns: "Id",
+      primaryitem: "Warehouse/B", primaryschema: "HigherEducation", primaryobject: "Input", primarycolumns: "Id" }];
+    root.__WD_STATE.entities = { items: ["|Warehouse/A"] };
+    D.ui.entitiesPage(body, m); flush();
+    const state = root.__WD_STATE.entities, svg = body.querySelector("svg"), boxes = body.querySelectorAll(".wd-er-box");
+    const id = "Warehouse/B|HigherEducation|Input", box = boxes.find((b) => b.getAttribute("data-er-id") === id);
+    assert.ok(box, "the relationship includes its other-item endpoint");
+    assert.ok(!body.querySelector(".wd-entry-list").textContent.includes("Warehouse/B"));
+    if (activation === "Enter") box.fire("keydown", { key: "Enter" });
+    else { box.fire("pointerdown"); box.fire("pointerup"); }
+    for (const selector of [".wd-side", ".wd-entry-detail"]) {
+      assert.equal(body.querySelector(selector).querySelector(".wd-detail-title")?.textContent, "HigherEducation.Input");
+    }
+    assert.equal(state.selected, "node|c");
+    assert.equal(state.er.focus, id);
+    assert.deepEqual(state.er.selection, []);
+    assert.deepEqual(state.items, ["|Warehouse/A"]);
+    assert.ok(box.classList.contains("wd-er-box-current"));
+    assert.equal(body.querySelector("svg"), svg);
+    assert.equal(body.querySelectorAll(".wd-er-box").length, boxes.length);
+  });
+}
+
+test("ER endpoint without catalogue metadata shows its identity and the metadata gap in both panels", () => {
+  const { D, m, body, flush } = fixture();
+  m.tables.foreignkeys = [{ item: "Warehouse/A", schema: "HigherEducation", object: "Input", columns: "Id",
+    primaryitem: "Warehouse/External", primaryschema: "Other", primaryobject: "Missing", primarycolumns: "Id" }];
+  D.ui.entitiesPage(body, m); flush();
+  const svg = body.querySelector("svg"), box = body.querySelectorAll(".wd-er-box").find((b) => b.getAttribute("data-er-id") === "Warehouse/External|Other|Missing");
+  box.fire("keydown", { key: "Enter" });
+  for (const selector of [".wd-side", ".wd-entry-detail"]) {
+    const panel = body.querySelector(selector);
+    assert.equal(panel.querySelector(".wd-detail-title")?.textContent, "Other.Missing");
+    assert.ok(panel.textContent.includes("Warehouse/External"));
+    assert.ok(panel.textContent.includes("No catalogue metadata is available for this table."));
+  }
+  assert.equal(body.querySelector("svg"), svg);
+});
+
+test("ER dragging moves a box but neither opens details nor zooms, and cancellation does nothing", () => {
+  const { D, m, body, flush } = fixture(), s = {}, picks = [];
+  D.ui.erWorkspace(body, m, s, { onPick: (id) => picks.push(id) }); flush();
   const box = body.querySelector(".wd-er-box"), view = { ...s.view };
   box.fire("pointerdown"); box.fire("pointermove", { clientX: 20, clientY: 10 }); box.fire("pointerup", { clientX: 20, clientY: 10 });
   assert.equal(Object.keys(s.moved).length, 1);
@@ -171,4 +317,5 @@ test("ER dragging moves a box but neither selects nor zooms, and cancellation do
   box.fire("pointerdown"); box.fire("pointercancel"); box.fire("pointerup");
   assert.deepEqual(s.view, view);
   assert.deepEqual(s.selection, []);
+  assert.deepEqual(picks, []);
 });

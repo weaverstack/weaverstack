@@ -20,6 +20,12 @@ class Element {
   getAttribute(k) { return this.attrs[k] ?? null; }
   removeAttribute(k) { delete this.attrs[k]; }
   appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+  insertBefore(child, before) {
+    if (!before) return this.appendChild(child);
+    const at = this.children.indexOf(before);
+    if (at < 0) throw new Error("Reference node is not a child");
+    child.parentElement = this; this.children.splice(at, 0, child); return child;
+  }
   addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
   removeEventListener() {}
   setPointerCapture() {}

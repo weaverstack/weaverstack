@@ -10,7 +10,7 @@ function load(root = {}, document) {
   const body = fs.readdirSync(folder).filter((name) => name.endsWith(".js")).sort()
     .map((name) => fs.readFileSync(path.join(folder, name), "utf8")).join("\n");
   const module = { exports: {} };
-  const ui = "\nmodule.exports.ui = { erWorkspace, graphWorkspace, GraphView };";
+  const ui = "\nmodule.exports.ui = { erWorkspace, entitiesPage, graphWorkspace, GraphView };";
   new Function("root", "module", "document", '"use strict";\n' + body + ui)(root, module, document);
   return module.exports;
 }

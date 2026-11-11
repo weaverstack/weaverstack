@@ -44,8 +44,9 @@ test("ER pointer activation zooms without selecting, redrawing or calling onPick
   assert.ok(s.view.k > before.view.k, "click zooms toward the activated node");
 });
 
-function graph(s, items) {
+function graph(s, items, configure) {
   const env = fixture(s), { D, m, root, body } = env;
+  if (configure) configure(m);
   // Canvas paint is outside these state/window tests; keep the real view geometry.
   root.requestAnimationFrame = undefined;
   D.ui.GraphView.prototype.draw = function () {};
@@ -81,6 +82,30 @@ test("orchestration rejects saved and newly picked inputs outside the selected i
   env.controller.select("c");
   assert.deepEqual(s.selection, ["a"]);
   assert.deepEqual([...env.win.shown].sort(), ["a", "b"]);
+});
+
+test("out-of-scope detail dependencies and mirror references are readable but not interactive", () => {
+  const s = { selection: ["a"], focus: "a" };
+  const env = graph(s, ["Warehouse/A"], (m) => {
+    const a = m.nodes.get("a"), c = m.nodes.get("c"), d = m.nodes.get("d");
+    a.vup.push(c.key);
+    a.vdown.push(d.key); d.kind = "Assumption";
+    a.original = c; a.copies = [d];
+  });
+  const side = env.body.querySelector(".wd-side");
+  const references = side.querySelectorAll("button").concat(side.querySelectorAll("span"))
+    .filter((e) => (e.getAttribute("title") || "").startsWith(env.D.shownItem("Warehouse/B") + " · "));
+  assert.equal(references.length, 5, "Reads, Read by, validation, source and mirror-copy references remain visible");
+  for (const reference of references) {
+    assert.equal(reference.tagName, "span", "outside references must not present a dead button");
+    assert.equal(reference.onclick, undefined);
+    assert.equal(reference.getAttribute("tabindex"), null);
+  }
+  const local = side.querySelectorAll("button").find((e) => e.textContent.includes("Other.Output"));
+  assert.ok(local, "in-scope dependencies remain interactive");
+  local.fire("click");
+  assert.deepEqual(s.selection, ["b"]);
+  assert.ok([...env.win.shown].every((k) => env.m.nodes.get(k).item === "Warehouse/A"));
 });
 
 test("a wildcard with no in-item matches cannot fall back to the estate", () => {

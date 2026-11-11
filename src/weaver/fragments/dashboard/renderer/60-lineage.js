@@ -69,13 +69,13 @@ function graphWorkspace(body, m, options) {
     view.setWindow(win, lay);
     status(win);
     renderChips();
-    details(side, m, s.focus, { onOpen: select, health: health, emptyText: options.empty });
+    details(side, m, s.focus, { onOpen: select, within: within, health: health, emptyText: options.empty });
     if (refit) { if (win) view.fitWindow(true); else view.fitAll(true); }
     saveState();
   }
   function renderChips() {
     selectionChips(f.chips, s.selection, s.focus, function (key) { var n = m.nodes.get(key); return { kind: n.kind, label: n.label, title: n.item + " · " + qualified(n) }; },
-      function (key) { s.focus = key; details(side, m, key, { onOpen: select, health: health }); renderChips(); view.fitKeys([key], true); }, select,
+      function (key) { s.focus = key; details(side, m, key, { onOpen: select, within: within, health: health }); renderChips(); view.fitKeys([key], true); }, select,
       { list: s.patterns, count: function (q) { return matches(q).length; }, remove: removePattern });
   }
   function status(win) {

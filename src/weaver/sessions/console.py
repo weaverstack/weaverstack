@@ -109,6 +109,8 @@ class ConsoleSession(Session):
 
         # Validate the supplied credential now; acquire its token lazily.
         self._given_credential = checked_credential(credential)
+        self._token_providers: dict[tuple[int, str], Any] = {}
+        self._token_lock = threading.Lock()
         self._given_livy = livy
         self._given_store = store
         self._given_resolver = resolver
@@ -398,7 +400,17 @@ class ConsoleSession(Session):
             store=self._given_store,
             resolver=self._given_resolver,
             credential=self._given_credential,
+            token_provider_factory=self._token_provider,
         )
+
+    def _token_provider(self, scope, credential):
+        from ..fabric.auth import TokenProvider
+
+        key = (id(credential), scope)
+        with self._token_lock:
+            if key not in self._token_providers:
+                self._token_providers[key] = TokenProvider(scope, credential)
+            return self._token_providers[key]
 
     # --- readiness ----------------------------------------------------------
 
@@ -800,6 +812,7 @@ class ConsoleScope(WorkspaceScope):
         *,
         livy: Any = None,
         credential: Any = None,
+        token_provider_factory=None,
         **kwargs,
     ) -> None:
         super().__init__(workspace, **kwargs)
@@ -808,6 +821,7 @@ class ConsoleScope(WorkspaceScope):
         #: None defers credential selection and token acquisition until use.
         self._credential = credential
         self._given_credential = credential
+        self._token_provider_factory = token_provider_factory
         self._transport_store = None
         self._version_checked = False
         #: The Lakehouse this scope's Livy session was acquired against.
@@ -946,6 +960,8 @@ class ConsoleScope(WorkspaceScope):
             from ..fabric.auth import credential
 
             self._credential = credential()
+        if self._token_provider_factory is not None:
+            return self._token_provider_factory(scope or FABRIC_SCOPE, self._credential)
         return TokenProvider(scope or FABRIC_SCOPE, self._credential)
 
     def _power_bi_client(self):
@@ -1154,6 +1170,7 @@ class ConsoleScope(WorkspaceScope):
 
     def _acquire_sql(self, warehouse: WarehouseTarget):
         from ..fabric import desktop_sql_executor
+        from ..fabric.auth import SQL_SCOPE
         from .sql import SessionSqlExecutor
 
         if self._credential is None:
@@ -1164,6 +1181,7 @@ class ConsoleScope(WorkspaceScope):
                 self.workspace,
                 credential=self._credential,
                 resolver=self.resolver,
+                token_provider=self.token_provider(SQL_SCOPE),
             ),
             self.telemetry,
         )

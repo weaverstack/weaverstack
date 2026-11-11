@@ -275,6 +275,38 @@ def test_a_python_import_of_the_shortcut_carries_the_failure_across():
     assert finding.code == LOAD_ANCESTOR_UNESTABLISHED
 
 
+@weaver_test()
+def test_cross_catalogue_reachability_is_not_recomputed_for_every_report(monkeypatch):
+    from weaver.graph import Graph
+
+    producer = central()
+    consumer = sales()
+    entries = [Member("Central", "Central", "Weaver", producer, producer.dag())]
+    entries.extend(
+        Member(f"Sales{number}", f"Sales{number}", "Weaver", consumer, consumer.dag())
+        for number in range(7)
+    )
+    descendants = Graph.descendants
+    calls = []
+
+    def count_crossing_reach(graph, node):
+        if "::" in node:
+            calls.append(node)
+        return descendants(graph, node)
+
+    monkeypatch.setattr(Graph, "descendants", count_crossing_reach)
+    report = assess_joined(entries, as_of=NOW - timedelta(days=1), generated_at=NOW)
+
+    assert report.complete
+    assert [each.label for each in report.catalogues] == [e.label for e in entries]
+    for each in report.catalogues[1:]:
+        assert each.report is not None
+        finding = next(f for f in each.report.findings if f.object_id == REVENUE)
+        assert finding.code == LOAD_ANCESTOR_UNESTABLISHED
+    assert len(calls) == 7
+    assert len(set(calls)) == 7
+
+
 # --- what is reported, and in what order --------------------------------------
 
 

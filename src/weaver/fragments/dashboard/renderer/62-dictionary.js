@@ -152,7 +152,8 @@ function entitiesPage(body, m) {
   var s = pageState("entities"), md = metadata(m);
   s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
   var pick = pageItems(m, "entities", DETAIL_KINDS, false), chosen = pick.set;
-  var entries = dictionaryEntries(m).filter(function (e) {
+  var detailEntries = dictionaryEntries(m);
+  var entries = detailEntries.filter(function (e) {
     return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
   });
   var counts = {};
@@ -183,13 +184,20 @@ function entitiesPage(body, m) {
   var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(browsed.length) + " entries by name, kind or description; choose Column for columns · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
   var list = el("div", { "class": "wd-entry-list", role: "listbox" }), detail = el("div", { "class": "wd-entry-detail" }), note = el("div", { "class": "wd-status-line" });
   body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, pageKey(m), el("div", { "class": "wd-dictionary" }, [list, detail])]));
-  function tableEntry(id) { return entries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0] || null; }
+  function tableEntry(id) {
+    var entry = detailEntries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0];
+    var parts = id.split("|");
+    return entry || { kind: "Table reference", label: parts.slice(1).join("."), item: parts[0], id: id };
+  }
   function tableOf(e) {
     if (e.ref && e.ref.key) return e.ref.id;
     if (e.kind === "Column") return identityKey(e.ref.item, e.ref.schema, e.ref.object);
     return null;
   }
-  function current() { return entries.filter(function (e) { return entryId(e) === s.selected; })[0] || null; }
+  function current() {
+    return detailEntries.filter(function (e) { return entryId(e) === s.selected; })[0] ||
+      (s.selected && s.selected.indexOf("table|") === 0 ? tableEntry(s.selected.slice(6)) : null);
+  }
   function renderFacets() {
     facets.textContent = "";
     ENTITY_KINDS.forEach(function (k) {
@@ -240,6 +248,7 @@ function entitiesPage(body, m) {
 }
 
 function entryId(e) {
+  if (e.kind === "Table reference") return "table|" + e.id;
   if (e.kind === "Item") return "item|" + e.item;
   if (e.ref && e.ref.key) return "node|" + e.ref.key;
   if (e.kind === "Column") return "col|" + identityKey(e.ref.item, e.ref.schema, e.ref.object) + "|" + e.ref.column;
@@ -249,6 +258,12 @@ function entryId(e) {
 
 function entryDetail(panel, m, md, e, select) {
   panel.textContent = "";
+  if (e.kind === "Table reference") {
+    panel.appendChild(el("h2", { "class": "wd-detail-title", text: e.label }));
+    panel.appendChild(el("div", { "class": "wd-muted", text: e.item }));
+    panel.appendChild(el("p", { "class": "wd-note", text: "No catalogue metadata is available for this table." }));
+    return;
+  }
   var entries = dictionaryEntries(m);
   function find(kind, test) { return entries.filter(function (x) { return x.kind === kind && test(x); })[0]; }
   function openNode(key) {

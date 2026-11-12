@@ -74,7 +74,12 @@ class CatalogueConnection:
 
         if self._query_sets is None:
             return tuple(self._query(statement) for statement in statements)
-        return tuple(self._query_sets(statements))
+        sets = tuple(self._query_sets(statements))
+        if len(sets) != len(statements):
+            raise CommandError(
+                f"Catalogue returned {len(sets)} result sets for {len(statements)} queries"
+            )
+        return sets
 
     def execute(self, statement: str) -> None:
         if self._execute is None:
@@ -83,48 +88,6 @@ class CatalogueConnection:
                 "was provided"
             )
         self._execute(statement)
-
-    def projected_row_sets(self, tables, statements) -> tuple:
-        """Read whole catalogue tables through one typed relational projection."""
-
-        from .tsql import identifier
-
-        if not tables:
-            return ()
-        slots = dict.fromkeys(
-            (column.name, column.warehouse_type)
-            for table in tables
-            for column in table.columns
-        )
-        slots = {key: f"c{index}" for index, key in enumerate(slots)}
-        branches = []
-        for ordinal, (table, statement) in enumerate(zip(tables, statements)):
-            own = {(column.name, column.warehouse_type) for column in table.columns}
-            projection = [f"{ordinal} AS [__weaver_table]"]
-            for key, slot in slots.items():
-                name, sql_type = key
-                value = (
-                    f"[source].{identifier(name)}"
-                    if key in own
-                    else f"CAST(NULL AS {sql_type})"
-                )
-                projection.append(f"{value} AS {identifier(slot)}")
-            branches.append(
-                f"SELECT {', '.join(projection)} FROM ({statement}) AS [source]"
-            )
-        groups = tuple([] for table in tables)
-        for row in self.rows(" UNION ALL ".join(branches)):
-            ordinal = row["__weaver_table"]
-            if type(ordinal) is not int or not 0 <= ordinal < len(tables):
-                raise CommandError("Catalogue projection returned an unknown table")
-            table = tables[ordinal]
-            groups[ordinal].append(
-                {
-                    column.name: row[slots[column.name, column.warehouse_type]]
-                    for column in table.columns
-                }
-            )
-        return groups
 
 
 def catalogue_connection(session, workspace=None) -> CatalogueConnection:
@@ -141,7 +104,7 @@ def catalogue_connection(session, workspace=None) -> CatalogueConnection:
         lambda statement: session.execute_tsql(
             statement, target=target, workspace=resolved
         ),
-        lambda statements: session.query_tsql_sets(
+        lambda statements: session.query_tsql_batch(
             statements, target=target, workspace=resolved
         ),
     )

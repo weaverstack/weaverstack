@@ -129,6 +129,7 @@ class ConsoleSession(Session):
         self._ticking = False
 
     def close(self) -> None:
+        self._discovery.assert_can_close()
         with self._http_close_lock:
             super().close()
             if self._closed:

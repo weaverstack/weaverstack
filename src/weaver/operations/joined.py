@@ -253,7 +253,7 @@ def requested_by_label(
 READERS = 8
 
 
-def concurrently(entries, work, *, workers=READERS) -> list:
+def concurrently(entries, work, *, workers=READERS, session=None) -> list:
     """``work`` over each entry, in order: each result or the exception it raised."""
 
     from concurrent.futures import ThreadPoolExecutor
@@ -267,6 +267,8 @@ def concurrently(entries, work, *, workers=READERS) -> list:
 
     if not entries:
         return []
+    if session is not None:
+        return session.map_discovery(entries, guarded, workers=workers)
     with ThreadPoolExecutor(max_workers=min(workers, len(entries))) as pool:
         futures = [pool.submit(copy_context().run, guarded, e) for e in entries]
         return [future.result() for future in futures]
@@ -309,7 +311,7 @@ def read_run_places(session, places, *, tables=None):
         )
 
     found, failed = [], []
-    for place, outcome in zip(places, concurrently(places, read)):
+    for place, outcome in zip(places, concurrently(places, read, session=session)):
         if isinstance(outcome, Exception):
             failed.append(f"{place.reference}: {outcome}")
             continue

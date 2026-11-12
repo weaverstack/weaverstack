@@ -355,7 +355,9 @@ def _joined_health(
                 return member, seen, None
 
             with opened.step(f"Read {len(places)} catalogues"):
-                outcomes = concurrently(places, read, workers=_DISCOVERY_READERS)
+                outcomes = concurrently(
+                    places, read, workers=_DISCOVERY_READERS, session=opened
+                )
             entries, observed, failures = [], {}, {}
             for place, (member, seen, failure) in zip(places, outcomes):
                 if member is None:

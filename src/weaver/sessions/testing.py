@@ -374,6 +374,15 @@ class TestSession(Session):
             for statement in statements
         )
 
+    def query_tsql_batch(self, statements, *, target, workspace=None) -> tuple:
+        """Record a batch and retain one answer per independent SELECT."""
+
+        self._record("tsql", list(statements), workspace, target=target)
+        return tuple(
+            tuple(self._answer(self._tsql_answers, [statement]))
+            for statement in statements
+        )
+
     # --- recording -----------------------------------------------------------
 
     def _record(self, kind: str, body, workspace, **detail) -> None:

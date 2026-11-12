@@ -113,7 +113,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <section class="page-head"><div class="wrap">
 <p class="eyebrow"><a href="/guides/">Fabric Engineering Guides</a></p>
 <h1>Organising Fabric workspaces for independent teams</h1>
-<p class="lead">Give your teams their own Fabric projects and schedules, and you still need a way to follow the data between them. When a shared source fails, each team should be able to recover its own work—and join a coordinated recovery when that helps. This 50-workspace experiment shows how.</p>
+<p class="lead">Give your teams their own Fabric projects and schedules, and you still need a way to follow the data between them. When a shared source fails, each team should be able to recover its own work—and join a coordinated recovery when that helps. This 50-workspace recovery experiment shows how, followed by a separate Health check across 500 workspaces.</p>
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
@@ -198,6 +198,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 
 <h2 id="results">6. Results</h2>
 <p>Now return to the failed customer load. What could you see as the central team, what could you do as Team 05, and what happened when the remaining work ran together?</p>
+<p>The recovery and coordinated Load results below are from the 50-workspace experiment. The later <a href="#health-at-500-workspaces">500-workspace Health qualification</a> measures a different operation.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Experiment results"><table class="benchmark" style="min-width:640px"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
 <tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 managed tables and semantic models in 45 downstream workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
 <tr><td>Team 05</td><td>Which of our tables need attention, and why?</td><td>Both Mart tables, with the failed <code>BRZ.Customer</code> load named as the cause.</td><td>11 seconds</td></tr>
@@ -218,6 +219,15 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <h3 id="coordination-when-required">6.4 Coordination when the organisation needs it</h3>
 <p>When you need a wider recovery, select the workspaces or items together and supply their catalogues. Use <code>--stale</code> to narrow that selection to work whose recorded state needs another load.</p>
 <p>In this run, that meant coordinating work across the participating projects using their existing dependencies. You can choose this for an organisation-wide recovery while leaving everyday scheduling with each team.</p>
+
+<h3 id="health-at-500-workspaces">6.5 Health across 500 workspaces</h3>
+<p>The estate was subsequently expanded to 500 workspaces, preserving the original 50. On 12 November 2026, a separate read-only qualification used an unreleased desktop optimisation candidate to check all 500 catalogues and their default target inventories on the same FTL64 trial capacity.</p>
+<figure class="facts-figure" aria-label="Read-only Health qualification across 500 workspaces">
+<div><strong>500</strong><span>catalogues in each check</span></div><div><strong>&lt;4 min</strong><span>first complete check</span></div><div><strong>&lt;3 min</strong><span>repeat complete check</span></div><div><strong>0</strong><span>unreadable catalogues in either check</span></div>
+<figcaption>Two consecutive checks of the same estate, with all default inventory checks enabled. These are desktop Health timings, not Load timings.</figcaption>
+</figure>
+<p>Each check included discovery, catalogue reads, target inventories, joined assessment and Session lifetime. Both returned the same report content apart from observation timestamps. Complete means that every selected catalogue was readable and assessed; it does not mean every catalogue was green.</p>
+<p>The expanded 500-workspace managed campaign has not qualified end to end. These Health results do not turn that campaign into a successful coordinated Load or recovery. The qualified recovery results above remain the 50-workspace experiment.</p>
 
 <h2 id="conclusion">7. Team ownership, coordinated operation</h2>
 <p>You can give teams control of their Fabric work without losing the ability to operate across it. Keep each team's project, catalogue and schedule; use the recorded connections when a shared failure or coordinated run needs a wider view.</p>

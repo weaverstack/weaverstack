@@ -985,11 +985,17 @@ class _FakeTds:
 
     @classmethod
     def answer(cls, statement: str) -> list[dict]:
+        from support.tsql_projection import projected_rows
+
         from weaver.catalogue.tables import (
             INSTALLATION,
             PROJECTED_TABLES,
             REGISTRY,
         )
+
+        projected = projected_rows(statement, cls.answer)
+        if projected is not None:
+            return projected
 
         if "INFORMATION_SCHEMA.COLUMNS" in statement:
             return [

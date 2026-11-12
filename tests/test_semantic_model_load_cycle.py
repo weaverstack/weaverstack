@@ -70,6 +70,9 @@ def installed_rows():
 
 
 def answer_installed(session, rows):
+    from support.tsql_projection import ProjectedAnswers
+
+    session._tsql_answers = ProjectedAnswers(session._tsql_answers)
     session.answer_tsql(
         "SELECT TABLE_NAME, COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = N'_'",
         [

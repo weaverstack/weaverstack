@@ -51,6 +51,9 @@ HEALTH_TABLES = (
 #: Mirrored catalogues contribute only current load state.
 SOURCE_TABLES = (LOAD_STATUS,)
 
+# Each whole-catalogue read uses one relational TDS request.
+_DISCOVERY_READERS = 64
+
 
 def health(
     items: str | Sequence[str] | None = None,
@@ -352,7 +355,7 @@ def _joined_health(
                 return member, seen, None
 
             with opened.step(f"Read {len(places)} catalogues"):
-                outcomes = concurrently(places, read)
+                outcomes = concurrently(places, read, workers=_DISCOVERY_READERS)
             entries, observed, failures = [], {}, {}
             for place, (member, seen, failure) in zip(places, outcomes):
                 if member is None:

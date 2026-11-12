@@ -46,6 +46,22 @@ class Item:
         return f"{self.type} {self.name} ({self.id})"
 
 
+class WorkspaceDirectory:
+    """One lazy directory snapshot shared by a Session's workspace resolvers."""
+
+    def __init__(self) -> None:
+        import threading
+
+        self._lock = threading.Lock()
+        self._entries = None
+
+    def read(self, *, client: FabricClient):
+        with self._lock:
+            if self._entries is None:
+                self._entries = tuple(client.paged("workspaces"))
+            return self._entries
+
+
 def find_workspace(
     name: str, *, client: FabricClient | None = None, workspaces=None
 ) -> WorkspaceItem:

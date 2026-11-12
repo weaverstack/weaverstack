@@ -123,10 +123,12 @@ class OneLakeDfsClient:
         token: str | Callable[[], str] | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         telemetry=None,
+        requester=None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.telemetry = telemetry
+        self._requester = requester
         self._token_source = token_source(token, scope=STORAGE_SCOPE)
 
     @property
@@ -172,6 +174,11 @@ class OneLakeDfsClient:
                     headers=merged,
                     data=data,
                     timeout=self.timeout,
+                    **(
+                        {"requester": self._requester}
+                        if self._requester is not None
+                        else {}
+                    ),
                 )
             except requests.exceptions.RequestException as exc:
                 error = StoreError if never_sent(exc) else StoreOutcomeUnknown

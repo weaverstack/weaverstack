@@ -253,7 +253,7 @@ def requested_by_label(
 READERS = 8
 
 
-def concurrently(entries, work) -> list:
+def concurrently(entries, work, *, workers=READERS) -> list:
     """``work`` over each entry, in order: each result or the exception it raised."""
 
     from concurrent.futures import ThreadPoolExecutor
@@ -267,7 +267,7 @@ def concurrently(entries, work) -> list:
 
     if not entries:
         return []
-    with ThreadPoolExecutor(max_workers=min(READERS, len(entries))) as pool:
+    with ThreadPoolExecutor(max_workers=min(workers, len(entries))) as pool:
         futures = [pool.submit(copy_context().run, guarded, e) for e in entries]
         return [future.result() for future in futures]
 

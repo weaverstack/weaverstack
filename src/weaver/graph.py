@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from heapq import heapify, heappop, heappush
+from itertools import count
+from typing import Any, Iterable, Mapping
 
 from .errors import GraphError
 
@@ -18,6 +20,18 @@ class Edge:
 
     def __str__(self) -> str:
         return f"{self.upstream} -> {self.downstream}"
+
+
+@dataclass(eq=False, slots=True)
+class _Ready:
+    rank: Any
+    sequence: int
+    value: Any
+
+    def __lt__(self, other):
+        return self.rank < other.rank or (
+            not other.rank < self.rank and self.sequence < other.sequence
+        )
 
 
 class Graph:
@@ -211,16 +225,21 @@ class Graph:
             if source != target and target not in below[source]:
                 below[source].add(target)
                 waiting[target] += 1
-        ready = sorted((m for m, count in waiting.items() if count == 0), key=first)
+        sequence = count()
+        ready = [
+            _Ready(first(m), next(sequence), m)
+            for m, remaining in waiting.items()
+            if remaining == 0
+        ]
+        heapify(ready)
         ordered: list[str] = []
         while ready:
-            members = ready.pop(0)
+            members = heappop(ready).value
             ordered.extend(self._order_within(members, rank))
             for target in below[members]:
                 waiting[target] -= 1
                 if waiting[target] == 0:
-                    ready.append(target)
-            ready.sort(key=first)
+                    heappush(ready, _Ready(first(target), next(sequence), target))
         return tuple(ordered)
 
     def _plain_order(self, key=None) -> tuple[str, ...]:
@@ -228,19 +247,22 @@ class Graph:
 
         rank = (lambda node: node) if key is None else key
         remaining = {node: len(self._upstream[node]) for node in self._nodes}
-        ready = sorted(
-            (node for node, count in remaining.items() if count == 0), key=rank
-        )
+        sequence = count()
+        ready = [
+            _Ready(rank(node), next(sequence), node)
+            for node, waiting in remaining.items()
+            if waiting == 0
+        ]
+        heapify(ready)
         ordered: list[str] = []
 
         while ready:
-            node = ready.pop(0)
+            node = heappop(ready).value
             ordered.append(node)
             for child in sorted(self._downstream[node]):
                 remaining[child] -= 1
                 if remaining[child] == 0:
-                    ready.append(child)
-            ready.sort(key=rank)
+                    heappush(ready, _Ready(rank(child), next(sequence), child))
         return tuple(ordered)
 
     def _order_within(self, members: tuple[str, ...], rank) -> list[str]:

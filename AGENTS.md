@@ -1061,9 +1061,10 @@ architecture left layered underneath the new architecture is not.
 ## Environment neutrality
 
 Weaverstack contains no defaults for product, workspace, Lakehouse, Warehouse,
-endpoint, repository or notebook names, no production endpoints and no local
-platform paths. Allowed defaults are generic technical values: Fabric API URLs,
-auth scopes, Livy version, timeouts, polling intervals, parallelism.
+endpoint, repository or notebook names, no production endpoints, no local
+platform paths and no private hostnames. Allowed defaults are generic technical
+values: Fabric API URLs, auth scopes, Livy version, timeouts, polling intervals,
+parallelism.
 
 This covers examples, docstrings and test fixtures as well as code paths. Use
 neutral item names such as `Sales`, `Inventory` and `Reporting`.

@@ -64,31 +64,32 @@
 
       <section class="section">
         <div class="wrap">
-          <h2>What Weaver covers beyond dbt</h2>
+          <h2>When your work extends beyond SQL models</h2>
+          <p>If your main task is transforming relations with dbt, you may already have the workflow you need. But Microsoft Fabric is much broader than SQL transformation. You may also need to load source data with Python, connect Lakehouse and Warehouse work, and deploy and refresh native Power BI models. Weaver brings that work into the same project and operating workflow.</p>
           <div class="cards two">
             <div class="card">
               <h3>One project from source data to Power BI</h3>
-              <p>Load files and APIs with Python, build Delta Tables in a Lakehouse, write T-SQL in a Warehouse, then deploy native Power BI models and Reports. Weaver connects the supported steps in the right order.</p>
+              <p>When your report depends on both a Python load and a Warehouse query, put those definitions and your native Power BI files in one project. Weaver records their dependencies and orders the selected data work, including the SQL endpoint readiness steps between engines.</p>
             </div>
             <div class="card">
               <h3>Keep your SQL looking like SQL</h3>
-              <p>Write an ordinary Warehouse SELECT. Weaver creates the table and loading code around it, including staging, key-based updates and recorded row changes. Python and supported SQL references also help establish what depends on what.</p>
+              <p>Write an ordinary Warehouse SELECT and declare the table's columns and key in its comment. You choose which source changes to supply; Weaver creates the table and loading routines around your query, handling staging, key-based updates and recorded row changes. Supported T-SQL references establish dependencies.</p>
             </div>
             <div class="card">
               <h3>Build and load are separate steps</h3>
-              <p><code>weaver build</code> deploys tables, views, shortcuts and loading code. <code>weaver load</code> runs the data work separately. Preview proposed changes before applying them, or run only the parts you need.</p>
+              <p>Use <code>weaver build --dry-run</code> to inspect a deployment, then Build to install definitions and loading code. Run Load when you want to process data. This lets you review a definition change separately from the work that fills its tables.</p>
             </div>
             <div class="card">
               <h3>Develop with the data already there</h3>
-              <p>Mirror can use existing Warehouse and Lakehouse data through views and OneLake shortcuts. Make local changes to the parts you're working on without copying every table into development.</p>
+              <p>Use Mirror to borrow existing Warehouse and Lakehouse data through views and OneLake shortcuts. You can develop local changes to the parts you own without first copying every table into development.</p>
             </div>
             <div class="card">
-              <h3>See beyond dbt job history</h3>
-              <p>dbt shows job results and lineage. Weaver adds queryable Fabric Warehouse history and a Power BI dashboard for the Lakehouse, Warehouse and semantic-model work it manages, including ER diagrams and model bus matrices. <a href="#catalogue-dashboard">See the difference →</a></p>
+              <h3>Investigate the work behind a report</h3>
+              <p>Use dbt's job results and lineage to investigate your dbt models. With Weaver, you can also query deployment, load and test history for managed Lakehouse, Warehouse and semantic-model work in Fabric Warehouse tables, or explore it in the included Power BI dashboard. <a href="#catalogue-dashboard">See how to investigate a run →</a></p>
             </div>
             <div class="card">
               <h3>Take native Power BI all the way to deployment</h3>
-              <p>Use PBIP and TMDL, apply shared or model-specific rules, unit test DAX measures against independent SQL results, and deploy Reports connected to the right semantic model.</p>
+              <p>Keep authoring in PBIP and TMDL. Use Weaver to apply shared or model-specific rules, deploy models and associated Reports, and unit test DAX measures against independent SQL results. Build deploys definitions; Load refreshes the selected models after their selected sources.</p>
             </div>
           </div>
         </div>
@@ -98,15 +99,17 @@
 
             <section class="section">
         <div class="wrap">
-          <h2>Build, load, test and Health</h2>
-          <p>Deploying a table, loading its data and checking the results are separate steps. Run just the one you need. Here is the workflow for a Warehouse item:</p>
+          <h2>Build, Load, Test and Health</h2>
+          <p>Suppose you have defined a Warehouse item named <code>Operations</code>, including its tables and validations. From its project folder, with <code>workspace-config.yml</code> pointing to your prepared Fabric workspace, catalogue and Warehouse target, you can inspect the deployment before installing it:</p>
           <div class="code plain">
             <div class="code-bar"><span>From a configured Fabric project</span></div>
-            <pre>weaver build --item Warehouse/Operations   <span class="c-dim"># Deploy its definitions</span>
-weaver load Warehouse/Operations           <span class="c-dim"># Run the data work</span>
-weaver test Warehouse/Operations           <span class="c-dim"># Check the results</span>
-weaver health                              <span class="c-dim"># Inspect the whole project</span></pre>
+            <pre><code data-language="bash">weaver build --item Warehouse/Operations --dry-run
+weaver build --item Warehouse/Operations
+weaver load Warehouse/Operations
+weaver test Warehouse/Operations
+weaver health</code></pre>
           </div>
+          <p>Build reads your source files. Load runs the installed loading code; Test runs the installed validations. Rebuild after a source edit to put it into use. Health reads the managed estate's state so you can see what needs attention. The same commands cover Lakehouse and semantic-model work; build physical sources first, then models and Reports in a separate call.</p>
           <p><a class="text-link" href="/how-it-works/">See how the commands work →</a></p>
         </div>
       </section>
@@ -114,7 +117,7 @@ weaver health                              <span class="c-dim"># Inspect the who
       <section class="section dbt-dashboard-section" id="catalogue-dashboard">
         <div class="wrap">
           <h2>Lineage and run state in Power BI</h2>
-          <p>dbt in Fabric already gives you job results, tests and model lineage. Weaver adds a different perspective: <strong>what is happening across the Fabric project it manages?</strong></p>
+          <p>When a report looks out of date, start by asking which source loads and model refreshes completed. dbt in Fabric gives you job results, tests and model lineage. Weaver's Catalogue Dashboard brings the managed Lakehouse, Warehouse and semantic-model work into the same investigation.</p>
           <div class="dbt-visibility-contrast">
             <div>
               <h3>dbt in Fabric</h3>
@@ -122,13 +125,13 @@ weaver health                              <span class="c-dim"># Inspect the who
             </div>
             <div>
               <h3>Weaver</h3>
-              <p>Query deployment, load and test history in Fabric Warehouse tables. Open a ready-to-use Power BI dashboard covering managed Lakehouses, Warehouses and semantic models, including Health, performance and workflow timelines.</p>
+              <p>Open the included Power BI dashboard to find failed or stale work, follow its dependencies and examine workflow timings. Query the underlying Fabric Warehouse tables when you need your own analysis of deployment, load and test history.</p>
             </div>
           </div>
           <div class="dbt-dashboard-gallery">
             <figure>
-              <a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#overview">
-                <img src="/assets/images/catalogue-dashboard/overview.webp" width="1440" height="900" loading="lazy" alt="Weaver Catalogue Dashboard: overview of deployed Fabric work, Health and recent activity.">
+              <a href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#items">
+                <img src="/assets/images/catalogue-dashboard/items.webp" width="1440" height="900" loading="lazy" alt="Weaver Catalogue Dashboard: installed items with their objects, load state and Health.">
               </a>
               <figcaption>Operational Health and run history</figcaption>
             </figure>
@@ -139,8 +142,8 @@ weaver health                              <span class="c-dim"># Inspect the who
               <figcaption>ER diagram and table dictionary</figcaption>
             </figure>
           </div>
-          <p><strong>Lineage isn't the same as data modelling.</strong> dbt's lineage shows transformation dependencies. Weaver also shows declared primary-key and foreign-key relationships in an ER diagram, and fact-to-dimension relationships in a bus matrix for each native Power BI semantic model.</p>
-          <p><a class="text-link" href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#the-pages">Try all seven interactive dashboard pages →</a><span aria-hidden="true"> · </span><a class="text-link" href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#semantic-model">Explore the semantic-model bus matrix →</a></p>
+          <p>Use lineage to follow transformation dependencies. When you need to understand how tables relate, use Weaver's ER diagram of declared primary and foreign keys, or the fact-to-dimension bus matrix for each native Power BI semantic model. These answer a different question from which transformation ran first.</p>
+          <p><a class="text-link" href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#the-pages">Try all eight interactive dashboard pages →</a><span aria-hidden="true"> · </span><a class="text-link" href="https://docs.weaverstack.dev/estate/catalogue-dashboard/#semantic-model">Explore the semantic-model bus matrix →</a></p>
         </div>
       </section>
 
@@ -316,8 +319,8 @@ weaver health                              <span class="c-dim"># Inspect the who
       <section class="section" id="migrating-from-dbt" style="scroll-margin-top: 90px;">
         <div class="wrap">
           <h2>Migrating from dbt</h2>
-          <p class="lede">Weaver uses declarative files for the whole Fabric estate. A dbt project fits naturally into the part that handles Tables, Views and Tests.</p>
-          <p>Use this agent brief with a coding agent to migrate your project.</p>
+          <p class="lede">Start by mapping your dbt models and validations to Weaver Tables, Views and Tests. Keep the original business logic and incremental behaviour explicit as you choose the Fabric destinations.</p>
+          <p>Use this brief with a coding agent to inspect your project, confirm the migration decisions with you and validate the result. It defaults to isolated development destinations and local validation; authorise deployment separately when you are ready.</p>
           <div class="actions">
             <button class="button blue" type="button" data-copy-markdown="migration-agent-brief.md" aria-describedby="migration-copy-status" disabled>Copy agent brief</button>
             <a class="button ghost" href="migration-agent-brief.md">View Markdown</a>

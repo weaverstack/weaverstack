@@ -7,7 +7,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from check_product_site import run, stamp_assets
+from check_product_site import route_file, run, stamp_assets
+
+
+class RouteResolution(unittest.TestCase):
+    def test_origin_without_path_resolves_to_index(self):
+        root = Path("built-docs")
+        self.assertEqual(route_file(root, ""), root / "index.html")
+        self.assertEqual(route_file(root, "/"), root / "index.html")
+        self.assertEqual(route_file(root, "/guide/"), root / "guide/index.html")
+        self.assertEqual(route_file(root, "/demo.html"), root / "demo.html")
+
 
 ROOT = Path(__file__).resolve().parents[1] / "docs"
 
@@ -43,8 +53,8 @@ class ProductMigration(unittest.TestCase):
     def test_rejects_a_link_to_the_retired_scale_page(self):
         self.mutate(
             "features",
-            "<h2>Built for scale</h2>",
-            '<h2>Built for scale</h2><a href="/scale/">old</a>',
+            '<h3 id="scale-title">',
+            '<a href="/scale/">old</a><h3 id="scale-title">',
         )
         with self.assertRaisesRegex(AssertionError, "stale retired product link"):
             self.check()

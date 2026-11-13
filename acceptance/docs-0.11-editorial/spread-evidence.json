@@ -1,0 +1,171 @@
+{
+  "runtime_revision": "efc046e7cf066daefd27f9268413ae05c3ed64e4",
+  "run_date": "2026-11-07",
+  "timing_boundary": "CLI harness wall time",
+  "times": {
+    "00a-bronze-build-good": {
+      "seconds": 75.3,
+      "exit": 0
+    },
+    "01-federated-load": {
+      "seconds": 314.5,
+      "exit": 0
+    },
+    "02-baseline-health": {
+      "seconds": 74.0,
+      "exit": 1
+    },
+    "03a-bronze-build-broken": {
+      "seconds": 77.1,
+      "exit": 0
+    },
+    "03b-bronze-failed-load": {
+      "seconds": 88.4,
+      "exit": 1
+    },
+    "04-impact-health": {
+      "seconds": 81.9,
+      "exit": 1
+    },
+    "05-team05-health": {
+      "seconds": 10.8,
+      "exit": 1
+    },
+    "06a-bronze-build-fixed": {
+      "seconds": 65.0,
+      "exit": 0
+    },
+    "06b-central-plan": {
+      "seconds": 23.2,
+      "exit": 0
+    },
+    "06c-central-recovery": {
+      "seconds": 137.6,
+      "exit": 0
+    },
+    "07a-team05-ready": {
+      "seconds": 5.0,
+      "exit": 1
+    },
+    "07b-team05-reload": {
+      "seconds": 14.9,
+      "exit": 0
+    },
+    "07c-team05-after": {
+      "seconds": 67.4,
+      "exit": 0
+    },
+    "08-federated-stale": {
+      "seconds": 256.0,
+      "exit": 0
+    },
+    "09-final-health": {
+      "seconds": 105.7,
+      "exit": 1
+    }
+  },
+  "files": {
+    "runs/RESULTS.md": "c0f46c251d989c0e13a61bc1e0ba4f0e479f62ef8e9b232448887264d5ba9a04",
+    "runs3/00-publish.txt": "ba5087355429b7926236c39e338101df287b0b1d9598e2d373d05cd3fb867f1b",
+    "runs3/01-federated-load.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs3/01-federated-load.json": "e6b1bc5818f53db60dbb4b9242ca11a36d6763f13a425411d80987ccdd45bca2",
+    "runs3/04-impact-health.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs3/04-impact-health.json": "6c02595d2b9e847255e94403d2a3b361d9feaad53a9006ddf357639e727dc412",
+    "runs3/05-team05-health.err": "9afcbf4634019ce2a745f929f68cc97f32ec0e8ff85ff77bf0c5f54fa5143d0d",
+    "runs3/05-team05-health.txt": "8765cd48f3a1c588fc6b167db954bf3995f42c00d5cd16b44d53267fed08d42f",
+    "runs3/06b-central-plan.txt": "899e0f1835ffbdc116cb17720f87779513f191dc8192235e4d712ae2ffc98ce8",
+    "runs3/06c-central-recovery.txt": "48bd8c613d0e3a4aa6cd2c56d217517a7f9ddbd4baa3aacda54d674bf9645bb0",
+    "runs3/07a-team05-ready.txt": "df7c395a88c8497d06db7adbd05862f95d03eec816416225c20fbcb5fdd9ce49",
+    "runs3/07b-team05-reload.txt": "af8d86b59540852e8a78a31554a61adbb482e37bc432757e7252653cc4c44728",
+    "runs3/07c-team05-after.txt": "0c16c357944208ca63d7d2bee5b32c4c0f8f0558532670ad5729786f8f072f57",
+    "runs3/08-federated-stale.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs3/08-federated-stale.json": "552002e0c9d21490d80f9f22ca7543e84c74a130fc8cd1dcd8dcb0adee148a51",
+    "runs3/09-final-health.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs3/09-final-health.json": "e0c9cd2bb293034039ced69dce79d0b6739300ecd2fd0c6cb4d32ffe5d691179",
+    "runs3/RESULTS.md": "8adb892a8a8de104a19b95ba2755887d993584a0a4c8b67d6e969fc67f5db3b8",
+    "runs3/times.json": "0e9ac126c9986a5eaa3c1035599b80f06d4c75489d9d1fc67f5bd88f18252a4b",
+    "spread_docs.py": "6550a2d3ee8d973bffa24045aff45eee4601ec028c325cfe4e0429dd1bfa6a19",
+    "spread_estate.py": "eaf6c9b80b0200383d9430e73537ddf6c19a27c4bc509e65c78a2c5471bc2297"
+  },
+  "coordinated_load": {
+    "catalogues_supplied": 50,
+    "steps": 125,
+    "statuses": {
+      "succeeded": 125
+    },
+    "object_loads": 80,
+    "object_owner_catalogues": 46,
+    "all_node_owner_catalogues": 46,
+    "primitive_kinds": {
+      "python_table": 8,
+      "endpoint_refresh": 41,
+      "warehouse_procedure": 61,
+      "onelake_publication": 4,
+      "semantic_refresh": 11
+    },
+    "workflow_id": "ed2392e2fa7d45fe96a474de6733e169"
+  },
+  "stale_recovery": {
+    "catalogues_supplied": 50,
+    "steps": 112,
+    "statuses": {
+      "succeeded": 112
+    },
+    "object_loads": 71,
+    "object_owner_catalogues": 42,
+    "all_node_owner_catalogues": 43,
+    "primitive_kinds": {
+      "onelake_publication": 3,
+      "endpoint_refresh": 38,
+      "warehouse_procedure": 57,
+      "semantic_refresh": 10,
+      "python_table": 4
+    },
+    "workflow_id": "8aa6bb335fb940be9275aa64f6343e7a"
+  },
+  "impact": {
+    "catalogues": 50,
+    "catalogue_statuses": {
+      "red": 1,
+      "amber": 45,
+      "green": 4
+    },
+    "downstream_subjects": 77,
+    "downstream_catalogues": 45,
+    "subject_types": {
+      "Lakehouse": 5,
+      "Warehouse": 61,
+      "SemanticModel": 11
+    }
+  },
+  "final_health": {
+    "catalogue_statuses": {
+      "green": 49,
+      "amber": 1
+    },
+    "cycles": [
+      [
+        "SPREAD_TEAM_01::Lakehouse/Bridge/Tables/PEER.Summary",
+        "SPREAD_TEAM_01::Warehouse/Mart/MART.PeerSummary",
+        "SPREAD_TEAM_02::Lakehouse/Bridge/Tables/PEER.PeerSummary",
+        "SPREAD_TEAM_02::Warehouse/Mart/MART.Summary"
+      ]
+    ],
+    "findings": [
+      {
+        "catalogue": "SPREAD_TEAM_01",
+        "area": "load",
+        "code": "load_stale_ancestor",
+        "severity": "amber",
+        "status": "succeeded",
+        "message": "SPREAD_TEAM_02: Warehouse/Mart/MART.RegionCustomers has been established since this object was loaded",
+        "object_id": "Warehouse/Mart/MART.PeerSummary",
+        "target": "Warehouse/Mart",
+        "workflow_id": "8aa6bb335fb940be9275aa64f6343e7a",
+        "started_at": "2026-11-07T12:34:08.532955+00:00",
+        "completed_at": "2026-11-07T12:34:12.017073+00:00",
+        "failure_count": null
+      }
+    ]
+  }
+}

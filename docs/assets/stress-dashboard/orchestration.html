@@ -337,7 +337,57 @@ border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surf
 .wd-mini th { padding: 3px 4px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-align: right; text-transform: uppercase; }
 .wd-mini td { padding: 4px; border-top: 1px solid var(--line); text-align: right; }
 .wd-mini th:first-child, .wd-mini td:first-child { text-align: left; }
-.wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }</style><script>(function (root, module) {
+.wd-mini .wd-current td { background: var(--blue-soft); font-weight: 700; }
+/* The mirror toggle sits in the toolbar. */
+/* As a mirror left an object: borrowed objects muted, changed and added ones marked. */
+.wd-borrowed { opacity: 0.6; }
+.wd-borrowed:hover, .wd-borrowed:focus-visible { opacity: 0.9; }
+tr.wd-changed > td:first-child, .wd-entry.wd-changed { box-shadow: inset 3px 0 0 var(--violet); }
+.wd-change-mark { display: inline-block; min-width: 13px; margin-left: 5px; padding: 0 2px; border-radius: 3px; background: var(--violet); color: var(--surface); font: 700 10px/13px var(--sans); text-align: center; }
+.wd-er-change { fill: var(--violet); font: 700 13px var(--sans); }
+.wd-key-swatch.wd-borrowed { background: var(--ink); opacity: 0.45; }
+.wd-key-change { width: 13px; height: 13px; border-radius: 3px; background: var(--violet); }
+.wd-key-change::before { content: "Δ"; display: block; color: var(--surface); font: 700 9px/13px var(--sans); text-align: center; }
+/* --- estate ------------------------------------------------------------------ */
+.wd-estate { margin: 12px 0 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.wd-estate-scroll { overflow: auto; max-height: 720px; }
+.wd-estate-svg { display: block; }
+.wd-estate-edge { fill: none; stroke: var(--line-strong); stroke-width: 1.6; }
+.wd-estate-edge.wd-lit { stroke: var(--blue); stroke-width: 2.4; }
+.wd-estate-arrowhead { fill: var(--line-strong); }
+.wd-estate-count { fill: var(--muted); font: 600 11px var(--mono); }
+.wd-estate-card { cursor: pointer; }
+.wd-estate-card rect:first-of-type { fill: var(--surface); stroke: var(--line-strong); }
+.wd-estate-card.wd-current rect:first-of-type { stroke: var(--blue); stroke-width: 2; }
+.wd-estate-card .wd-estate-tone { fill: var(--faint); stroke: none; }
+.wd-estate-card.wd-ok .wd-estate-tone { fill: var(--green); }
+.wd-estate-card.wd-warn .wd-estate-tone { fill: var(--amber); }
+.wd-estate-card.wd-bad .wd-estate-tone { fill: var(--red); }
+.wd-estate-eyebrow { fill: var(--blue); font: 700 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.wd-estate-title { fill: var(--ink); font: 700 15px var(--sans); }
+.wd-estate-line { fill: var(--muted); font: 12px var(--sans); }
+.wd-dim { opacity: .35; }
+/* --- choosing items ---------------------------------------------------------- */
+.wd-chooser { position: relative; display: inline-block; }
+.wd-chooser-button { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; padding: 3px 10px 3px 0; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.wd-chooser-button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.wd-chooser-caret { color: var(--muted); font-size: 10px; }
+.wd-chooser-panel { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(460px, calc(100vw - 32px)); max-height: 460px; display: flex; flex-direction: column;
+border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.wd-chooser-tools { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
+.wd-chooser-tools .wd-search { flex: 1 1 auto; min-width: 0; }
+.wd-chooser-list { overflow: auto; padding: 4px 0; }
+.wd-chooser-entry { display: flex; align-items: center; gap: 8px; padding: 4px 12px; cursor: pointer; }
+.wd-chooser-entry.wd-current { background: var(--blue-soft); }
+.wd-chooser-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+.wd-chooser-hint { padding: 6px 12px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.wd-ws-group { margin-bottom: 18px; }
+.wd-ws-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 8px; }
+.wd-ws-head h3 { margin: 0; font-size: 15px; }
+.wd-model-part + .wd-model-part { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+.wd-chooser-whole .wd-chooser-name { font-weight: 700; }
+.wd-key-plain .wd-kind { filter: grayscale(1); opacity: 0.8; }
+.wd-page-key { margin: 0 0 14px; }</style><script>(function (root, module) {
 "use strict";
 var UTC_ZONES = /^(?:UTC|Etc\/UTC|GMT|Etc\/GMT|Z)$/;
 function showUtc() { return !!(root.__WD_STATE && root.__WD_STATE.utc); }
@@ -378,6 +428,7 @@ if (root.__WD_REDRAW) root.__WD_REDRAW();
 }, function (v) { return v === "utc" ? "UTC" : "Local · " + zoneLabel(m.at, false); });
 }
 var FIELD = "", ROW = "", TABLE = "", LESS = "";
+var OWNER = "";
 var KIND = {
 TABLE: "Table", VIEW: "View", FOLDER: "Folder", SHORTCUT: "Shortcut",
 TEST: "Test", ASSUMPTION: "Assumption", MODEL: "Semantic model", REPORT: "Report"
@@ -408,8 +459,26 @@ return isNaN(n) ? null : n;
 }
 function identityKey(item, schema, object) { return item + "|" + (schema || "") + "|" + (object || ""); }
 function isValidation(node) { return node.kind === KIND.TEST || node.kind === KIND.ASSUMPTION; }
-function itemType(label) { return String(label).split("/")[0]; }
-function itemName(label) { var s = String(label); return s.slice(s.indexOf("/") + 1); }
+function bare(value) { var s = String(value), at = s.indexOf(OWNER); return at < 0 ? s : s.slice(0, at); }
+function ownerCode(value) { var s = String(value), at = s.indexOf(OWNER); return at < 0 ? "" : s.slice(at + 1); }
+function owned(value, code) { return code ? value + OWNER + code : value; }
+function itemType(label) { return bare(label).split("/")[0]; }
+function itemName(label) { var s = bare(label); return s.slice(s.indexOf("/") + 1); }
+/* The catalogues the page reads, by code; set by buildModel. */
+var CATALOGUES = new Map();
+function catalogueLabel(value) { var c = CATALOGUES.get(ownerCode(value)); return c ? c.label : ""; }
+/* Each installed item's workspace; set by buildModel. */
+var ITEM_WORKSPACES = new Map();
+/* The Fabric item of each item whose path another item shares. */
+var ITEM_TARGETS = new Map();
+/* An item as every page shows it: Workspace/Kind/Name, as the chooser lists it. */
+function shownItem(label) {
+if (label === null || label === undefined) return "";
+var w = ITEM_WORKSPACES.get(label) || catalogueLabel(label), target = ITEM_TARGETS.get(label);
+return (w ? w + "/" : "") + bare(label) + (target ? " (" + target + ")" : "");
+}
+/* An item's name alone, where its workspace and kind are shown beside it. */
+function shownName(label) { return itemName(label); }
 function typeRank(type) { var i = ITEM_TYPES.indexOf(type); return i < 0 ? ITEM_TYPES.length : i; }
 function compare(a, b) {
 a = String(a === null || a === undefined ? "" : a).toLowerCase();
@@ -423,22 +492,34 @@ draws, where a read through a shortcut is drawn from the shortcut. */
 function buildModel(tables, problems) {
 var t = function (name) { return tables[name] || []; };
 var meta = t("meta")[0] || {}, page = t("page")[0] || {};
+CATALOGUES = new Map();
+t("catalogues").forEach(function (r) { CATALOGUES.set(r.code, { code: r.code, label: r.label, reference: r.reference }); });
 var m = {
 page: page.name || "overview", at: num(meta.at) || Date.now(), tables: tables,
+catalogues: Array.from(CATALOGUES.values()), mode: meta.mode || null, imported: num(meta.imported),
+tooLarge: (t("toolarge")[0] || null),
 problems: (problems || []).slice(), items: new Map(), nodes: new Map(), byIdentity: new Map(),
 internalItems: new Set(), edgeCount: 0, hiddenEdges: 0, externalCount: 0
 };
 t("internal").forEach(function (r) { m.internalItems.add(r.item); });
 function item(label) {
 var it = m.items.get(label);
-if (!it) m.items.set(label, it = { label: label, type: itemType(label), name: itemName(label), workspace: null, target: null, version: null, nodes: [], internal: m.internalItems.has(label) || label === CATALOGUE_ITEM });
+if (!it) m.items.set(label, it = { label: label, type: itemType(label), name: itemName(label), code: ownerCode(label), catalogue: catalogueLabel(label),
+workspace: null, workspaceId: null, target: null, targetId: null, version: null, nodes: [], internal: m.internalItems.has(label) || bare(label) === CATALOGUE_ITEM });
 return it;
 }
 t("items").forEach(function (r) {
 var it = item(r.item);
 it.workspace = r.workspace; it.target = r.target; it.version = r.version;
+it.workspaceId = r.workspaceid || null; it.targetId = r.targetid || null;
 });
-var catalogue = m.items.get(CATALOGUE_ITEM);
+ITEM_WORKSPACES = new Map(); ITEM_TARGETS = new Map();
+m.items.forEach(function (it) { if (it.workspace) ITEM_WORKSPACES.set(it.label, it.workspace); });
+var paths = new Map();
+m.items.forEach(function (it) { if (!it.internal) addTo(paths, shownItem(it.label), it); });
+paths.forEach(function (list) { if (list.length > 1) list.forEach(function (it) { if (it.target) ITEM_TARGETS.set(it.label, it.target); }); });
+var first = m.catalogues.length ? m.catalogues[0].code : "";
+var catalogue = m.items.get(owned(CATALOGUE_ITEM, first)) || m.items.get(CATALOGUE_ITEM);
 m.catalogue = { name: catalogue ? catalogue.target : null, workspace: catalogue ? catalogue.workspace : null, version: catalogue ? catalogue.version : null };
 t("nodes").forEach(function (r) {
 if (m.nodes.has(r.key)) { m.problems.push("Two lineage nodes share the key " + r.key + "; one of them is not shown."); return; }
@@ -470,10 +551,20 @@ from.vdown.push(d.key); d.vup.push(from.key);
 d.kinds[from.key] = from === u ? kind : "Dependency";
 }
 });
+m.crossings = joinCatalogues(m, t("shortcuts"));
+m.crossings.forEach(function (c) {
+if (!c.producer) return;
+var u = m.nodes.get(c.producer), d = m.nodes.get(c.consumer), key = u.key + ">" + d.key;
+if (seen.has(key)) return;
+seen.add(key); u.down.push(d.key); d.up.push(u.key); m.edgeCount += 1;
+if (!vseen.has(key)) { vseen.add(key); u.vdown.push(d.key); d.vup.push(u.key); d.kinds[u.key] = "Shortcut"; }
+});
 t("loads").forEach(function (r) {
 var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
 if (n) n.load = status(r);
 });
+mirrorSources(m, t("mirrors"));
+markChanges(m, t("signatures"));
 t("tests").forEach(function (r) {
 var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
 if (n) { n.test = status(r); n.test.failures = num(r.failures); }
@@ -494,6 +585,98 @@ m.workflows.sort(function (a, b) { return (b.completed || 0) - (a.completed || 0
 m.workflowCount = num((t("workflowcount")[0] || {}).count);
 return m;
 }
+/* Where each physical shortcut lands among the catalogues read, as
+weaver.catalogues.join decides it: the installation of the target item in
+its workspace, then the object that item installs at the target path. A
+shortcut nothing given installs, or that several items install, joins nothing. */
+function joinCatalogues(m, shortcuts) {
+var installed = new Map();
+m.items.forEach(function (it) {
+if (!it.target) return;
+var key = [String(it.workspace || "").toLowerCase(), it.type, String(it.target).toLowerCase()].join("|");
+addTo(installed, key, it);
+});
+var out = [];
+shortcuts.forEach(function (r) {
+var code = ownerCode(r.item), consumerItem = m.items.get(r.item);
+var workspace = r.workspace || (consumerItem ? consumerItem.workspace : "");
+var target = workspace + "/" + r.targettype + "/" + r.target + "/" + r.targetschema + (r.targetobject ? "." + r.targetobject : "");
+var consumer = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+var crossing = { consumer: consumer ? consumer.key : null, item: r.item, target: target, workspace: workspace, producer: null, reason: null };
+var candidates = installed.get([String(workspace).toLowerCase(), r.targettype, String(r.target).toLowerCase()].join("|")) || [];
+var reached = candidates.map(function (it) { return { item: it, nodes: reachedNodes(m, it, r) }; }).filter(function (x) { return x.nodes.length; });
+if (!consumer) crossing.reason = "Its shortcut object is not installed in " + shownItem(r.item) + ".";
+else if (!candidates.length) crossing.reason = "No catalogue read installs " + workspace + "/" + r.targettype + "/" + r.target + ".";
+else if (reached.length > 1) crossing.reason = target + " is installed by more than one item read.";
+else if (!reached.length) crossing.reason = r.targetschema + (r.targetobject ? "." + r.targetobject : "") + " is not installed there.";
+if (crossing.reason) { out.push(crossing); return; }
+reached[0].nodes.forEach(function (n) {
+var schemaDestination = r.type === "Schema" ? m.byIdentity.get(identityKey(r.item, r.schema, n.object)) : null;
+out.push({ consumer: schemaDestination ? schemaDestination.key : consumer.key, item: r.item, target: target, workspace: workspace, producer: n.key, reason: null });
+});
+void code;
+});
+return out;
+}
+/* Where each mirrored object's rows come from. When the catalogue holding its
+source is read, the object's state is the source's, and none when the source
+no longer holds it; otherwise its state is not observed here. */
+function mirrorSources(m, rows) {
+function where(type, workspace, target) { return [type, workspace, target].map(function (v) { return String(v || "").toLowerCase(); }).join("|"); }
+var byTarget = new Map();
+m.items.forEach(function (it) {
+if (it.target) byTarget.set(where(it.type, it.workspace, it.target), it);
+});
+m.mirrored = new Map();
+rows.forEach(function (r) {
+var source = byTarget.get(where(bare(r.item).split("/")[0], r.workspace, r.target));
+if (source) m.mirrored.set(ownerCode(r.item), source.code);
+var n = m.byIdentity.get(identityKey(r.item, r.schema, r.object));
+var slash = String(r.schema || "").indexOf("/"), sourceSchema = String(r.sourceschema || "");
+if (slash >= 0 && sourceSchema.indexOf("/") < 0) sourceSchema = r.schema.slice(0, slash + 1) + sourceSchema;
+if (n && n.isMirrored && source) n.mirror = { read: true, source: m.byIdentity.get(identityKey(source.label, sourceSchema, r.sourceobject)) || null };
+});
+}
+/* How each object differs between a mirror and the catalogue it mirrors,
+where both are read. On the mirror's side an object is borrowed when it is
+mirrored, changed when its source signature differs from the same object's
+there, added when that catalogue holds no such object, and otherwise rebuilt
+with the same code. The source's copy of a borrowed or changed object takes
+that state. A mirror whose source is not read marks only what it borrows. */
+var CHANGE = { BORROWED: "borrowed", CHANGED: "changed", ADDED: "added" };
+function markChanges(m, signatures) {
+var sources = m.mirrored, signed = new Map();
+signatures.forEach(function (r) { signed.set(identityKey(r.item, r.schema, r.object) + "|" + r.kind, r.signature); });
+function signature(n) { return signed.get(identityKey(n.item, n.schema, n.object) + "|" + (isValidation(n) ? "test" : "data")) || null; }
+m.nodes.forEach(function (n) {
+var code = sources.get(ownerCode(n.item));
+if (!n.isMirrored && !code) return;
+var original = n.mirror && n.mirror.source ? n.mirror.source
+: code ? m.byIdentity.get(identityKey(owned(bare(n.item), code), n.schema, n.object)) || null : null;
+if (n.isMirrored) n.change = CHANGE.BORROWED;
+else if (!original) n.change = CHANGE.ADDED;
+else if (signature(n) && signature(original) && signature(n) !== signature(original)) n.change = CHANGE.CHANGED;
+if (n.change) m.changes = true;
+if (!original) return;
+n.original = original;
+(original.copies = original.copies || []).push(n);
+if (n.change && !original.change) original.change = n.change;
+});
+}
+function relational(schema) { return String(schema || "").replace(/^Tables\//, ""); }
+function reachedNodes(m, it, r) {
+var schema = relational(r.targetschema);
+if (r.type === "Schema") {
+return it.nodes.filter(function (n) { return relational(n.schema).toLowerCase() === schema.toLowerCase() && String(n.schema || "").indexOf("Files") !== 0; });
+}
+if (r.type === "Folder") {
+var parts = String(r.targetschema).replace(/^\/+|\/+$/g, "").split("/");
+if (parts.length !== 2) return [];
+var folder = m.byIdentity.get(identityKey(it.label, "Files/" + parts[0], parts[1]));
+return folder ? [folder] : [];
+}
+return it.nodes.filter(function (n) { return n.object === r.targetobject && relational(n.schema).toLowerCase() === schema.toLowerCase() && String(n.schema || "").indexOf("Files") !== 0; });
+}
 function status(r) {
 return { result: r.result, workflow: r.workflow, started: num(r.started), completed: num(r.completed), duration: num(r.duration) };
 }
@@ -502,14 +685,14 @@ every item are Weaver's own; no page reports them as part of the estate. */
 var INTERNAL_SCHEMA = /^(?:Files\/|Tables\/)?_$/;
 function isInternal(m, item, schema) {
 var it = m.items.get(item);
-return !!(it && it.internal) || item === CATALOGUE_ITEM || INTERNAL_SCHEMA.test(schema || "");
+return !!(it && it.internal) || bare(item) === CATALOGUE_ITEM || INTERNAL_SCHEMA.test(schema || "");
 }
 function visibleItems(m) {
 return Array.from(m.items.values()).filter(function (it) { return !it.internal; });
 }
 /* Shown names: a Lakehouse folder keeps its Files path. */
 function qualified(node) {
-if (!node.schema && !node.object) return node.item;
+if (!node.schema && !node.object) return shownItem(node.item);
 if (!node.object) return node.schema;
 return node.schema + (String(node.schema).indexOf("Files") === 0 ? "/" : ".") + node.object;
 }
@@ -524,53 +707,98 @@ function isView(n) { return n.kind === KIND.VIEW; }
 load state. A View settles when its build succeeds. */
 function participates(n) { return n.canLoad || n.isMirrored || isView(n); }
 function isLoadSubject(n) { return (n.canLoad || n.isMirrored) && !isView(n); }
-/* A mirrored object's state is recorded in the catalogue it mirrors, which
-this Dashboard does not read. */
-function effectiveLoad(n) { return n.isMirrored ? null : n.load; }
+/* A mirrored object's state is recorded in the catalogue it mirrors: the
+source object's, where the Dashboard reads that catalogue. */
+function effectiveLoad(n) {
+if (!n.isMirrored) return n.load;
+return n.mirror && n.mirror.source ? n.mirror.source.load : null;
+}
+function mirrorObserved(n) { return !!(n.mirror && n.mirror.read); }
 function establishedAt(n) {
 var s = effectiveLoad(n);
 return s && ESTABLISHED.indexOf(s.result) >= 0 ? s.completed : null;
 }
-/* Nodes in an order where every upstream comes first. */
-function topological(m) {
-var indegree = new Map(), order = [], queue = [];
-m.nodes.forEach(function (n) { indegree.set(n.key, n.up.length); if (!n.up.length) queue.push(n.key); });
-for (var i = 0; i < queue.length; i++) {
-var n = m.nodes.get(queue[i]);
-order.push(n);
-n.down.forEach(function (d) { var k = indegree.get(d) - 1; indegree.set(d, k); if (k === 0) queue.push(d); });
+/* Strongly connected components: nodes that read one another share one. Each
+node maps to its component's index; components come out with every upstream
+component before them. */
+function components(m) {
+if (m.components) return m.components;
+var index = new Map(), low = new Map(), on = new Set(), stack = [], comp = new Map(), list = [], counter = 0;
+function connect(start) {
+var work = [[start, 0]];
+index.set(start, counter); low.set(start, counter); counter += 1; stack.push(start); on.add(start);
+while (work.length) {
+var top = work[work.length - 1], key = top[0], ups = m.nodes.get(key).up;
+if (top[1] < ups.length) {
+var u = ups[top[1]++];
+if (!index.has(u)) {
+index.set(u, counter); low.set(u, counter); counter += 1; stack.push(u); on.add(u);
+work.push([u, 0]);
+} else if (on.has(u)) low.set(key, Math.min(low.get(key), index.get(u)));
+continue;
 }
-if (order.length < m.nodes.size) {
-var placed = new Set(order.map(function (n) { return n.key; }));
-m.nodes.forEach(function (n) { if (!placed.has(n.key)) order.push(n); });
+work.pop();
+if (work.length) { var parent = work[work.length - 1][0]; low.set(parent, Math.min(low.get(parent), low.get(key))); }
+if (low.get(key) === index.get(key)) {
+var members = [], w;
+do { w = stack.pop(); on.delete(w); comp.set(w, list.length); members.push(w); } while (w !== key);
+list.push(members);
 }
-return order;
 }
+}
+Array.from(m.nodes.keys()).sort().forEach(function (k) { if (!index.has(k)) connect(k); });
+m.components = { of: comp, list: list };
+return m.components;
+}
+function sameCycle(m, a, b) { var c = components(m).of; return c.get(a) === c.get(b); }
 /* Over each node's lifecycle ancestors: whether one has not been processed,
-the latest instant one was processed, and the latest it was processed or built. */
+the latest instant one outside its cycle was processed, and the latest one
+was processed or built. Members of a cycle count as each other's ancestors
+for what has not been processed, never for what is newer. */
 function ancestry(m) {
-var out = new Map();
-topological(m).forEach(function (n) {
-var a = { unprocessed: false, latest: null, changed: null };
-n.up.forEach(function (key) {
-var p = m.nodes.get(key), pa = out.get(key) || { unprocessed: false, latest: null, changed: null };
-if (pa.unprocessed) a.unprocessed = true;
-a.latest = later(a.latest, pa.latest);
-a.changed = later(a.changed, pa.changed);
+var c = components(m), out = new Map();
+function empty() { return { unprocessed: false, latest: null, changed: null }; }
+function merge(a, b) { if (b.unprocessed) a.unprocessed = true; a.latest = later(a.latest, b.latest); a.changed = later(a.changed, b.changed); }
+function own(p) {
+var r = empty();
 if (participates(p)) {
 var at = establishedAt(p);
-if (at === null) a.unprocessed = true;
-a.latest = later(a.latest, at);
-a.changed = later(a.changed, later(at, p.built));
+if (at === null) r.unprocessed = true;
+r.latest = at;
+r.changed = later(at, p.built);
 }
+return r;
+}
+var full = [];
+c.list.forEach(function (members, i) {
+var upstream = empty(), seen = new Set();
+members.forEach(function (key) {
+m.nodes.get(key).up.forEach(function (u) {
+var j = c.of.get(u);
+if (j === i || seen.has(j)) return;
+seen.add(j);
+merge(upstream, full[j]);
 });
-out.set(n.key, a);
+});
+var whole = { unprocessed: upstream.unprocessed, latest: upstream.latest, changed: upstream.changed };
+members.forEach(function (key) { merge(whole, own(m.nodes.get(key))); });
+full[i] = whole;
+members.forEach(function (key) {
+var a = { unprocessed: upstream.unprocessed, latest: upstream.latest, changed: upstream.changed };
+if (members.length > 1) members.forEach(function (other) {
+if (other === key) return;
+var o = own(m.nodes.get(other));
+if (o.unprocessed) a.unprocessed = true;
+a.changed = later(a.changed, o.changed);
+});
+out.set(key, a);
+});
 });
 return out;
 }
 function later(a, b) { return a === null ? b : b === null ? a : Math.max(a, b); }
 function ancestorsOf(m, key) {
-var seen = new Set(), stack = [key], out = [];
+var seen = new Set([key]), stack = [key], out = [];
 while (stack.length) {
 m.nodes.get(stack.pop()).up.forEach(function (u) { if (!seen.has(u)) { seen.add(u); out.push(m.nodes.get(u)); stack.push(u); } });
 }
@@ -580,6 +808,22 @@ function firstAncestor(m, key, test) {
 var found = ancestorsOf(m, key).filter(function (a) { return participates(a) && test(a); });
 found.sort(function (a, b) { return compare(a.id, b.id); });
 return found[0] || null;
+}
+/* The unprocessed ancestor named as the cause: a failed load before a Pending one. */
+var CAUSES = ["Failed", "Error", "Blocked"];
+function causeRank(p) { var s = effectiveLoad(p), i = s ? CAUSES.indexOf(s.result) : -1; return i < 0 ? CAUSES.length : i; }
+function firstCause(m, key) {
+var found = ancestorsOf(m, key).filter(function (a) { return participates(a) && establishedAt(a) === null; });
+found.sort(function (a, b) { return causeRank(a) - causeRank(b) || compare(a.id, b.id); });
+return found[0] || null;
+}
+function unestablished(p) {
+if (!p) return "an upstream object has not been processed since it was built";
+var s = effectiveLoad(p), result = s ? s.result : "Pending";
+if (result === "Failed") return "the last load of " + p.label + " failed";
+if (result === "Error") return "the last load of " + p.label + " raised an error";
+if (result === "Blocked") return "the last load of " + p.label + " was blocked";
+return p.label + " has not been processed since it was built";
 }
 function finding(area, code, severity, node, result, message, s) {
 return { area: area, code: code, severity: severity, node: node, result: result, message: message,
@@ -607,9 +851,15 @@ if (!n.isInstalled) build.push(finding("build", "missing_validation_artefact", R
 else green.push(finding("build", "build_installed", GREEN, n, null, "installed and current"));
 } else green.push(finding("build", "build_installed", GREEN, n, null, "installed and current"));
 });
+components(m).list.forEach(function (members) {
+if (members.length < 2) return;
+var nodes = members.map(function (k) { return m.nodes.get(k); }).sort(function (a, b) { return compare(a.id, b.id); });
+build.push(finding("build", "dependency_cycle", GREEN, nodes[0], null,
+"These objects read one another, so each loads once and the first reads what the last loaded before: " + nodes.map(function (n) { return n.label; }).join(", ")));
+});
 (m.tables.uncertified || []).forEach(function (r) {
 if (!m.items.has(r.item) || m.items.get(r.item).internal || !m.items.get(r.item).target) return;
-build.push({ area: "build", code: "not_installed", severity: RED, node: null, label: r.item + " " + r.schema + "." + r.object,
+build.push({ area: "build", code: "not_installed", severity: RED, node: null, label: r.schema + "." + r.object,
 item: r.item, schema: r.schema, object: r.object,
 result: null, message: "declared in the dictionary, but not certified in Registry", unobserved: false });
 });
@@ -624,10 +874,12 @@ compare(a.node ? a.node.id : a.label, b.node ? b.node.id : b.label) || compare(a
 function loadFindings(m, n, anc, asOf) {
 var s = effectiveLoad(n), out = [];
 if (!s || s.result === "Pending") {
-var f = finding("load", "load_pending", AMBER, n, "Pending", n.isMirrored ?
+var unseen = n.isMirrored && !mirrorObserved(n);
+var f = finding("load", "load_pending", AMBER, n, "Pending", unseen ?
 "loaded in the catalogue this one mirrors, which the Dashboard does not read" :
+n.isMirrored ? "the catalogue this one mirrors has not loaded it" :
 "no load has processed this object since it was built", s);
-f.unobserved = n.isMirrored;
+f.unobserved = unseen;
 return [f];
 }
 if (LOAD_RED.indexOf(s.result) >= 0) return [finding("load", "load_failed", RED, n, s.result, "the last load " + s.result, s)];
@@ -636,13 +888,12 @@ if (NO_DATA.indexOf(s.result) >= 0 || n.isStatic) return out;
 if (s.completed !== null && s.completed < asOf) out.push(finding("load", "load_stale_time", AMBER, n, s.result, "last loaded " + stamp(s.completed), s));
 var a = anc.get(n.key);
 if (a.unprocessed) {
-var behind = firstAncestor(m, n.key, function (p) { return establishedAt(p) === null; });
-out.push(finding("load", "load_ancestor_unestablished", AMBER, n, s.result,
-(behind ? behind.label : "an upstream object") + " has not been processed since it was built", s));
+var behind = firstCause(m, n.key);
+out.push(finding("load", "load_ancestor_unestablished", AMBER, n, s.result, unestablished(behind), s));
 }
 var loaded = establishedAt(n);
 if (loaded !== null && a.latest !== null && a.latest > loaded) {
-var newer = firstAncestor(m, n.key, function (p) { var at = establishedAt(p); return at !== null && at > loaded; });
+var newer = firstAncestor(m, n.key, function (p) { var at = establishedAt(p); return !sameCycle(m, p.key, n.key) && at !== null && at > loaded; });
 out.push(finding("load", "load_stale_ancestor", AMBER, n, s.result,
 (newer ? newer.label : "an upstream object") + " has been established since this object was loaded", s));
 }
@@ -881,8 +1132,9 @@ return { nodes: nodes, items: items };
 up to the budget, plus whatever the reader has expanded. Every neighbour left
 out is counted on the shown node it hangs from, as a marker that expands it.
 Given within, the lineage stays inside it, and with nothing selected the
-window is all of it. */
-function focusWindow(m, selection, upDepth, downDepth, expanded, within) {
+window is all of it. whole lifts the budget, for the objects of a chosen
+item, which the estate drawing would show in full. */
+function focusWindow(m, selection, upDepth, downDepth, expanded, within, whole) {
 var seeds = (Array.isArray(selection) ? selection : [selection]).filter(function (k) { return m.nodes.has(k) && (!within || within.has(k)); });
 if (!seeds.length && !within) return null;
 var focus = seeds.length ? seeds[seeds.length - 1] : null, dist = new Map();
@@ -905,7 +1157,7 @@ return Math.abs(a.dist) - Math.abs(b.dist) || (a.dist > 0) - (b.dist > 0) ||
 compare(m.nodes.get(a.key).label, m.nodes.get(b.key).label) || compare(a.key, b.key);
 });
 var lineage = new Map();
-if (seeds.length) ranked.slice(0, BUDGET.NODES).forEach(function (r) { lineage.set(r.key, r.dist); });
+if (seeds.length) ranked.slice(0, whole ? ranked.length : BUDGET.NODES).forEach(function (r) { lineage.set(r.key, r.dist); });
 else within.forEach(function (k) { if (m.nodes.has(k)) lineage.set(k, 0); });
 var shown = new Set(lineage.keys()), added = new Set();
 (expanded || []).forEach(function (k) {
@@ -921,7 +1173,7 @@ var line = du !== undefined && dd !== undefined && ((dd <= 0 && du < 0 && du < d
 });
 });
 var edgeTotal = edges.length + plain.length;
-edges = edges.concat(plain).slice(0, BUDGET.EDGES);
+edges = edges.concat(plain).slice(0, whole ? edgeTotal : BUDGET.EDGES);
 var more = new Map(), hidden = new Set();
 shown.forEach(function (k) {
 var n = m.nodes.get(k);
@@ -937,6 +1189,8 @@ function revealFrom(m, keys) {
 return keys.slice().sort(function (a, b) { return compare(m.nodes.get(a).label, m.nodes.get(b).label) || compare(a, b); }).slice(0, BUDGET.REVEAL);
 }
 var CELL = 64, LABEL_DROP = 20;
+/* The opacity of an object a mirror borrows, and of edges between two. */
+var BORROWED_ALPHA = 0.55;
 function GraphView(host, m, lay, options) {
 var self = this;
 this.m = m; this.lay = lay; this.o = options; this.s = options.state;
@@ -1088,31 +1342,40 @@ ctx.fillText(meta, b.x + b.width - 16 - ctx.measureText(meta).width, b.y + 8 + e
 });
 var shown = win ? win.shown : null;
 ctx.lineWidth = 1 / Math.max(k, 0.5);
+function borrowed(key) { return m.nodes.get(key).change === CHANGE.BORROWED; }
+function lent(u, d) { return borrowed(u) && borrowed(d); }
 if (!win) {
-ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = k < 0.3 ? 0.35 : 0.6; ctx.beginPath();
+[false, true].forEach(function (light) {
+ctx.strokeStyle = P["line-strong"]; ctx.globalAlpha = (k < 0.3 ? 0.35 : 0.6) * (light ? BORROWED_ALPHA : 1); ctx.beginPath();
 m.nodes.forEach(function (n) {
 var b = lay.pos.get(n.key);
 n.vup.forEach(function (u) {
 var a = lay.pos.get(u);
-if (a && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
+if (a && lent(u, n.key) === light && (inView(a.x, a.y) || inView(b.x, b.y))) curve(ctx, a, b);
 });
 });
-ctx.stroke(); ctx.globalAlpha = 1;
+ctx.stroke();
+});
+ctx.globalAlpha = 1;
 } else {
 var hl = this.hover && shown.has(this.hover) ? this.hover : null;
 [null, "up", "down"].forEach(function (side) {
+[false, true].forEach(function (light) {
 ctx.beginPath();
 var heads = [];
 win.edges.forEach(function (e) {
-if (e.side !== side) return;
+if (e.side !== side || lent(e.u, e.d) !== light) return;
 var a = lay.pos.get(e.u), b = lay.pos.get(e.d);
 curve(ctx, a, b); heads.push(b);
 });
+if (!heads.length) return;
 if (side === null) { ctx.strokeStyle = P["line-strong"]; ctx.lineWidth = 1 / Math.max(k, 0.6); ctx.globalAlpha = 0.75; }
 else { ctx.strokeStyle = side === "up" ? P.up : P.down; ctx.lineWidth = 1.8 / Math.max(k, 0.7); ctx.globalAlpha = 1; }
+if (light) ctx.globalAlpha *= BORROWED_ALPHA;
 ctx.stroke();
 if (side !== null && k > 0.4) { ctx.beginPath(); heads.forEach(function (b) { arrow(ctx, b); }); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); }
 ctx.globalAlpha = 1;
+});
 });
 if (hl) {
 ctx.beginPath();
@@ -1130,15 +1393,19 @@ if (win && win.seeds.has(n.key)) {
 ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fillStyle = P["blue-soft"]; ctx.fill();
 ctx.lineWidth = 2 / Math.max(k, 0.8); ctx.strokeStyle = P.ink; ctx.stroke();
 }
+var muted = n.change === CHANGE.BORROWED;
+ctx.globalAlpha = muted ? BORROWED_ALPHA : 1;
 glyph(ctx, n.kind, p.x, p.y, colour, P);
 self.marks(ctx, n, p, P);
+ctx.globalAlpha = 1;
+changeBadge(ctx, n, p.x - 9, p.y - 9, P);
 if (labels || (win && k > 0.3)) {
 var seed = win && win.seeds.has(n.key);
 var text = clip(ctx, n.label, lay.geometry.LABEL, seed ? fontStrong : font);
 ctx.font = seed ? fontStrong : font;
 var half = ctx.measureText(text).width / 2;
 ctx.lineJoin = "round"; ctx.lineWidth = 3; ctx.strokeStyle = P.band; ctx.strokeText(text, p.x - half, p.y + LABEL_DROP);
-ctx.fillStyle = P.ink;
+ctx.fillStyle = muted ? P.muted : P.ink;
 ctx.fillText(text, p.x - half, p.y + LABEL_DROP);
 self.labels.set(n.key, { x0: p.x - half, x1: p.x + half });
 }
@@ -1158,9 +1425,17 @@ if (more.down.length) self.marker(ctx, P, key, "down", more.down, label.x1 + 6, 
 GraphView.prototype.nodeColour = function (n, P) {
 if (this.o.mode !== "load") return kindColour(n.kind, P);
 var s = isValidation(n) ? n.test : effectiveLoad(n);
-if (n.isMirrored) return P.faint;
 return s ? toneColour(tone(s.result), P) : participates(n) ? P.faint : kindColour(n.kind, P);
 };
+/* A changed object's Δ, or an added one's +, centred at x, y. */
+function changeBadge(ctx, n, x, y, P) {
+if (n.change !== CHANGE.CHANGED && n.change !== CHANGE.ADDED) return;
+ctx.beginPath(); roundRect(ctx, x - 5.5, y - 5.5, 11, 11, 3);
+ctx.fillStyle = P.violet; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = P.surface; ctx.stroke();
+ctx.fillStyle = P.surface; ctx.font = "700 9px " + (P.sans || "sans-serif");
+var mark = n.change === CHANGE.CHANGED ? "Δ" : "+";
+ctx.fillText(mark, x - ctx.measureText(mark).width / 2, y + 3.2);
+}
 /* Small status marks: a dot for a load or test that needs attention, and on
 the Load page a ring for derived readiness. */
 GraphView.prototype.marks = function (ctx, n, p, P) {
@@ -1399,7 +1674,7 @@ this.showTip(cx, cy, [el("b", { text: h.marker.keys.length + (h.marker.side === 
 el("div", { "class": "wd-muted", text: "Select to show " + (h.marker.keys.length > BUDGET.REVEAL ? "the first " + BUDGET.REVEAL : h.marker.keys.length === 1 ? "it" : "them") })]);
 } else if (key) {
 var n = this.m.nodes.get(key), s = isValidation(n) ? n.test : effectiveLoad(n);
-this.showTip(cx, cy, [el("b", { text: n.label }), el("div", { "class": "wd-muted", text: n.kind + " · " + n.item }),
+this.showTip(cx, cy, [el("b", { text: n.label }), el("div", { "class": "wd-muted", text: n.kind + " · " + shownItem(n.item) }),
 s ? el("div", {}, [chip(s.result), " " + (s.completed ? stamp(s.completed) : "")]) : null]);
 } else this.hideTip();
 if (key !== this.hover) { this.hover = key; this.draw(); }
@@ -1468,28 +1743,34 @@ return root.__WD_STATE;
 function pageState(name) { var s = state(); s[name] = s[name] || {}; return s[name]; }
 function weaveMark() { return el("span", { "class": "wd-mark", "aria-hidden": "true" }, [el("i"), el("i"), el("i"), el("i")]); }
 var PAGE_TITLES = {
-overview: "Overview", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
+workspaces: "Workspaces", overview: "Items", health: "Health", orchestration: "Orchestration", gantt: "Gantt",
 performance: "Performance", entities: "Entity dictionary", semantic: "Semantic model"
 };
+/* The catalogues the header names before it counts the rest. */
+var HEADER_CATALOGUES = 3;
 /* The header every page shares: the catalogue's own name, where it lives, and
 the two times a reader needs apart, when this was queried and when work
 last processed. */
 function shell(mount, m) {
 var s = state();
-var title = m.catalogue.name || "Weaver catalogue";
-var context = [m.catalogue.workspace ? "Workspace " + m.catalogue.workspace : null,
+var several = m.catalogues && m.catalogues.length > 1;
+var title = several ? fmt(m.catalogues.length) + " catalogues" : m.catalogue.workspace || m.catalogue.name || "Weaver catalogue";
+var labels = several ? m.catalogues.map(function (c) { return c.label; }) : [];
+var context = several ? labels.slice(0, HEADER_CATALOGUES).join(" · ") + (labels.length > HEADER_CATALOGUES ? " +" + fmt(labels.length - HEADER_CATALOGUES) + " more" : "") :
+[m.catalogue.name ? "Catalogue " + m.catalogue.name : null,
 m.catalogue.version ? "Weaver " + m.catalogue.version : null].filter(Boolean).join(" · ");
 var processed = latestProcessed(m);
 var head = el("header", { "class": "wd-top" }, [
 el("div", { "class": "wd-brand" }, [weaveMark(), el("div", {}, [
-el("div", { "class": "wd-eyebrow", text: "Catalogue · " + (PAGE_TITLES[m.page] || m.page) }),
+el("div", { "class": "wd-eyebrow", text: (several ? "Catalogues · " : "Catalogue · ") + (PAGE_TITLES[m.page] || m.page) }),
 el("h1", { text: title }),
-context ? el("div", { "class": "wd-context", text: context }) : null
+context ? el("div", { "class": "wd-context", text: context, title: several ? labels.join("\n") : null }) : null
 ])]),
 el("span", { "class": "wd-grow" }),
 zoneControl(m),
 el("dl", { "class": "wd-times" }, [
 el("dt", { text: "Queried" }), el("dd", { text: stamp(m.at) }),
+m.imported ? el("dt", { text: "Imported" }) : null, m.imported ? el("dd", { text: stamp(m.imported) + " · " + ago(m.imported, m.at) }) : null,
 processed === undefined ? null : el("dt", { text: "Last processed" }),
 processed === undefined ? null : el("dd", { text: processed ? stamp(processed) + " · " + ago(processed, m.at) : "nothing has been processed" })
 ])
@@ -1502,7 +1783,7 @@ m.problems.slice(0, 3).join(" ") + (m.problems.length > 3 ? " (" + (m.problems.l
 ]));
 }
 if (m.graphGaps && m.graphGaps.size) {
-var gaps = Array.from(m.graphGaps.keys()).sort(compare);
+var gaps = Array.from(m.graphGaps.keys()).sort(compare).map(shownItem);
 mount.appendChild(el("div", { "class": "wd-banner wd-banner-warn wd-banner-top" }, [
 el("b", { text: "Lineage may be out of date. " }),
 fmt(Array.from(m.graphGaps.values()).reduce(function (a, b) { return a + b; }, 0)) + " certified objects in " + gaps.join(", ") +
@@ -1512,6 +1793,130 @@ fmt(Array.from(m.graphGaps.values()).reduce(function (a, b) { return a + b; }, 0
 var body = el("main", { "class": "wd-body" });
 mount.appendChild(body);
 return body;
+}
+/* A page whose data would exceed what one measure can return. */
+function tooLargePage(body, m) {
+var t = m.tooLarge;
+body.appendChild(section("This page contains too much data to display", [
+el("p", { text: "The selected data is " + fmt(num(t.size)) + " characters, over Power BI's limit of about " + fmt(num(t.budget)) + " for one measure." }),
+el("p", { text: "Narrow the selection in the Filters pane on the right: Workspace, then Item type, Item name, Object type and Object name. The page recalculates over what remains." })
+]));
+}
+/* ---- choosing items --------------------------------------------------------- */
+function catalogueRank(code) { var n = Number(code); return isNaN(n) ? 0 : n; }
+/* The items of the given kinds, in the order a page offers them: catalogues in
+the order given, then kind, then name. */
+function eligibleItems(m, kinds) {
+return visibleItems(m).filter(function (it) { return kinds.indexOf(it.type) >= 0 && (it.nodes.length || it.target); })
+.sort(function (a, b) {
+return catalogueRank(a.code) - catalogueRank(b.code) || typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name) || compare(a.label, b.label);
+});
+}
+/* An item as view state keeps it: by its catalogue's reference, which stays
+with the catalogue whatever the order given. */
+function stableItem(label) { var c = CATALOGUES.get(ownerCode(label)); return (c ? c.reference : "") + "|" + bare(label); }
+/* An item as a chooser lists it. */
+function choiceLabel(it) { return shownItem(it.label); }
+/* The items a page shows. A workspace chosen brings every item it offers
+there. Nothing chosen is every item on a page that shows the estate, and
+the first item it offers on a page about one. */
+function chosenItems(s, eligible, everything) {
+var byStable = new Map(eligible.map(function (it) { return [stableItem(it.label), it.label]; }));
+var out = [];
+(s.items || []).forEach(function (k) {
+if (k.indexOf("workspace:") === 0) {
+var w = k.slice(10);
+eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w && out.indexOf(it.label) < 0) out.push(it.label); });
+} else if (byStable.has(k) && out.indexOf(byStable.get(k)) < 0) out.push(byStable.get(k));
+});
+if (out.length) return out;
+return everything ? eligible.map(function (it) { return it.label; }) : eligible.length ? [eligible[0].label] : [];
+}
+/* A chooser that stays open across the redraw a Ctrl, ⌘ or tick causes. */
+var OPEN_CHOOSER = null;
+/* One list, filtered by typing. A plain click shows that entry alone and
+closes the list; Ctrl, ⌘ or the box adds or removes it and keeps the list
+open. Choosing nothing returns to the page's default. */
+function chooser(options) {
+var chosen = new Set(options.chosen), wrap = el("div", { "class": "wd-chooser" }), panel = el("div", { "class": "wd-chooser-panel", hidden: "hidden" });
+var names = options.entries.filter(function (e) { return chosen.has(e.key); }).map(function (e) { return e.label; });
+var summary = !names.length ? options.allLabel : names.length === 1 ? names[0] : fmt(names.length) + " chosen";
+var button = el("button", { type: "button", "class": "wd-chooser-button", "aria-haspopup": "listbox", "aria-expanded": "false", title: names.join("\n") || options.allLabel }, [
+el("span", { "class": "wd-seg-label", text: options.title }), el("b", { text: summary }), el("span", { "class": "wd-chooser-caret", text: "▾" })]);
+var search = el("input", { "class": "wd-search", type: "search", placeholder: "Filter " + fmt(options.entries.length), "aria-label": "Filter " + options.title.toLowerCase(), autocomplete: "off", spellcheck: "false" });
+var list = el("div", { "class": "wd-chooser-list", role: "listbox", "aria-multiselectable": "true" });
+function keep() { OPEN_CHOOSER = { id: options.id, query: search.value, scroll: list.scrollTop }; }
+function toggle(key) {
+if (chosen.has(key)) chosen.delete(key); else chosen.add(key);
+keep();
+options.onChange(Array.from(chosen));
+}
+function render() {
+var q = search.value.trim().toLowerCase();
+list.textContent = "";
+options.entries.forEach(function (e) {
+if (q && e.label.toLowerCase().indexOf(q) < 0) return;
+var on = chosen.has(e.key);
+list.appendChild(el("label", { "class": "wd-chooser-entry" + (on ? " wd-current" : "") + (e.whole ? " wd-chooser-whole" : ""), role: "option", "aria-selected": String(on), title: e.label,
+onclick: function (ev) {
+if (ev.target.tagName === "INPUT") return;
+ev.preventDefault();
+if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggle(e.key);
+else { OPEN_CHOOSER = null; options.onChange([e.key]); }
+} }, [
+el("input", { type: "checkbox", checked: on ? "checked" : null, onchange: function () { toggle(e.key); } }),
+el("span", { "class": "wd-chooser-name", text: e.label })
+]));
+});
+if (!list.firstChild) list.appendChild(empty("Nothing matches."));
+}
+function open(on) {
+panel.hidden = !on; button.setAttribute("aria-expanded", String(on));
+if (on) render(); else if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) OPEN_CHOOSER = null;
+}
+button.addEventListener("click", function () { open(panel.hidden); if (!panel.hidden) search.focus(); });
+search.addEventListener("input", render);
+document.addEventListener("click", function (ev) {
+if (!wrap.isConnected || !ev.target.isConnected) return;
+if (!panel.hidden && !wrap.contains(ev.target)) open(false);
+});
+document.addEventListener("keydown", function (ev) { if (wrap.isConnected && ev.key === "Escape" && !panel.hidden) open(false); });
+panel.appendChild(el("div", { "class": "wd-chooser-tools" }, [search,
+el("button", { type: "button", "class": "wd-text-btn", onclick: function () { OPEN_CHOOSER = null; options.onChange([]); } }, [options.resetLabel])]));
+panel.appendChild(list);
+panel.appendChild(el("div", { "class": "wd-chooser-hint", text: "Click to show one · Ctrl, ⌘ or the box to add" }));
+wrap.appendChild(button); wrap.appendChild(panel);
+if (OPEN_CHOOSER && OPEN_CHOOSER.id === options.id) {
+var kept = OPEN_CHOOSER;
+search.value = kept.query || "";
+open(true);
+list.scrollTop = kept.scroll || 0;
+}
+return wrap;
+}
+/* The chooser every page but Workspaces starts its toolbar with, and the items
+it leaves the page showing. everything says whether choosing nothing shows
+every item or only the first. */
+function pageItems(m, page, kinds, everything) {
+var s = pageState(page), eligible = eligibleItems(m, kinds), shown = chosenItems(s, eligible, everything);
+var workspaces = [];
+eligible.forEach(function (it) { var w = it.workspace || it.catalogue; if (w && workspaces.indexOf(w) < 0) workspaces.push(w); });
+var entries = [];
+workspaces.forEach(function (w) {
+if (workspaces.length > 1) entries.push({ key: "workspace:" + w, label: w, whole: true });
+eligible.forEach(function (it) { if ((it.workspace || it.catalogue) === w) entries.push({ key: stableItem(it.label), label: choiceLabel(it) }); });
+});
+var keys = new Set(entries.map(function (e) { return e.key; }));
+var chosen = (s.items || []).filter(function (k) { return keys.has(k); });
+if (!chosen.length && !everything && shown.length) chosen = [stableItem(shown[0])];
+return {
+items: shown, set: new Set(shown), all: everything && !(s.items || []).some(function (k) { return keys.has(k); }),
+chooser: chooser({
+id: page, title: "Items", allLabel: everything ? "All items" : "No items", resetLabel: everything ? "All" : "First",
+chosen: chosen, entries: entries,
+onChange: function (picked) { s.items = picked; saveState(); redraw(); }
+})
+};
 }
 /* The latest processed load, test or workflow, or undefined when the page
 carries none of them. */
@@ -1578,7 +1983,7 @@ var terms = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
 if (!terms.length) return [];
 var found = [];
 m.nodes.forEach(function (n) {
-var label = n.label.toLowerCase(), item = n.item.toLowerCase(), desc = n.desc.toLowerCase(),
+var label = n.label.toLowerCase(), item = shownItem(n.item).toLowerCase(), desc = n.desc.toLowerCase(),
 full = (n.schema + "." + n.object).toLowerCase(), score = 0;
 for (var i = 0; i < terms.length; i++) {
 var t = terms[i], s = 0, w = wildcard(t);
@@ -1640,7 +2045,7 @@ function nodeSearch(m, onPick, onPattern) {
 return searchBox({
 placeholder: "Search " + fmt(m.nodes.size) + " objects · * matches any text · Shift adds",
 find: function (q) {
-return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + n.item, desc: n.desc }; });
+return searchNodes(m, q, 12).map(function (n) { return { key: n.key, kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc }; });
 },
 onPick: function (r, adding) { onPick(r.key, adding); },
 onPattern: onPattern
@@ -1660,10 +2065,37 @@ return group;
 }
 function depthLabel(d) { return d < 0 ? "Max" : String(d); }
 /* ---- object details ----------------------------------------------------------- */
-function nodeLink(m, key, onOpen) {
+/* The class that draws an object as a mirror left it: muted when borrowed,
+marked when changed or added. */
+function changeClass(n) {
+return !n || !n.change ? "" : n.change === CHANGE.BORROWED ? " wd-borrowed" : " wd-changed";
+}
+var CHANGE_TEXT = { changed: "Changed from its source", added: "Added; not in the catalogue mirrored" };
+function changeMark(n) {
+if (!n || !CHANGE_TEXT[n.change]) return null;
+return el("span", { "class": "wd-change-mark", title: CHANGE_TEXT[n.change], text: n.change === CHANGE.CHANGED ? "Δ" : "+" });
+}
+/* The marks a page draws for its objects: each kind present, and how a mirror
+left an object when one is read. plain draws the kinds without their
+colours, for a graph coloured by outcome. */
+function objectKey(m, plain) {
+var present = new Set();
+m.nodes.forEach(function (n) { present.add(n.kind); });
+var keys = KIND_ORDER.filter(function (k) { return present.has(k); }).map(function (k) {
+return el("span", { "class": "wd-key" + (plain ? " wd-key-plain" : "") }, [kindMark(k), k]);
+});
+if (m.changes) keys.push(
+el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-swatch wd-borrowed" }), "Borrowed from the catalogue mirrored"]),
+el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-change" }), "Changed (Δ) or added (+) in a mirror"]));
+return keys;
+}
+/* The key above the first table or list of a page that draws object marks. */
+function pageKey(m) { return el("div", { "class": "wd-legend wd-page-key" }, objectKey(m)); }
+/* plain leaves the item out, for a table that shows it in a column of its own. */
+function nodeLink(m, key, onOpen, plain) {
 var n = m.nodes.get(key);
-return el("button", { "class": "wd-link", type: "button", title: n.item + " · " + qualified(n), onclick: function () { onOpen(key); } },
-[kindMark(n.kind), n.label, el("span", { "class": "wd-link-meta", text: itemName(n.item) })]);
+return el("button", { "class": "wd-link" + changeClass(n), type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
+[kindMark(n.kind), n.label, changeMark(n), plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 function details(panel, m, key, options) {
 options = options || {};
@@ -1673,7 +2105,7 @@ if (!n) { panel.appendChild(empty(options.emptyText || "Select an object to see 
 var open = options.onOpen || function () {};
 panel.appendChild(el("div", { "class": "wd-eyebrow" }, [kindMark(n.kind), " " + n.kind]));
 panel.appendChild(el("h2", { "class": "wd-detail-title", text: n.label }));
-panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: n.item + " · " + qualified(n) }));
+panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(n.item) + " · " + qualified(n) }));
 if (options.describe !== false) panel.appendChild(el("p", { "class": n.desc ? "wd-desc" : "wd-desc wd-muted", text: n.desc || "No description is declared." }));
 var s = isValidation(n) ? n.test : effectiveLoad(n), carries = !!m.tables.loads;
 var facts = el("dl", { "class": "wd-facts" });
@@ -1690,6 +2122,11 @@ var ready = readiness(m, n);
 fact("Readiness", el("span", {}, [el("span", { "class": "wd-chip wd-" + readinessTone(ready.state), text: ready.state }),
 ready.waitingOn.length ? " waiting on " + ready.waitingOn.slice(0, 3).map(function (w) { return w.label; }).join(", ") + (ready.waitingOn.length > 3 ? " and " + (ready.waitingOn.length - 3) + " more" : "") : ""]));
 }
+var FROM = { borrowed: "Borrowed from", changed: "Changed from" }, IN = { borrowed: "Borrowed by", changed: "Changed in" };
+if (n.original) fact(FROM[n.change] || "Same code as", nodeLink(m, n.original.key, open));
+else if (n.change === CHANGE.BORROWED) fact("Borrowed from", el("span", { "class": "wd-muted", text: "Its source's catalogue is not read" }));
+else if (n.change === CHANGE.ADDED) fact("Added", el("span", { "class": "wd-muted", text: "Not in the catalogue mirrored" }));
+(n.copies || []).forEach(function (c) { fact(IN[c.change] || "Rebuilt in", nodeLink(m, c.key, open)); });
 if (n.built) fact("Built", stamp(n.built));
 if (n.isStatic) fact("Static", "Loaded once");
 panel.appendChild(facts);
@@ -1753,7 +2190,8 @@ var r = typeof x === "number" || typeof y === "number" ? (x === null ? -Infinity
 return desc ? -r : r;
 });
 }
-/* A table for a list of records, with optional sorting, grouping and a row limit. */
+/* A table for a list of records, with optional sorting, grouping and a row
+limit. A row about an object is drawn as a mirror left it. */
 function dataTable(columns, rows, options) {
 options = options || {};
 var limit = options.limit || 200, sortBy = options.sort || null, desc = options.desc !== false;
@@ -1770,7 +2208,8 @@ render();
 } }, [c.title])]);
 }))]),
 el("tbody", {}, sorted.slice(0, limit).map(function (row) {
-return el("tr", { "class": options.onRow ? "wd-clickable" : null, onclick: options.onRow ? function () { options.onRow(row); } : null },
+var n = row && (row.node || row.n);
+return el("tr", { "class": ((options.onRow ? "wd-clickable" : "") + changeClass(n)).trim() || null, onclick: options.onRow ? function () { options.onRow(row); } : null },
 columns.map(function (c) {
 var v = c.render ? c.render(row) : c.value(row);
 return el("td", { "class": c.numeric ? "wd-num" : c.mono ? "wd-mono" : null }, [v === null || v === undefined ? "—" : typeof v === "object" ? v : String(v)]);
@@ -1792,19 +2231,16 @@ shown object expands the neighbours left out. Nodes can be dragged, and the
 graph can fill the page. Nodes are coloured by kind, or by last outcome with
 derived readiness ringed. */
 function graphWorkspace(body, m, options) {
-var s = pageState(options.page), estate = layoutEstate(m);
-s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
-if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+var s = pageState(options.page);
+var estate = layoutEstate(m), scoped = options.items ? keysOf(m, options.items) : [];
+scopeSelection(m, s, options.items || null);
 if (s.up === undefined) s.up = 1;
 if (s.down === undefined) s.down = 1;
-if (s.item && !m.items.has(s.item)) s.item = null;
-s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
-s.moved = s.moved || {};
-s.patterns = s.patterns || [];
 var matched = new Map();
 function matches(q) { if (!matched.has(q)) matched.set(q, nodeMatches(m, q)); return matched.get(q); }
 /* The selected objects and every match of each wildcard term. */
 function seeds() {
+if (!s.selection.length && !s.patterns.length && scoped.length) return scoped.slice();
 var out = s.selection.slice(), seen = new Set(out);
 s.patterns.forEach(function (q) { matches(q).forEach(function (k) { if (!seen.has(k)) { seen.add(k); out.push(k); } }); });
 return out;
@@ -1813,9 +2249,6 @@ var health = options.health ? assessHealth(m) : null;
 s.mode = s.mode || options.mode;
 var view, f = workspaceFrame(s, function () { if (view) view.resize(); });
 var host = f.host, side = f.side, line = f.line, legendHost = f.legend;
-function within() {
-return s.item ? new Set(m.items.get(s.item).nodes.map(function (n) { return n.key; })) : null;
-}
 /* A plain choice replaces the selection; Shift, Ctrl or ⌘ adds or removes. */
 function select(key, adding) {
 if (!key) { s.selection = []; s.patterns = []; }
@@ -1823,7 +2256,6 @@ else if (adding) {
 var at = s.selection.indexOf(key);
 if (at >= 0) s.selection.splice(at, 1); else s.selection.push(key);
 } else s.selection = [key];
-if (key && s.item && m.nodes.get(key).item !== s.item) { s.item = null; itemPicker.value = ""; }
 s.focus = key && s.selection.indexOf(key) >= 0 ? key : s.selection[s.selection.length - 1] || null;
 s.expanded = []; s.moved = {};
 apply(true);
@@ -1848,8 +2280,7 @@ view.pin(marker.key, screen);
 }
 function moved(key, p) { s.moved[key] = { x: p.x, y: p.y }; saveState(); }
 function apply(refit) {
-var only = within();
-var seed = seeds(), win = seed.length || only ? focusWindow(m, seed, s.up, s.down, s.expanded, only) : null;
+var seed = seeds(), win = seed.length ? focusWindow(m, seed, s.up, s.down, s.expanded, null, !s.selection.length && !s.patterns.length) : null;
 var lay = win ? layoutEstate(subModel(m, win.shown), WINDOW_GEOMETRY) : layoutEstate(m);
 Object.keys(s.moved).forEach(function (k) { var p = lay.pos.get(k); if (p) { p.x = s.moved[k].x; p.y = s.moved[k].y; } });
 view.setWindow(win, lay);
@@ -1870,29 +2301,21 @@ if (!win) {
 line.appendChild(document.createTextNode(fmt(m.nodes.size) + " objects in " + fmt(estate.bands.length) + " items. Search or select an object to follow its lineage."));
 return;
 }
-var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 ? " · " + win.seeds.size + " selected" : "")];
+var parts = [fmt(win.shown.size) + " of " + fmt(m.nodes.size) + " objects shown" + (win.seeds.size > 1 && (s.selection.length || s.patterns.length) ? " · " + win.seeds.size + " selected" : "")];
 if (win.expanded.size) parts.push(fmt(win.expanded.size) + " expanded");
 if (win.hidden) parts.push(fmt(win.hidden) + " more beside them; select a ‹‹ or ›› marker to expand");
 if (win.truncated) parts.push(el("b", { "class": "wd-warn-text", text: "lineage cut to the " + fmt(win.lineage.size) + " nearest of " + fmt(win.reach) + "; lower a depth" }));
 if (win.edgesDropped) parts.push(el("b", { "class": "wd-warn-text", text: win.edgesDropped + " edges not drawn" }));
 parts.forEach(function (p, i) { if (i) line.appendChild(document.createTextNode(" · ")); line.appendChild(typeof p === "string" ? document.createTextNode(p) : p); });
 }
-var itemPicker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-s.item = this.value || null; s.expanded = []; s.moved = {};
-if (s.item) s.selection = s.selection.filter(function (k) { return m.nodes.get(k).item === s.item; });
-s.focus = s.selection[s.selection.length - 1] || null;
-apply(true);
-} }, [el("option", { value: "", text: "Every item" })].concat(estate.bands.map(function (b) {
-return el("option", { value: b.item.label, selected: b.item.label === s.item ? "selected" : null, text: b.item.label });
-})));
 if (options.above) body.appendChild(options.above);
 f.mount(body, [
+options.chooser,
 nodeSearch(m, select, addPattern),
-itemPicker,
 segmented("Up", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
 segmented("Down", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; apply(true); }, depthLabel),
 segmented("Colour", ["load", "kind"], s.mode, function (v) {
-s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v)); saveState();
+s.mode = v; view.o.mode = v; view.draw(); legendHost.textContent = ""; legendHost.appendChild(legend(v, m)); saveState();
 }, function (v) { return v === "load" ? "Outcome" : "Kind"; }),
 el("span", { "class": "wd-grow" }),
 el("div", { "class": "wd-zoom" }, [
@@ -1900,17 +2323,43 @@ el("button", { "class": "wd-icon", type: "button", title: "Zoom out", "aria-labe
 el("button", { "class": "wd-icon", type: "button", title: "Zoom in", "aria-label": "Zoom in", onclick: function () { view.zoomAt(1.25, view.width / 2, view.height / 2); } }, ["+"]),
 el("button", { "class": "wd-text-btn", type: "button", title: "Fit what is shown", onclick: function () { view.fitWindow(true); } }, ["Fit"]),
 el("button", { "class": "wd-text-btn", type: "button", title: "Show the whole estate", onclick: function () {
-s.item = null; itemPicker.value = ""; select(null);
+select(null);
 } }, ["Estate"])
 ])
 ]);
-legendHost.appendChild(legend(s.mode));
+legendHost.appendChild(legend(s.mode, m));
 if (!m.nodes.size) { host.appendChild(empty("The catalogue records no installed objects yet. Build a project to see its graph.")); return; }
 var fresh = !s.view;
 view = new GraphView(host, m, estate, { state: s, mode: s.mode, onSelect: select, onReveal: expand, onMove: moved, label: options.label });
 apply(false);
-if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || s.item) view.fitWindow(false); else view.fitAll(false); }
+if (fresh || !view.showing(s.focus)) { if (s.selection.length || s.patterns.length || scoped.length) view.fitWindow(false); else view.fitAll(false); }
 return { select: select };
+}
+/* A graph page's selection, made consistent with the catalogue and the items
+chosen. When the chosen items change, what the page held for the previous
+ones goes: objects, search terms with no match among the new items,
+expansions and moved nodes. What still belongs stays selected. */
+function scopeSelection(m, s, items) {
+s.selection = (s.selection || (s.focus ? [s.focus] : [])).filter(function (k) { return m.nodes.has(k); });
+s.expanded = (s.expanded || []).filter(function (k) { return m.nodes.has(k); });
+s.moved = s.moved || {};
+s.patterns = s.patterns || [];
+var scope = items ? items.slice().sort().join("\n") : null;
+if (s.scope !== undefined && s.scope !== scope && items) {
+var inside = new Set(keysOf(m, items));
+s.selection = s.selection.filter(function (k) { return inside.has(k); });
+s.patterns = s.patterns.filter(function (q) { return nodeMatches(m, q).some(function (k) { return inside.has(k); }); });
+s.expanded = []; s.moved = {};
+}
+s.scope = scope;
+if (!s.focus || s.selection.indexOf(s.focus) < 0) s.focus = s.selection[s.selection.length - 1] || null;
+return s;
+}
+/* The objects of the given items. */
+function keysOf(m, labels) {
+var out = [];
+labels.forEach(function (label) { var it = m.items.get(label); if (it) it.nodes.forEach(function (n) { out.push(n.key); }); });
+return out;
 }
 /* The frame both graph pages share: a toolbar, the selection as chips, a status
 line, and the drawing beside its details, with a control that fills the page
@@ -1934,7 +2383,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape" && s.
 f.mount = function (body, tools) {
 tools.forEach(function (t) { if (t) f.bar.appendChild(t); });
 f.host.appendChild(maximise);
-[f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.host, f.legend]), f.side])]
+[f.bar, f.chips, f.line, el("div", { "class": "wd-split" }, [el("div", { "class": "wd-graph-col" }, [f.legend, f.host]), f.side])]
 .forEach(function (c) { f.frame.appendChild(c); });
 body.appendChild(f.frame);
 set(!!s.maximised);
@@ -1964,19 +2413,17 @@ el("button", { type: "button", "class": "wd-chip-remove", "aria-label": "Remove 
 });
 if (selection.length + terms.length > 1) chips.appendChild(el("button", { type: "button", "class": "wd-text-btn wd-chip-clear", onclick: function () { select(null); } }, ["Clear"]));
 }
-function legend(mode) {
+function legend(mode, m) {
 var entries = mode === "load" ? [
 ["swatch wd-ok", "Last load succeeded"], ["swatch wd-bad", "Failed, error or blocked"], ["swatch wd-warn", "Rejected rows or pending"],
 ["swatch wd-none", "Nothing processed, or loaded elsewhere"], ["ring wd-next", "Ready: dependencies processed"], ["ring wd-wait", "Waiting on a dependency"]
-] : [
-["kind wd-kind wd-kind-table", "Table"], ["kind wd-kind wd-kind-view", "View"], ["kind wd-kind wd-kind-folder", "Folder"], ["kind wd-kind wd-kind-shortcut", "Shortcut"],
-["kind wd-kind wd-kind-test", "Test"], ["kind wd-kind wd-kind-assumption", "Assumption"], ["kind wd-kind wd-kind-semantic-model", "Semantic model"], ["kind wd-kind wd-kind-report", "Report"],
-["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]
-];
-return el("div", { "class": "wd-legend" }, entries.map(function (e) {
+] : [["line wd-up", "Upstream"], ["line wd-down", "Downstream"], ["dot wd-bad", "Needs attention"]];
+return el("div", { "class": "wd-legend" }, objectKey(m, mode === "load").concat(entries.map(function (e) {
 return el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-" + e[0] }), e[1]]);
-}).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
+})).concat([el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "3 ››" }), "neighbours not shown: select to expand"])]));
 }
+/* The kinds of item the Orchestration and Entity dictionary pages offer. */
+var DETAIL_KINDS = ["Lakehouse", "Warehouse", "SQLDatabase"];
 function orchestrationPage(body, m) {
 var counts = {}, failed = [], ready = [], waiting = [];
 m.nodes.forEach(function (n) {
@@ -1997,12 +2444,14 @@ tile("Loaded elsewhere", counts[READINESS.ELSEWHERE] || 0, "mirrored; not read h
 latest ? tile("Latest workflow", duration((latest.completed || 0) - (latest.started || 0)), fmt(latest.records) + " processed records · " + ago(latest.completed, m.at), latest.failed ? "bad" : "none") : null
 ]);
 var note = el("p", { "class": "wd-note", text: "Readiness is derived from the recorded state of each object's nearest loadable dependencies. It is not a queue: the catalogue records processed work only, so nothing here is shown as running." });
+var pick = pageItems(m, "orchestration", DETAIL_KINDS, false);
 graphWorkspace(body, m, { page: "orchestration", mode: "load", health: true, label: "Orchestration graph", above: el("div", { "class": "wd-summary" }, [tiles, note]),
+items: pick.items, chooser: pick.chooser,
 empty: "Search for an object, or select one in the graph, to follow its lineage, last outcome and readiness." });
 var lists = el("div", { "class": "wd-columns-2" }, [
 section("Ready · " + ready.length, [dataTable([
 { key: "object", title: "Object", value: function (r) { return r.n.label; } },
-{ key: "item", title: "Item", value: function (r) { return r.n.item; } },
+{ key: "item", title: "Item", value: function (r) { return shownItem(r.n.item); } },
 { key: "outcome", title: "Last outcome", render: function (r) { var s = effectiveLoad(r.n); return chip(s ? s.result : null, s ? null : "None"); }, value: function (r) { var s = effectiveLoad(r.n); return s ? s.result : ""; } }
 ], ready, { limit: 100, sort: "object", desc: false, emptyText: "Nothing is ready to load." })]),
 section("Waiting · " + waiting.length, [dataTable([
@@ -2021,27 +2470,52 @@ note ? el("div", { "class": "wd-tile-note", text: note }) : null
 ]);
 }
 var KIND_ORDER = [KIND.FOLDER, KIND.SHORTCUT, KIND.TABLE, KIND.VIEW, KIND.MODEL, KIND.REPORT, KIND.TEST, KIND.ASSUMPTION];
+/* Each item's workspace, as the Items page groups it. */
+function workspaceOf(it) { return it.workspace || it.catalogue || ""; }
+/* Workspaces in the order the catalogues were given. */
+function workspaceList(m) {
+var seen = [];
+eligibleItems(m, ITEM_TYPES).forEach(function (it) { var w = workspaceOf(it); if (seen.indexOf(w) < 0) seen.push(w); });
+return seen;
+}
 function overviewPage(body, m) {
-var health = assessHealth(m), s = pageState("overview");
+var all = assessHealth(m), s = pageState("overview");
+var workspaces = workspaceList(m), several = workspaces.length > 1, pick = pageItems(m, "overview", ITEM_TYPES, true);
+function inScope(n) { return !n || pick.all || pick.set.has(n.item); }
+var health = {
+load: all.load.filter(function (f) { return inScope(f.node); }), tests: all.tests.filter(function (f) { return inScope(f.node); }),
+build: all.build.filter(function (f) { return f.node ? inScope(f.node) : pick.all || pick.set.has(f.item); }),
+counts: { load: { subjects: 0 }, tests: { subjects: 0 } }
+};
+health.all = health.load.concat(health.tests, health.build).sort(byFinding);
+m.nodes.forEach(function (n) {
+if (!inScope(n)) return;
+if (isLoadSubject(n)) health.counts.load.subjects += 1;
+if (isValidation(n)) health.counts.tests.subjects += 1;
+});
 var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
 function open(key) {
 s.open = key;
 side.hidden = !key;
-details(side, m, key, { onOpen: open, health: health });
+details(side, m, key, { onOpen: open, health: all });
 if (key) side.insertBefore(el("button", { "class": "wd-icon wd-close", type: "button", "aria-label": "Close", onclick: function () { open(null); } }, ["×"]), side.firstChild);
 }
+var items = visibleItems(m).filter(function (it) { return (it.nodes.length || it.target) && pick.set.has(it.label); });
+var shownWorkspaces = new Set(items.map(workspaceOf));
+body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser]));
 var loadRed = health.load.filter(function (f) { return f.severity === RED; }).length;
 var loadAmber = health.load.filter(function (f) { return f.severity === AMBER && !f.unobserved; }).length;
 var testRed = health.tests.filter(function (f) { return f.severity === RED; }).length;
 var testAmber = health.tests.filter(function (f) { return f.severity === AMBER; }).length;
 body.appendChild(el("div", { "class": "wd-tiles" }, [
-tile("Items", visibleItems(m).filter(function (it) { return it.nodes.length; }).length, fmt(m.nodes.size) + " installed objects", "none"),
+tile("Items", items.filter(function (it) { return it.nodes.length; }).length,
+fmt(items.reduce(function (a, it) { return a + it.nodes.length; }, 0)) + " installed objects" + (several ? " in " + fmt(shownWorkspaces.size) + (shownWorkspaces.size === 1 ? " workspace" : " workspaces") : ""), "none"),
 tile("Load", loadRed ? loadRed + " red" : loadAmber ? loadAmber + " amber" : "Green", health.counts.load.subjects + " subjects · " + loadAmber + " amber", loadRed ? "bad" : loadAmber ? "wait" : "ok"),
 tile("Tests", testRed ? testRed + " red" : testAmber ? testAmber + " amber" : "Green", health.counts.tests.subjects + " Tests and Assumptions", testRed ? "bad" : testAmber ? "wait" : "ok"),
 tile("Build", health.build.length ? health.build.length + " red" : "Consistent", "catalogue consistency only", health.build.length ? "bad" : "ok"),
 tile("Workflows, 7 days", m.workflowCount || 0, m.workflows.length ? "latest " + ago(m.workflows[0].completed, m.at) : "none in the last 7 days", "none")
 ]));
-var inventory = section("Installed items", [itemInventory(m, open)]);
+var inventory = section("Installed items", [pageKey(m), several ? workspaceInventory(m, open, items) : itemInventory(m, open, items)]);
 var findings = health.all.filter(function (f) { return !f.unobserved; });
 var significant = section("Significant findings", [findings.length ? el("ul", { "class": "wd-findings wd-findings-wide" }, findings.slice(0, 12).map(function (f) {
 return el("li", {}, [severityChip(f.severity), f.node ? nodeLink(m, f.node.key, open) : el("span", { "class": "wd-mono", text: f.label }),
@@ -2052,9 +2526,27 @@ var activity = section("Recent workflows", [workflowTable(m, 8)]);
 body.appendChild(el("div", { "class": "wd-overview" }, [el("div", { "class": "wd-overview-main" }, [inventory, significant, activity]), side]));
 if (s.open && m.nodes.has(s.open)) open(s.open);
 }
+/* Items grouped by workspace, each workspace in the order its catalogue was given. */
+function workspaceInventory(m, open, items) {
+if (!items.length) return empty("Nothing is installed yet. Build a project to fill the catalogue.");
+var groups = new Map();
+workspaceList(m).forEach(function (w) { groups.set(w, []); });
+items.forEach(function (it) { var g = groups.get(workspaceOf(it)); if (g) g.push(it); });
+var out = [];
+groups.forEach(function (list, w) {
+if (!list.length) return;
+var kinds = {};
+list.forEach(function (it) { kinds[it.type] = (kinds[it.type] || 0) + 1; });
+out.push(el("div", { "class": "wd-ws-group" }, [
+el("div", { "class": "wd-ws-head" }, [el("h3", { text: w }), el("span", { "class": "wd-muted", text: composition(kinds) })]),
+itemCards(m, open, list, true)
+]));
+});
+return el("div", {}, out);
+}
 /* Each item with its objects by kind and the state of what it loads. */
-function itemInventory(m, open) {
-var items = visibleItems(m).filter(function (it) { return it.nodes.length || it.target; });
+function itemInventory(m, open, items) {
+items = items.slice();
 items.sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
 if (!items.length) return empty("Nothing is installed yet. Build a project to fill the catalogue.");
 var groups = [];
@@ -2066,7 +2558,15 @@ g.items.push(it);
 return el("div", { "class": "wd-inventory" }, groups.map(function (g) {
 return el("div", { "class": "wd-inv-group" }, [
 el("div", { "class": "wd-eyebrow", text: g.type + " · " + g.items.length }),
-el("div", { "class": "wd-inv-items" }, g.items.map(function (it) {
+itemCards(m, open, g.items, false)
+]);
+}));
+}
+/* An item's card: its objects by kind, the state of what it loads and when it
+last processed. With kind, the card names its kind, for a list that mixes them. */
+function itemCards(m, open, items, kind) {
+items = items.slice().sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
+return el("div", { "class": "wd-inv-items" }, items.map(function (it) {
 var byKind = {}, tones = { ok: 0, bad: 0, warn: 0, wait: 0, none: 0 }, latest = null;
 it.nodes.forEach(function (n) {
 byKind[n.kind] = (byKind[n.kind] || 0) + 1;
@@ -2077,6 +2577,7 @@ if (st && st.result !== "Pending") latest = later(latest, st.completed);
 var total = tones.ok + tones.bad + tones.warn + tones.wait + tones.none;
 var first = it.nodes[0];
 return el("button", { "class": "wd-inv-item", type: "button", onclick: function () { if (first) open(first.key); } }, [
+kind ? el("div", { "class": "wd-eyebrow", text: kindName(it.type) }) : null,
 el("div", { "class": "wd-inv-head" }, [el("b", { text: it.name }), it.target && it.target !== it.name ? el("span", { "class": "wd-muted", text: " → " + it.target }) : null]),
 el("div", { "class": "wd-inv-kinds" }, KIND_ORDER.filter(function (k) { return byKind[k]; }).map(function (k) {
 return el("span", { "class": "wd-inv-kind" }, [kindMark(k), fmt(byKind[k]) + " " + k.toLowerCase() + (byKind[k] === 1 ? "" : "s")]);
@@ -2084,8 +2585,6 @@ return el("span", { "class": "wd-inv-kind" }, [kindMark(k), fmt(byKind[k]) + " "
 total ? el("div", { "class": "wd-bar-stack", title: tones.ok + " succeeded · " + tones.bad + " failed · " + (tones.warn + tones.wait) + " pending or rejected · " + tones.none + " not processed" },
 ["ok", "warn", "wait", "bad", "none"].map(function (t) { return tones[t] ? el("i", { "class": "wd-" + t, style: "flex:" + tones[t] }) : null; })) : null,
 el("div", { "class": "wd-inv-meta", text: total ? "Last processed " + ago(latest, m.at) : it.nodes.length ? "Nothing to load" : "No objects" })
-]);
-}))
 ]);
 }));
 }
@@ -2101,7 +2600,13 @@ return dataTable([
 ], m.workflows, { limit: limit, sort: "completed" });
 }
 function healthPage(body, m) {
-var health = assessHealth(m), s = pageState("health");
+var health = assessHealth(m), s = pageState("health"), pick = pageItems(m, "health", ITEM_TYPES, true);
+function inScope(f) { return pick.all || (f.node ? pick.set.has(f.node.item) : pick.set.has(f.item)); }
+health = Object.assign({}, health, {
+load: health.load.filter(inScope), tests: health.tests.filter(inScope), build: health.build.filter(inScope),
+all: health.all.filter(inScope), green: health.green.filter(inScope)
+});
+body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser]));
 s.area = s.area || "all"; s.severity = s.severity || "all";
 var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
 function open(key) {
@@ -2134,8 +2639,8 @@ return (s.area === "all" || f.area === s.area) && (s.severity === "all" || (s.se
 tableHost.appendChild(dataTable([
 { key: "severity", title: "Severity", value: function (f) { return SEVERITY_RANK[f.severity] * 2 + (f.unobserved ? 0 : 1); }, render: function (f) { return severityChip(f.severity, f.unobserved); }, numeric: true },
 { key: "area", title: "Area", value: function (f) { return { load: "Load", tests: "Tests", build: "Build" }[f.area]; } },
-{ key: "object", title: "Object", value: function (f) { return f.node ? f.node.label : f.label; }, render: function (f) { return f.node ? nodeLink(m, f.node.key, open) : el("span", { "class": "wd-mono", text: f.label }); } },
-{ key: "item", title: "Item", value: function (f) { return f.node ? f.node.item : ""; } },
+{ key: "object", title: "Object", value: function (f) { return f.node ? f.node.label : f.label; }, render: function (f) { return f.node ? nodeLink(m, f.node.key, open, true) : el("span", { "class": "wd-mono", text: f.label }); } },
+{ key: "item", title: "Item", value: function (f) { return f.node ? shownItem(f.node.item) : f.item ? shownItem(f.item) : ""; } },
 { key: "result", title: "Status", value: function (f) { return f.result || ""; }, render: function (f) { return f.result ? chip(f.result) : "—"; } },
 { key: "message", title: "Finding", value: function (f) { return f.message; } },
 { key: "completed", title: "Processed", value: function (f) { return f.completed; }, render: function (f) { return f.completed ? stamp(f.completed) : "—"; }, numeric: true }
@@ -2146,7 +2651,7 @@ segmented("Area", ["all", "load", "tests", "build"], s.area, function (v) { s.ar
 segmented("Severity", ["all", "red", "amber", "green", "unobserved"], s.severity, function (v) { s.severity = v; render(); saveState(); }, function (v) { return { all: "All", red: "Red", amber: "Amber", green: "Green", unobserved: "Unobserved" }[v]; })
 ]));
 render();
-body.appendChild(el("div", { "class": "wd-overview" }, [el("div", { "class": "wd-overview-main" }, [tableHost]), side]));
+body.appendChild(el("div", { "class": "wd-overview" }, [el("div", { "class": "wd-overview-main" }, [pageKey(m), tableHost]), side]));
 }
 function metadata(m) {
 if (m.meta) return m.meta;
@@ -2226,15 +2731,15 @@ if (m.entries) return m.entries;
 var md = metadata(m), out = [];
 visibleItems(m).forEach(function (it) {
 if (!it.nodes.length && !it.target) return;
-out.push({ kind: "Item", label: it.name, meta: it.type + (it.target && it.target !== it.name ? " · " + it.target : ""), desc: "", item: it.label, ref: it });
+out.push({ kind: "Item", label: it.name, meta: it.type + (it.target && it.target !== it.name ? " · " + it.target : "") + (CATALOGUES.size > 1 && it.catalogue ? " · " + it.catalogue : ""), desc: "", item: it.label, ref: it });
 });
 m.nodes.forEach(function (n) {
-out.push({ kind: n.kind, label: n.label, meta: n.kind + " · " + n.item, desc: n.desc, item: n.item, ref: n, qualified: qualified(n) });
+out.push({ kind: n.kind, label: n.label, meta: n.kind + " · " + shownItem(n.item), desc: n.desc, item: n.item, ref: n, qualified: qualified(n) });
 });
 md.columns.forEach(function (list, id) {
 var owner = m.byIdentity.get(id);
 list.forEach(function (c) {
-out.push({ kind: "Column", label: c.column, meta: "Column · " + (owner ? owner.label : c.schema + "." + c.object) + " · " + c.item, desc: c.description || "", item: c.item, ref: c, owner: owner });
+out.push({ kind: "Column", label: c.column, meta: "Column · " + (owner ? owner.label : c.schema + "." + c.object) + " · " + shownItem(c.item), desc: c.description || "", item: c.item, ref: c, owner: owner });
 });
 });
 md.models.forEach(function (mo) {
@@ -2288,20 +2793,15 @@ between Lakehouse and Warehouse objects, and their dictionary. The Semantic
 model page is its counterpart for models. */
 function entitiesPage(body, m) {
 var s = pageState("entities"), md = metadata(m);
-s.item = s.item || "all"; s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
-var items = visibleItems(m).filter(function (it) { return SEMANTIC_TYPES.indexOf(it.type) < 0 && (it.nodes.length || it.target); })
-.sort(function (a, b) { return typeRank(a.type) - typeRank(b.type) || compare(a.name, b.name); });
-if (s.item !== "all" && !items.some(function (it) { return it.label === s.item; })) s.item = "all";
+s.kind = s.kind || "All"; s.query = s.query || ""; s.er = s.er || {};
+var pick = pageItems(m, "entities", DETAIL_KINDS, false), chosen = pick.set;
 var entries = dictionaryEntries(m).filter(function (e) {
-return ENTITY_KINDS.indexOf(e.kind) > 0 && SEMANTIC_TYPES.indexOf(itemType(e.item)) < 0 && (s.item === "all" || e.item === s.item);
+return ENTITY_KINDS.indexOf(e.kind) > 0 && chosen.has(e.item);
 });
 var counts = {};
 entries.forEach(function (e) { counts[e.kind] = (counts[e.kind] || 0) + 1; });
-var picker = el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () {
-s.item = this.value; s.selected = null; s.er = { up: s.er.up, down: s.er.down, maximised: s.er.maximised }; saveState(); redraw();
-} }, [el("option", { value: "all", text: "Every Lakehouse and Warehouse" })].concat(items.map(function (it) {
-return el("option", { value: it.label, selected: it.label === s.item ? "selected" : null, text: it.type + " · " + it.name });
-})));
+var browsed = entries.filter(function (e) { return e.kind !== "Column"; });
+var picker = pick.chooser;
 var search = searchBox({
 placeholder: "Search " + fmt(entries.length) + " tables, views, folders and columns · * matches any text · Shift adds",
 find: function (q) {
@@ -2310,7 +2810,7 @@ return q.trim() ? searchEntries(entries, q, "All").slice(0, 12).map(function (e)
 onPick: function (r, adding) { choose(r.entry, adding); },
 onPattern: function (q) { er.addPattern(q); }
 });
-var er = erWorkspace(body, m, s.er, { item: s.item, tools: [search, picker], describe: renderSide,
+var er = erWorkspace(body, m, s.er, { item: chosen, tools: [picker, search], describe: renderSide,
 matches: function (q) { return searchEntries(entries, q, "All").filter(function (e) { return e.ref && e.ref.key; }).map(function (e) { return e.ref.id; }); },
 onPick: function (id) {
 var entry = tableEntry(id);
@@ -2319,9 +2819,9 @@ renderSide(); renderList(); renderDetail();
 saveState();
 } });
 var facets = el("div", { "class": "wd-facets", role: "radiogroup", "aria-label": "Entry kind" });
-var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(entries.length) + " entries by name, kind or description · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
+var input = el("input", { "class": "wd-search wd-search-wide", type: "search", value: s.query, placeholder: "Filter " + fmt(browsed.length) + " entries by name, kind or description; choose Column for columns · * matches any text", "aria-label": "Filter the dictionary", autocomplete: "off", spellcheck: "false" });
 var list = el("div", { "class": "wd-entry-list", role: "listbox" }), detail = el("div", { "class": "wd-entry-detail" }), note = el("div", { "class": "wd-status-line" });
-body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, el("div", { "class": "wd-dictionary" }, [list, detail])]));
+body.appendChild(section("Dictionary", [el("div", { "class": "wd-toolbar" }, [input]), facets, note, pageKey(m), el("div", { "class": "wd-dictionary" }, [list, detail])]));
 function tableEntry(id) { return entries.filter(function (e) { return e.ref && e.ref.key && e.ref.id === id; })[0] || null; }
 function tableOf(e) {
 if (e.ref && e.ref.key) return e.ref.id;
@@ -2335,17 +2835,18 @@ ENTITY_KINDS.forEach(function (k) {
 if (k !== "All" && !counts[k]) return;
 facets.appendChild(el("button", { type: "button", role: "radio", "class": "wd-facet", "aria-checked": String(s.kind === k),
 onclick: function () { s.kind = k; renderFacets(); renderList(); saveState(); } },
-[k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? entries.length : counts[k]) })]));
+[k === "All" ? null : kindMark(k), k + " ", el("span", { "class": "wd-facet-count", text: fmt(k === "All" ? browsed.length : counts[k]) })]));
 });
 }
 function renderList() {
-var found = searchEntries(entries, s.query, s.kind), shown = found.slice(0, 100);
+var found = searchEntries(s.kind === "Column" ? entries : browsed, s.query, s.kind), shown = found.slice(0, 100);
 list.textContent = "";
 note.textContent = found.length > 100 ? "Showing the first 100 of " + fmt(found.length) + " matches. Refine the filter to narrow them." : fmt(found.length) + (found.length === 1 ? " match" : " matches");
 shown.forEach(function (e) {
-list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry", "aria-selected": String(s.selected === entryId(e)),
+var n = e.ref && e.ref.key ? e.ref : e.owner;
+list.appendChild(el("button", { type: "button", role: "option", "class": "wd-entry" + changeClass(n), "aria-selected": String(s.selected === entryId(e)),
 onclick: function () { choose(e, false); } }, [
-el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label]),
+el("span", { "class": "wd-entry-label" }, [kindMark(e.kind), e.label, e.ref && e.ref.key ? changeMark(e.ref) : null]),
 el("span", { "class": "wd-entry-meta", text: e.meta }),
 e.desc ? el("span", { "class": "wd-entry-desc", text: e.desc }) : null
 ]));
@@ -2358,7 +2859,7 @@ function choose(e, adding) {
 s.selected = entryId(e);
 var id = tableOf(e);
 if (id && er.has(id)) er.select(id, adding);
-else if (id) er.say(e.label + " is not a declared table" + (s.item !== "all" ? " in " + itemName(s.item) : ""));
+else if (id) er.say(e.label + " is not a declared table in the items shown");
 renderSide(); renderList(); renderDetail();
 saveState();
 }
@@ -2610,13 +3111,21 @@ dictionary page is its counterpart for Lakehouses and Warehouses. */
 function semanticPage(body, m) {
 var s = pageState("semantic"), models = modelList(m);
 s.order = s.order || "authored"; s.dims = s.dims || "columns"; s.query = s.query || "";
-if (!models.length) { body.appendChild(empty("No semantic model is recorded in the catalogue.")); return; }
-if (!s.model || !models.some(function (mo) { return mo.item === s.model; })) s.model = models[0].item;
-var mo = metadata(m).models.get(s.model);
-var picker = el("select", { "class": "wd-select wd-select-strong", "aria-label": "Semantic model", onchange: function () { s.model = this.value; s.table = null; saveState(); redraw(); } },
-models.map(function (x) { return el("option", { value: x.item, selected: x.item === s.model ? "selected" : null, text: x.name }); }));
-var input = el("input", { "class": "wd-search", type: "search", value: s.query, placeholder: "Search this model's tables, columns and measures", "aria-label": "Search the model", autocomplete: "off", spellcheck: "false" });
-body.appendChild(el("div", { "class": "wd-toolbar" }, [picker, el("div", { "class": "wd-searchbox" }, [input])]));
+var pick = pageItems(m, "semantic", ["SemanticModel"], false);
+var input = el("input", { "class": "wd-search", type: "search", value: s.query, placeholder: "Search the models' tables, columns and measures", "aria-label": "Search the models", autocomplete: "off", spellcheck: "false" });
+body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser, el("div", { "class": "wd-searchbox" }, [input])]));
+var shown = pick.items.map(function (label) { return metadata(m).models.get(label); }).filter(Boolean);
+if (!shown.length) { body.appendChild(empty(models.length ? "The catalogue records no metadata for the models chosen." : "No semantic model is recorded in the catalogue.")); return; }
+input.addEventListener("input", function () { s.query = input.value; });
+shown.forEach(function (mo) {
+var part = el("div", { "class": "wd-model-part" });
+body.appendChild(part);
+semanticModelView(part, m, s, mo, models, input);
+});
+}
+/* One semantic model: what it is, how its tables relate, its tables, its
+measures and the sources they read. */
+function semanticModelView(body, m, s, mo, models, input) {
 var refresh = mo.node ? effectiveLoad(mo.node) : null, it = m.items.get(mo.item), measureCount = 0, columnCount = 0;
 mo.tables.forEach(function (tb) { measureCount += tb.measures.length; columnCount += tb.columns.length; });
 var facts = el("dl", { "class": "wd-facts wd-facts-wide" });
@@ -2627,7 +3136,7 @@ if (it && it.target) fact("Fabric item", it.target);
 fact("Contents", fmt(mo.tables.size) + " tables · " + fmt(columnCount) + " columns · " + fmt(measureCount) + " measures · " + fmt(mo.relationships.length) + " relationships");
 var validations = it ? it.nodes.filter(isValidation) : [];
 body.appendChild(el("div", { "class": "wd-model-head" }, [
-el("div", {}, [el("div", { "class": "wd-eyebrow", text: "Semantic model" }), el("h2", { "class": "wd-detail-title", text: mo.name }),
+el("div", {}, [el("div", { "class": "wd-eyebrow", text: "Semantic model · " + (m.items.get(mo.item) ? m.items.get(mo.item).workspace || "" : "") }), el("h2", { "class": "wd-detail-title", text: mo.name }),
 el("p", { "class": mo.description ? "wd-desc" : "wd-desc wd-muted", text: mo.description || "No description." }), facts]),
 validations.length ? el("div", {}, [el("h3", { "class": "wd-h3", text: "Tests and Assumptions · " + validations.length }),
 el("ul", { "class": "wd-list" }, validations.map(function (v) {
@@ -2683,7 +3192,7 @@ e.x.format ? el("div", { "class": "wd-muted", text: "Format " + e.x.format }) : 
 }
 body.appendChild(section("Measures · " + fmt(measureCount), [measuresHost]));
 body.appendChild(section("Sources", [sourceReuse(m, models, false, mo.item)]));
-input.addEventListener("input", function () { s.query = input.value; renderTables(); renderMeasures(); });
+input.addEventListener("input", function () { renderTables(); renderMeasures(); });
 renderBus(); renderTables(); renderMeasures();
 }
 /* Logical sources against the models whose tables read them. */
@@ -2703,7 +3212,7 @@ var list = Array.from(sources.values()).filter(function (src) { return !only || 
 .sort(function (a, b) { return compare(a.item, b.item) || compare(a.label, b.label); });
 if (!list.length) return empty("No table of this model records a managed source.");
 var rows = modelsAsRows ? models : list, cols = modelsAsRows ? list : models;
-function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + itemName(x.item) })]; }
+function name(x) { return x.name !== undefined ? [x.name] : [x.label, el("span", { "class": "wd-muted", text: " " + shownName(x.item) })]; }
 function tables(row, col) { var src = modelsAsRows ? col : row, mo = modelsAsRows ? row : col; return src.by.get(mo.item); }
 return el("div", { "class": "wd-table-wrap wd-bus-wrap" }, [el("table", { "class": "wd-bus" }, [
 el("thead", {}, [el("tr", {}, [el("th", { "class": "wd-bus-corner", text: modelsAsRows ? "Model ↓   Source →" : "Source ↓   Model →" })].concat(cols.map(function (c) {
@@ -2724,6 +3233,7 @@ A table with no relationship is a node of its own. Both ends of a
 relationship keep their foreign and primary columns. */
 function erGraph(m, item) {
 var md = metadata(m), nodes = new Map(), edges = [];
+var only = item instanceof Set ? item : item && item !== "all" ? new Set([item]) : null;
 function node(id) {
 if (nodes.has(id)) return;
 var parts = id.split("|"), owner = m.byIdentity.get(id) || null, declared = md.tables.get(id);
@@ -2734,11 +3244,11 @@ keys: keys.concat((md.keys.get(id) || []).map(function (k) { return { type: k.ty
 owner: owner, refs: [], back: [] });
 }
 md.foreignKeys.forEach(function (fk) {
-if (item && item !== "all" && fk.from.split("|")[0] !== item && fk.to.split("|")[0] !== item) return;
+if (only && !only.has(fk.from.split("|")[0]) && !only.has(fk.to.split("|")[0])) return;
 node(fk.from); node(fk.to);
 edges.push({ from: fk.from, to: fk.to, fromColumns: fk.fromColumns, toColumns: fk.toColumns, label: "", active: true, many: true });
 });
-md.tables.forEach(function (_, id) { if (!item || item === "all" || id.split("|")[0] === item) node(id); });
+md.tables.forEach(function (_, id) { if (!only || only.has(id.split("|")[0])) node(id); });
 edges.forEach(function (e, i) { e.id = i; nodes.get(e.from).refs.push(e); nodes.get(e.to).back.push(e); });
 return { nodes: nodes, edges: edges };
 }
@@ -2807,7 +3317,10 @@ return { seeds: new Set(seeds), rank: rank, expanded: added, reach: reach, trunc
 edges: g.edges.filter(function (e) { return rank.has(e.from) && rank.has(e.to); }) };
 }
 function unique(list) { return list.filter(function (x, i) { return list.indexOf(x) === i; }); }
-function erRows(n, edges) {
+/* A box's rows: its key and foreign key columns, the anchors its relationships
+attach to. With columns, it also lists further columns up to ER.COLUMNS;
+otherwise it counts them. */
+function erRows(n, edges, columns) {
 var keyCols = [], fkCols = [], rows = [];
 n.keys.forEach(function (k) { k.columns.forEach(function (c) { if (keyCols.indexOf(c) < 0) keyCols.push(c); }); });
 edges.forEach(function (e) {
@@ -2817,13 +3330,13 @@ if (e.to === n.id) e.toColumns.forEach(function (c) { if (keyCols.indexOf(c) < 0
 keyCols.forEach(function (c) { rows.push({ name: c, mark: "key" }); });
 fkCols.forEach(function (c) { if (keyCols.indexOf(c) < 0) rows.push({ name: c, mark: "fk" }); });
 var rest = n.columns.filter(function (c) { return keyCols.indexOf(c) < 0 && fkCols.indexOf(c) < 0; });
-var room = Math.max(0, ER.COLUMNS - rows.length);
+var room = columns ? Math.max(0, ER.COLUMNS - rows.length) : 0;
 rest.slice(0, room).forEach(function (c) { rows.push({ name: c, mark: "" }); });
 return { rows: rows, hidden: rest.length - Math.min(room, rest.length) };
 }
 /* Boxes for a window, one row per rank, each placed under the tables it relates
 to in the rows above. */
-function erLayout(g, win) {
+function erLayout(g, win, columns) {
 var levels = new Map();
 win.rank.forEach(function (d, id) { addTo(levels, d, id); });
 var order = Array.from(levels.keys()).sort(function (a, b) { return a - b; }), boxes = new Map(), placedX = new Map();
@@ -2837,7 +3350,7 @@ return [id, near.length ? near.reduce(function (a, b) { return a + b; }, 0) / ne
 ids.sort(function (a, b) { return bary.get(a) - bary.get(b) || compare(g.nodes.get(a).label, g.nodes.get(b).label) || compare(a, b); });
 for (var start = 0; start < ids.length; start += ER.WRAP) {
 var line = ids.slice(start, start + ER.WRAP);
-var rows = line.map(function (id) { return erRows(g.nodes.get(id), win.edges); });
+var rows = line.map(function (id) { return erRows(g.nodes.get(id), win.edges, columns); });
 var heights = rows.map(function (r) { return ER.HEAD + Math.max(1, r.rows.length + (r.hidden ? 1 : 0)) * ER.ROW + 8; });
 var width = line.length * ER.BOX + (line.length - 1) * ER.GAP_X, x = -width / 2;
 line.forEach(function (id, i) {
@@ -2852,8 +3365,8 @@ y += Math.max.apply(null, heights) + (start + ER.WRAP < ids.length ? ER.GAP_ROW 
 return { boxes: boxes, bounds: { x: left - 80, y: -80, w: right - left + 160, h: y - ER.GAP_ROW + 160 } };
 }
 /* The ER page's workspace, framed as the Orchestration graph is: s holds
-the selection, depths, expansions and viewport. options.item limits it to one
-item's relationships; options.tools come first in its toolbar; options.onPick
+the selection, depths, expansions and viewport. options.item limits it to the
+relationships of a set of items; options.tools come first in its toolbar; options.onPick
 hears a table chosen in the diagram, options.describe fills the details, and
 options.matches(term) lists the tables a wildcard term selects. */
 function erWorkspace(body, m, s, options) {
@@ -2943,7 +3456,7 @@ var w = win();
 status(w);
 renderChips();
 if (!w) { drawing.appendChild(empty("Search for a table, or select one, to draw its relationships.")); zoom = null; return; }
-var lay = erLayout(g, w), boxes = lay.boxes, current = focus();
+var lay = erLayout(g, w, !!s.columns), boxes = lay.boxes, current = focus();
 Object.keys(s.moved).forEach(function (id) { var b = boxes.get(id); if (b) { b.x = s.moved[id].x; b.y = s.moved[id].y; } });
 var svg = sv("svg", { "class": "wd-er-svg", role: "img", "aria-label": "Relationship diagram" }), stage = sv("g"), lines = sv("g");
 svg.appendChild(stage);
@@ -2968,16 +3481,18 @@ if (d.many) { d.many.setAttribute("x", r.from[0]); d.many.setAttribute("y", r.fr
 }
 boxes.forEach(function (box, id) {
 var n = g.nodes.get(id), seed = w.seeds.has(id);
-var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
+var group = sv("g", { "class": "wd-er-box" + (seed ? " wd-er-box-focus" : "") + changeClass(n.owner) + (id === current ? " wd-er-box-current" : ""), transform: "translate(" + box.x + " " + box.y + ")", tabindex: "0", role: "button", "aria-label": n.label });
 group.appendChild(sv("rect", { width: ER.BOX, height: box.h, rx: 9 }));
 group.appendChild(sv("rect", { "class": "wd-er-head", width: ER.BOX, height: ER.HEAD - 6, rx: 9 }));
 group.appendChild(sv("text", { "class": "wd-er-title", x: 12, y: 17 }, [clipText(n.label, 28)]));
-group.appendChild(sv("text", { "class": "wd-er-item", x: 12, y: 29 }, [clipText(itemName(n.item), 34)]));
+group.appendChild(sv("text", { "class": "wd-er-item", x: 12, y: 29 }, [clipText(shownName(n.item), 34)]));
+if (CHANGE_TEXT[n.owner && n.owner.change]) group.appendChild(sv("text", { "class": "wd-er-change", x: ER.BOX - 12, y: 17, "text-anchor": "end" },
+[n.owner.change === CHANGE.CHANGED ? "Δ" : "+", sv("title", {}, [CHANGE_TEXT[n.owner.change]])]));
 box.rows.forEach(function (r, i) {
 group.appendChild(sv("text", { "class": "wd-er-col" + (r.mark ? " wd-er-" + r.mark : ""), x: 12, y: ER.HEAD + i * ER.ROW + 13 },
 [(r.mark === "key" ? "⚿ " : r.mark === "fk" ? "↗ " : "   ") + clipText(r.name, 30)]));
 });
-if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + " more described columns"]));
+if (box.hidden) group.appendChild(sv("text", { "class": "wd-er-col wd-er-hidden", x: 12, y: ER.HEAD + box.rows.length * ER.ROW + 13 }, [box.hidden + (box.rows.length ? " more" : "") + (box.hidden === 1 ? " described column" : " described columns")]));
 var more = w.more.get(id);
 if (more && more.up.length) group.appendChild(marker(box, id, "up", more.up.length));
 if (more && more.down.length) group.appendChild(marker(box, id, "down", more.down.length));
@@ -3037,6 +3552,8 @@ if (options.onPick && s.selection.indexOf(id) >= 0) options.onPick(id);
 f.mount(body, (options.tools || []).concat([
 segmented("Parents", DEPTHS, s.up, function (d) { s.up = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
 segmented("Children", DEPTHS, s.down, function (d) { s.down = d; s.expanded = []; s.moved = {}; s.view = null; draw(); saveState(); }, depthLabel),
+segmented("Boxes", ["keys", "columns"], s.columns ? "columns" : "keys", function (v) { s.columns = v === "columns"; draw(); saveState(); },
+function (v) { return v === "keys" ? "Keys" : "Columns"; }),
 el("span", { "class": "wd-grow" }),
 el("div", { "class": "wd-zoom" }, [
 el("button", { "class": "wd-icon", type: "button", title: "Zoom out", "aria-label": "Zoom out", onclick: function () { if (zoom) zoom.zoomBy(0.8); } }, ["−"]),
@@ -3054,7 +3571,7 @@ el("span", { "class": "wd-key" }, [el("i", { "class": "wd-key-more", text: "↓ 
 ]));
 if (options.describe) options.describe(f.side);
 if (!g.nodes.size) {
-drawing.appendChild(empty("No declared table is recorded" + (options.item && options.item !== "all" ? " for " + itemName(options.item) : "") + "."));
+drawing.appendChild(empty("No declared table is recorded for the items shown."));
 return { has: function () { return false; }, select: function () {}, addPattern: function () {}, say: function () {}, side: f.side };
 }
 draw();
@@ -3125,15 +3642,16 @@ var GANTT = { LABEL: 560, ROW: 20, AXIS: 28 };
 function logRows(m) {
 if (m.logRows) return m.logRows;
 var byTarget = targetItems(m), flows = new Map((m.tables.logflows || []).map(function (r) { return [r.index, r.workflow]; }));
+function itemOf(r) { return byTarget.get((r.catalogue || "") + "|" + r.targettype + "|" + r.target) || null; }
 m.logRows = (m.tables.log || []).filter(function (r) {
-var item = byTarget.get(r.targettype + "|" + r.target);
+var item = itemOf(r);
 return !(item && isInternal(m, item, r.schema)) && !(r.object && INTERNAL_SCHEMA.test(r.schema || ""));
 }).map(function (r) {
-var item = byTarget.get(r.targettype + "|" + r.target) || null;
+var item = itemOf(r);
 var node = item && r.object ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
 var started = num(r.started), completed = num(r.completed);
 return { id: r.id, workflow: flows.get(r.flow) || null, task: r.task, target: r.target, schema: r.schema, object: r.object, result: r.result,
-item: item || (r.targettype && r.target ? r.targettype + "/" + r.target : null),
+item: item || (r.targettype && r.target ? owned(r.targettype + "/" + r.target, r.catalogue) : null),
 started: started !== null ? started : completed, completed: completed !== null ? completed : started, duration: num(r.duration),
 node: node, message: r.message, envelope: !r.object,
 label: node ? node.label : r.object ? qualified({ item: item, schema: r.schema, object: r.object }) : (r.message || r.task || "") };
@@ -3155,7 +3673,8 @@ events.forEach(function (e) { running += e[1]; peak = Math.max(peak, running); }
 return { t0: t0, t1: Math.max(t1, t0 + 1000), span: t1 > t0 ? t1 - t0 : 0, work: work, peak: peak };
 }
 function ganttPage(body, m) {
-var s = pageState("gantt"), all = logRows(m), flows = m.workflows || [];
+var pick = pageItems(m, "gantt", ITEM_TYPES, true);
+var s = pageState("gantt"), all = logRows(m).filter(function (r) { return pick.all || r.envelope || !r.item || pick.set.has(r.item); }), flows = m.workflows || [];
 var included = new Map((m.tables.logflows || []).map(function (r) { return [r.workflow, { records: num(r.records), included: num(r.included) }]; }));
 if (!flows.length) { body.appendChild(empty("No workflow has processed a record in the last 7 days. Run weaver load to see its timeline.")); return; }
 if (!s.workflow || !flows.some(function (w) { return w.id === s.workflow; }) || s.follow !== false) s.workflow = flows[0].id;
@@ -3180,7 +3699,7 @@ else {
 side.textContent = "";
 side.appendChild(el("div", { "class": "wd-eyebrow" }, [kind ? kindMark(kind) : null, (kind ? " " : "") + (r.envelope ? taskName(r.task) + " record" : "Record")]));
 side.appendChild(el("h2", { "class": "wd-detail-title", text: r.label }));
-side.appendChild(el("div", { "class": "wd-mono wd-muted", text: r.item || "" }));
+side.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(r.item) }));
 }
 var facts = el("dl", { "class": "wd-facts" });
 function fact(label, value) { facts.appendChild(el("dt", { text: label })); facts.appendChild(el("dd", {}, [value])); }
@@ -3201,7 +3720,7 @@ return el("option", { value: w.id, selected: w.id === s.workflow ? "selected" : 
 text: (i === 0 ? "Latest · " : "") + stamp(w.started).slice(0, 16) + " · " + duration((w.completed || 0) - (w.started || 0)) + " · " + fmt(w.records) + " records" + (w.failed ? " · " + w.failed + " failed" : "") + " · " + w.id.slice(0, 8) });
 }));
 var host = el("div", { "class": "wd-overview-main" });
-body.appendChild(el("div", { "class": "wd-toolbar" }, [select,
+body.appendChild(el("div", { "class": "wd-toolbar" }, [pick.chooser, select,
 segmented("Show", ["objects", "all"], s.scope, function (v) { s.scope = v; render(); saveState(); }, function (v) { return v === "objects" ? "Objects" : "All records"; }),
 el("span", { "class": "wd-grow" }),
 el("span", { "class": "wd-muted", text: "Click a row for its details. Ctrl or ⌘ and scroll to zoom time; drag to pan; double-click to reset" })]));
@@ -3230,6 +3749,7 @@ var shown = rows.filter(function (r) { return s.scope === "all" || !r.envelope; 
 shown.sort(function (a, b) { return a.started - b.started || compare(a.label, b.label) || compare(a.id, b.id); });
 if (!shown.length) { host.appendChild(empty("No object record has been processed for this workflow.")); return; }
 var chart = ganttChart(shown, sum, s, m, openRecord);
+host.appendChild(pageKey(m));
 host.appendChild(chart);
 host.repaint = chart.repaint;
 var kept = s.pick ? shown.filter(function (r) { return r.id === s.pick; })[0] : null;
@@ -3271,20 +3791,24 @@ for (var i = first; i < last; i++) {
 var r = rows[i], y = GANTT.AXIS + i * GANTT.ROW, mid = y + GANTT.ROW / 2;
 if (i % 2) { ctx.fillStyle = P["paper-deep"]; ctx.globalAlpha = 0.45; ctx.fillRect(0, y, width, GANTT.ROW); ctx.globalAlpha = 1; }
 if (r.id === s.pick) { ctx.fillStyle = P["blue-soft"]; ctx.fillRect(0, y, width, GANTT.ROW); }
+var change = r.node && r.node.change, light = change === CHANGE.BORROWED ? BORROWED_ALPHA : 1;
+if (CHANGE_TEXT[change]) { ctx.fillStyle = P.violet; ctx.fillRect(0, y + 2, 3, GANTT.ROW - 4); }
+ctx.globalAlpha = light;
 var kind = r.envelope ? null : recordKind(r.node, r.task);
 if (kind) glyph(ctx, kind, 17, mid, kindColour(kind, P), P);
 ctx.lineWidth = 1;
 ctx.fillStyle = r.envelope ? P.muted : P.ink;
 ctx.fillText(clip(ctx, r.label + (r.envelope ? " · " + r.task : ""), col.objectEnd - col.object, "11px " + P.sans), r.envelope ? 8 : col.object, mid);
 ctx.fillStyle = P.muted;
-if (col.item && r.item && !r.envelope) ctx.fillText(clip(ctx, r.item, col.itemEnd - col.item, "11px " + P.sans), col.item, mid);
+if (col.item && r.item && !r.envelope) ctx.fillText(clip(ctx, shownItem(r.item), col.itemEnd - col.item, "11px " + P.sans), col.item, mid);
 if (col.task && !r.envelope) ctx.fillText(taskName(r.task), col.task, mid);
 var x1 = Math.max(labelW, time(r.started)), x2 = Math.min(width - 8, time(r.completed));
 if (x2 >= labelW && x1 <= width - 8) {
 ctx.fillStyle = toneColour(tone(r.result), P);
-ctx.globalAlpha = r.envelope ? 0.35 : 0.9;
-ctx.beginPath(); roundRect(ctx, x1, y + 4, Math.max(2.5, x2 - x1), GANTT.ROW - 8, 3); ctx.fill(); ctx.globalAlpha = 1;
+ctx.globalAlpha = (r.envelope ? 0.35 : 0.9) * light;
+ctx.beginPath(); roundRect(ctx, x1, y + 4, Math.max(2.5, x2 - x1), GANTT.ROW - 8, 3); ctx.fill();
 }
+ctx.globalAlpha = 1;
 }
 var axisY = Math.max(top, 0);
 ctx.fillStyle = P.surface; ctx.fillRect(0, axisY, width, GANTT.AXIS);
@@ -3339,7 +3863,7 @@ var r = rowAt(e);
 if (!r) { tip.hidden = true; return; }
 tip.textContent = "";
 tip.appendChild(el("b", { text: r.label }));
-if (r.item && !r.envelope) tip.appendChild(el("div", { "class": "wd-muted", text: r.item }));
+if (r.item && !r.envelope) tip.appendChild(el("div", { "class": "wd-muted", text: shownItem(r.item) }));
 tip.appendChild(el("div", {}, [chip(r.result), " " + taskName(r.task) + " · " + duration(r.completed - r.started)]));
 tip.appendChild(el("div", { "class": "wd-muted", text: stamp(r.started) + " → " + stamp(r.completed).slice(11) }));
 if (r.message && r.object) tip.appendChild(el("div", { "class": "wd-tip-message", text: r.message }));
@@ -3388,10 +3912,11 @@ function recordKind(node, task) { return node ? node.kind : task === "test" ? KI
 function targetItems(m) {
 if (m.targetItems) return m.targetItems;
 m.targetItems = new Map();
-m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.type + "|" + it.target, it.label); });
+m.items.forEach(function (it) { if (it.target) m.targetItems.set(it.code + "|" + it.type + "|" + it.target, it.label); });
 return m.targetItems;
 }
-function targetItem(m, type, target) { return targetItems(m).get(type + "|" + target) || (type && target ? type + "/" + target : null); }
+/* The item a record's physical target belongs to, in the record's catalogue. */
+function targetItem(m, type, target, code) { return targetItems(m).get((code || "") + "|" + type + "|" + target) || (type && target ? owned(type + "/" + target, code) : null); }
 function perfRows(m, name) {
 return (m.tables[name] || []).filter(function (r) { return !isInternal(m, r.item, r.schema); }).map(function (r) {
 var node = m.byIdentity.get(identityKey(r.item, r.schema, r.object)) || null;
@@ -3403,7 +3928,7 @@ timedRead: num(r.timedread), timedDuration: num(r.timedduration), last: num(r.la
 }
 function testRows(m, name) {
 return (m.tables[name] || []).map(function (r) {
-var item = targetItem(m, r.targettype, r.target);
+var item = targetItem(m, r.targettype, r.target, r.catalogue);
 return { item: item, schema: r.schema, object: r.object, node: item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null,
 runs: num(r.runs) || 0, duration: num(r.duration), longest: num(r.longest), failed: num(r.failed) || 0, last: num(r.last) };
 }).filter(function (r) { return !(r.item && isInternal(m, r.item, r.schema)) && !(r.object && INTERNAL_SCHEMA.test(r.schema || "")); }).map(function (r) {
@@ -3416,7 +3941,7 @@ shape the Gantt's records have. */
 function runObjectRows(m) {
 if (m.runObjects) return m.runObjects;
 m.runObjects = (m.tables.runobjects || []).map(function (r) {
-var item = targetItem(m, r.targettype, r.target), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
+var item = targetItem(m, r.targettype, r.target, r.catalogue), node = item ? m.byIdentity.get(identityKey(item, r.schema, r.object)) || null : null;
 var started = num(r.started), completed = num(r.completed);
 return { workflow: r.workflow, task: r.task, item: item, schema: r.schema, object: r.object, node: node, result: r.result, message: r.message,
 started: started !== null ? started : completed, completed: completed !== null ? completed : started,
@@ -3613,11 +4138,17 @@ if (started === null) started = completed;
 if (completed === null) completed = started;
 if (started !== null) addTo(tasks, r.workflow, { task: r.task, started: started, completed: completed, records: num(r.records) || 0, failed: num(r.failed) || 0 });
 });
+var touched = new Map();
+(m.tables.runtargets || []).forEach(function (r) {
+var item = targetItem(m, r.targettype, r.target, r.catalogue);
+if (item) addTo(touched, r.workflow, item);
+});
 m.runs = (m.tables.runs || []).map(function (r) {
 var started = num(r.started), completed = num(r.completed);
 if (started === null) started = completed;
 if (completed === null) completed = started;
-return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [] };
+return { id: r.workflow, started: started, completed: completed, records: num(r.records) || 0, objects: num(r.objects) || 0, failed: num(r.failed) || 0, tasks: tasks.get(r.workflow) || [],
+items: new Set(touched.get(r.workflow) || []) };
 }).filter(function (r) { return r.started !== null; });
 m.runs.sort(function (a, b) { return b.completed - a.completed || compare(a.id, b.id); });
 return m.runs;
@@ -3736,7 +4267,8 @@ if (WINDOW_DAYS[s.window] === undefined) s.window = "week";
 if (["all", "load", "test"].indexOf(s.task) < 0) s.task = "all";
 if (["fit", "day"].indexOf(s.axis) < 0) s.axis = "fit";
 if (s.deadline === undefined || s.deadline === null) s.deadline = "";
-s.item = s.item || "all";
+var shown = pageItems(m, "performance", ITEM_TYPES, true);
+function chosenItem(item) { return shown.all || shown.set.has(item); }
 if (!s.card || typeof s.card.kind !== "string") s.card = null;
 var side = el("aside", { "class": "wd-drawer", hidden: "hidden" });
 /* The card follows the window, so it is drawn again whenever the page is. */
@@ -3747,24 +4279,28 @@ drawPerformanceCard(side, performanceCard(m, s.card, s.window), function () { pi
 }
 function pick(choice) { s.card = choice; card(); saveState(); }
 var host = el("div", { "class": "wd-overview-main" });
-var allItems = Array.from(new Set(["perfmonth", "testmonth"].reduce(function (all, name) {
-return all.concat((m.tables[name] || []).map(function (r) { return r.item || targetItem(m, r.targettype, r.target); }));
-}, []).filter(Boolean))).filter(function (it) { return !isInternal(m, it); }).sort(compare);
 var deadlines = [el("option", { value: "", selected: s.deadline === "" ? "selected" : null, text: "No deadline" })];
 for (var h = 0; h < 24; h++) deadlines.push(el("option", { value: String(h), selected: s.deadline === String(h) ? "selected" : null, text: (h < 10 ? "0" : "") + h + ":00 " + zone }));
 body.appendChild(el("div", { "class": "wd-toolbar" }, [
+shown.chooser,
 segmented("Window", ["day", "week", "month"], s.window, function (v) { s.window = v; render(); saveState(); }, function (v) { return { day: "Last 24 hours", week: "Last 7 days", month: "Last 30 days" }[v]; }),
 segmented("Task", ["all", "load", "test"], s.task, function (v) { s.task = v; render(); saveState(); }, function (v) { return { all: "All", load: "Load", test: "Test" }[v]; }),
 segmented("Axis", ["fit", "day"], s.axis, function (v) { s.axis = v; render(); saveState(); }, function (v) { return v === "fit" ? "Fit runs" : "24 hours"; }),
 el("select", { "class": "wd-select", "aria-label": "Deadline", onchange: function () { s.deadline = this.value; render(); saveState(); } }, deadlines),
-el("select", { "class": "wd-select", "aria-label": "Item", onchange: function () { s.item = this.value; render(); saveState(); } },
-[el("option", { value: "all", text: "Every item" })].concat(allItems.map(function (it) { return el("option", { value: it, selected: it === s.item ? "selected" : null, text: it }); })))
 ]));
 body.appendChild(el("div", { "class": "wd-overview" }, [host, side]));
+var keyed = false;
+/* The first object table drawn carries the key. */
+function keyFirst(children) {
+if (keyed) return children;
+keyed = true;
+return [pageKey(m)].concat(children);
+}
 function render() {
+keyed = false;
 host.textContent = "";
 var from = m.at - WINDOW_DAYS[s.window] * DAY;
-var views = runsOf(m).filter(function (r) { return r.completed >= from; }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
+var views = runsOf(m).filter(function (r) { return r.completed >= from && (shown.all || Array.from(r.items).some(chosenItem)); }).map(function (r) { return runView(r, s.task); }).filter(Boolean);
 if (!views.some(function (v) { return v.run.id === s.run; })) s.run = views.length ? views[0].run.id : null;
 var elapsed = views.map(function (v) { return v.elapsed; }), latest = views[0] || null;
 var longest = views.reduce(function (a, v) { return !a || v.elapsed > a.elapsed ? v : a; }, null);
@@ -3797,41 +4333,41 @@ var runColumns = [
 host.appendChild(section("Runs · " + fmt(views.length), [dataTable(runColumns, views, { limit: 200, sort: "started", onRow: function (v) { s.run = v.run.id; render(); saveState(); }, emptyText: "No workflow ran in this window." })]));
 var picked = views.filter(function (v) { return v.run.id === s.run; })[0] || null;
 if (picked) host.appendChild(runObjects(picked));
-function itemFilter(r) { return s.item === "all" || r.item === s.item; }
+function itemFilter(r) { return chosenItem(r.item); }
 if (s.task !== "test") {
 var loads = perfRows(m, "perf" + s.window).filter(itemFilter);
-host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
+host.appendChild(section("Loads · " + fmt(loads.length) + " objects, " + WINDOW_LABEL[s.window], keyFirst([dataTable([
 { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-{ key: "item", title: "Item", value: function (r) { return r.item; } },
+{ key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
 { key: "loads", title: "Loads", value: function (r) { return r.loads; }, numeric: true },
 { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
 { key: "reloads", title: "Reloads", value: function (r) { return r.reloads; }, numeric: true },
 { key: "last", title: "Last", value: function (r) { return r.last; }, render: function (r) { return ago(r.last, m.at); }, numeric: true }
-], loads, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "load", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No load statistic was recorded in this window." })]));
+], loads, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "load", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No load statistic was recorded in this window." })])));
 }
 if (s.task !== "load") {
 var tests = testRows(m, "test" + s.window).filter(itemFilter);
-host.appendChild(section("Tests · " + fmt(tests.length) + " objects, " + WINDOW_LABEL[s.window], [dataTable([
+host.appendChild(section("Tests · " + fmt(tests.length) + " objects, " + WINDOW_LABEL[s.window], keyFirst([dataTable([
 { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "test"); } },
-{ key: "item", title: "Item", value: function (r) { return r.item; } },
+{ key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
 { key: "runs", title: "Runs", value: function (r) { return r.runs; }, numeric: true },
 { key: "longest", title: "Longest", value: function (r) { return r.longest; }, render: function (r) { return duration(r.longest); }, numeric: true },
 { key: "failed", title: "Failed", value: function (r) { return r.failed; }, render: function (r) { return r.failed ? chip("Failed", fmt(r.failed)) : "0"; }, numeric: true },
 { key: "last", title: "Last", value: function (r) { return r.last; }, render: function (r) { return ago(r.last, m.at); }, numeric: true }
-], tests, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "test", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No Test was recorded in this window." })]));
+], tests, { limit: 200, sort: "longest", onRow: function (r) { pick({ kind: "test", item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No Test was recorded in this window." })])));
 }
 if (s.task !== "test") {
 var largest = largestRows(m).filter(itemFilter);
-host.appendChild(section("Largest changes, last 7 days", [dataTable([
+host.appendChild(section("Largest changes, last 7 days", keyFirst([dataTable([
 { key: "object", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, "load"); } },
-{ key: "item", title: "Item", value: function (r) { return r.item; } },
+{ key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
 { key: "completed", title: "Processed", value: function (r) { return r.completed; }, render: function (r) { return stamp(r.completed); }, numeric: true },
 { key: "duration", title: "Time", value: function (r) { return r.duration; }, render: function (r) { return duration(r.duration); }, numeric: true },
 { key: "inserted", title: "Inserted", value: function (r) { return r.inserted; }, render: function (r) { return fmt(r.inserted); }, numeric: true },
 { key: "updated", title: "Updated", value: function (r) { return r.updated; }, render: function (r) { return fmt(r.updated); }, numeric: true },
 { key: "deleted", title: "Deleted", value: function (r) { return r.deleted; }, render: function (r) { return fmt(r.deleted); }, numeric: true },
 { key: "workflow", title: "Run", value: function (r) { return r.workflow; }, render: function (r) { return r.workflow ? String(r.workflow).slice(0, 8) : "—"; }, mono: true }
-], largest, { limit: 50, sort: "inserted", onRow: function (r) { pick({ kind: "change", id: r.id, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No recorded row change in the last 7 days." })]));
+], largest, { limit: 50, sort: "inserted", onRow: function (r) { pick({ kind: "change", id: r.id, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No recorded row change in the last 7 days." })])));
 }
 card();
 }
@@ -3844,10 +4380,10 @@ function runObjects(v) {
 var title = "Objects in the run of " + stamp(v.started).slice(0, 16);
 var carried = runObjectRows(m).filter(function (r) { return r.workflow === v.run.id; });
 if (!carried.length) return section(title, [empty("Objects are listed for the 8 latest runs. Select a newer run, or find this one in the Gantt.")]);
-var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && (s.item === "all" || r.item === s.item); });
+var rows = carried.filter(function (r) { return (s.task === "all" || r.task === s.task) && chosenItem(r.item); });
 var columns = [
 { key: "label", title: "Object", value: function (r) { return r.label; }, render: function (r) { return objectCell(r.node, r.label, r.task); } },
-{ key: "item", title: "Item", value: function (r) { return r.item; } },
+{ key: "item", title: "Item", value: function (r) { return shownItem(r.item); } },
 { key: "task", title: "Task", value: function (r) { return taskName(r.task); } },
 { key: "result", title: "Result", value: function (r) { return r.result; }, render: function (r) { return chip(r.result); } },
 { key: "started", title: "Started", value: function (r) { return r.started; }, render: function (r) { return stamp(r.started).slice(11); }, numeric: true },
@@ -3855,23 +4391,291 @@ var columns = [
 { key: "message", title: "Message", value: function (r) { return r.message || ""; } }
 ];
 var note = v.run.objects > carried.length ? el("div", { "class": "wd-banner wd-banner-warn", text: "The " + fmt(carried.length) + " longest of this run's " + fmt(v.run.objects) + " object records. The Gantt has them all." }) : null;
-return section(title + " · " + fmt(rows.length), [note, dataTable(columns, rows, { limit: 200, sort: "duration", group: function (r) { return taskRank(r.task); },
-onRow: function (r) { pick({ kind: "record", workflow: r.workflow, task: r.task, started: r.started, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No object record matches." })]);
+return section(title + " · " + fmt(rows.length), keyFirst([note, dataTable(columns, rows, { limit: 200, sort: "duration", group: function (r) { return taskRank(r.task); },
+onRow: function (r) { pick({ kind: "record", workflow: r.workflow, task: r.task, started: r.started, item: r.item, schema: r.schema, object: r.object }); }, emptyText: "No object record matches." })]));
 }
 render();
 }
+/* Items by physical identity, workspaces, and the direct dependencies between
+them. An item is its workspace and Fabric item, so two catalogues recording
+one item count it once. A dependency is one object reading another
+directly: through a shortcut it is the shortcut, never what reads it, and a
+schema shortcut is one dependency. Dependencies inside one item are left
+out. */
+function estateTopology(m) {
+var t = function (name) { return m.tables[name] || []; };
+var physical = new Map(), byLabel = new Map(), installed = new Map();
+m.items.forEach(function (it) {
+if (it.internal || !it.target) return;
+var key = (it.workspaceId || it.workspace || "").toLowerCase() + "|" + (it.targetId || it.type + "/" + it.target).toLowerCase();
+var p = physical.get(key);
+if (!p) physical.set(key, p = { key: key, type: it.type, name: it.target, workspace: it.workspace || "", labels: [], objects: 0,
+loads: 0, failed: 0, pending: 0, tests: 0, testsFailed: 0, assessed: false });
+p.labels.push(it.label);
+byLabel.set(it.label, p);
+addTo(installed, [String(it.workspace || "").toLowerCase(), it.type, String(it.target).toLowerCase()].join("|"), p);
+});
+t("itemobjects").forEach(function (r) { var p = byLabel.get(r.item); if (p) p.objects += num(r.objects) || 0; });
+t("itemloads").forEach(function (r) {
+var p = byLabel.get(r.item); if (!p) return;
+p.loads += num(r.loads) || 0; p.failed += num(r.failed) || 0; p.pending += num(r.pending) || 0; p.assessed = true;
+});
+t("itemtests").forEach(function (r) {
+var p = byLabel.get(r.item); if (!p) return;
+p.tests += num(r.tests) || 0; p.testsFailed += num(r.failed) || 0; p.assessed = true;
+});
+var edges = new Map(), unmatched = new Map();
+function connect(up, down, count) {
+if (!up || !down || up === down) return;
+var key = up.key + ">" + down.key, e = edges.get(key);
+if (!e) edges.set(key, e = { up: up.key, down: down.key, count: 0 });
+e.count += count;
+}
+t("itemedges").forEach(function (r) { connect(byLabel.get(r.up), byLabel.get(r.down), num(r.count) || 0); });
+var seenShortcut = new Set();
+t("shortcuts").forEach(function (r) {
+var consumer = byLabel.get(r.item);
+if (!consumer) return;
+var workspace = r.workspace || consumer.workspace;
+var key = consumer.key + "|" + r.schema + "|" + r.object;
+if (seenShortcut.has(key)) return;
+seenShortcut.add(key);
+var found = installed.get([String(workspace).toLowerCase(), r.targettype, String(r.target).toLowerCase()].join("|")) || [];
+var producers = Array.from(new Set(found));
+if (producers.length === 1) connect(producers[0], consumer, 1);
+else unmatched.set(consumer.workspace, (unmatched.get(consumer.workspace) || 0) + 1);
+});
+var workspaces = new Map();
+physical.forEach(function (p) {
+var w = workspaces.get(p.workspace);
+if (!w) workspaces.set(p.workspace, w = { name: p.workspace, items: [], kinds: {}, objects: 0, loads: 0, failed: 0, pending: 0, tests: 0, testsFailed: 0, assessed: false,
+receives: new Set(), supplies: new Set(), incoming: 0, outgoing: 0, unmatched: 0 });
+w.items.push(p);
+w.kinds[p.type] = (w.kinds[p.type] || 0) + 1;
+w.objects += p.objects; w.loads += p.loads; w.failed += p.failed; w.pending += p.pending; w.tests += p.tests; w.testsFailed += p.testsFailed;
+if (p.assessed) w.assessed = true;
+});
+unmatched.forEach(function (n, name) { var w = workspaces.get(name); if (w) w.unmatched += n; });
+var itemEdges = Array.from(edges.values()), workspaceEdges = new Map();
+itemEdges.forEach(function (e) {
+var a = physical.get(e.up), b = physical.get(e.down);
+if (a.workspace === b.workspace) return;
+var from = workspaces.get(a.workspace), to = workspaces.get(b.workspace);
+from.supplies.add(b.workspace); to.receives.add(a.workspace);
+from.outgoing += e.count; to.incoming += e.count;
+var key = a.workspace + ">" + b.workspace, we = workspaceEdges.get(key);
+if (!we) workspaceEdges.set(key, we = { up: a.workspace, down: b.workspace, count: 0 });
+we.count += e.count;
+});
+var wEdges = Array.from(workspaceEdges.values());
+return {
+items: physical, workspaces: workspaces, itemEdges: itemEdges, workspaceEdges: wEdges,
+itemLoops: loopsOf(Array.from(physical.keys()), itemEdges),
+workspaceLoops: loopsOf(Array.from(workspaces.keys()), wEdges)
+};
+}
+/* Groups of two or more that read one another, each in name order. */
+function loopsOf(keys, edges) {
+var ups = new Map();
+keys.forEach(function (k) { ups.set(k, []); });
+edges.forEach(function (e) { if (ups.has(e.down)) ups.get(e.down).push(e.up); });
+var g = { nodes: new Map() };
+ups.forEach(function (list, k) { g.nodes.set(k, { up: list }); });
+return components(g).list.filter(function (c) { return c.length > 1; })
+.map(function (c) { return c.slice().sort(compare); }).sort(function (a, b) { return compare(a[0], b[0]); });
+}
+/* Columns by the longest chain of suppliers before each node, with the members
+of a loop side by side in one column. */
+function topologyColumns(keys, edges) {
+var ups = new Map();
+keys.forEach(function (k) { ups.set(k, []); });
+edges.forEach(function (e) { if (ups.has(e.down) && ups.has(e.up)) ups.get(e.down).push(e.up); });
+var g = { nodes: new Map() };
+ups.forEach(function (list, k) { g.nodes.set(k, { up: list }); });
+var c = components(g), level = [];
+c.list.forEach(function (members, i) {
+var l = 0;
+members.forEach(function (k) { ups.get(k).forEach(function (u) { var j = c.of.get(u); if (j !== i) l = Math.max(l, level[j] + 1); }); });
+level[i] = l;
+});
+var columns = [];
+keys.slice().sort(compare).forEach(function (k) {
+var l = level[c.of.get(k)];
+(columns[l] = columns[l] || []).push(k);
+});
+return columns.map(function (col) { return col || []; });
+}
+function loadTone(x) {
+if (x.failed || x.testsFailed) return "bad";
+if (x.pending) return "warn";
+return x.assessed ? "ok" : "none";
+}
+function loadNote(x) {
+if (!x.assessed) return "no load or test recorded";
+var parts = [];
+if (x.failed) parts.push(fmt(x.failed) + " failed loads");
+if (x.pending) parts.push(fmt(x.pending) + " pending");
+if (x.testsFailed) parts.push(fmt(x.testsFailed) + " failed validations");
+return parts.length ? parts.join(" · ") : "last loads and validations succeeded";
+}
+/* An item kind as a reader names it. */
+function kindName(type) { return { SQLDatabase: "SQL database", SemanticModel: "Semantic model" }[type] || type; }
+var KIND_NAMES = { Lakehouse: "Lakehouses", Warehouse: "Warehouses", SQLDatabase: "SQL databases", SemanticModel: "semantic models", Report: "Reports" };
+function composition(kinds) {
+return ITEM_TYPES.filter(function (k) { return kinds[k]; }).map(function (k) {
+return fmt(kinds[k]) + " " + (kinds[k] === 1 ? KIND_NAMES[k].replace(/s$/, "") : KIND_NAMES[k]);
+}).join(" · ") || "no items";
+}
+function workspacesPage(body, m) {
+var topo = estateTopology(m), s = pageState("workspaces");
+s.level = s.level || (topo.workspaces.size > 1 ? "workspace" : "item");
+if (s.selected && !(s.level === "workspace" ? topo.workspaces.has(s.selected) : topo.items.has(s.selected))) s.selected = null;
+var workspaceList = Array.from(topo.workspaces.values()), itemList = Array.from(topo.items.values());
+var crossing = topo.workspaceEdges.reduce(function (a, e) { return a + e.count; }, 0);
+var between = topo.itemEdges.reduce(function (n, e) { return n + e.count; }, 0);
+body.appendChild(el("div", { "class": "wd-tiles" }, [
+workspaceList.length > 1 ? tile("Workspaces", workspaceList.length, "with an item a catalogue read installs", "none") : null,
+tile("Items", itemList.length, composition(itemList.reduce(function (k, p) { k[p.type] = (k[p.type] || 0) + 1; return k; }, {})), "none"),
+workspaceList.length > 1 ? tile("Dependencies between workspaces", crossing, "direct object dependencies", "none")
+: tile("Dependencies between items", between, "direct object dependencies", "none")
+]));
+body.appendChild(el("p", { "class": "wd-note", text: "The estate is what the catalogues read describe. A dependency is one object reading another directly; dependencies inside one item are left out. Load state is each item's last loads and validations, not a Health assessment." }));
+var bar = el("div", { "class": "wd-toolbar" }, [segmented("Show", ["workspace", "item"], s.level, function (v) { s.level = v; s.selected = null; saveState(); redraw(); },
+function (v) { return v === "workspace" ? "Workspaces" : "Items"; })]);
+body.appendChild(bar);
+var nodes, edges, loops;
+if (s.level === "workspace") {
+nodes = workspaceList.map(function (w) { return { key: w.name, title: w.name, eyebrow: "Workspace", lines: [composition(w.kinds),
+"Receives from " + fmt(w.receives.size) + (w.receives.size === 1 ? " workspace" : " workspaces") + " · " + fmt(w.incoming) + (w.incoming === 1 ? " dependency" : " dependencies"),
+"Supplies " + fmt(w.supplies.size) + (w.supplies.size === 1 ? " workspace" : " workspaces") + " · " + fmt(w.outgoing) + (w.outgoing === 1 ? " dependency" : " dependencies")],
+tone: loadTone(w), note: loadNote(w) }; });
+edges = topo.workspaceEdges; loops = topo.workspaceLoops;
+} else {
+var incoming = new Map(), outgoing = new Map();
+topo.itemEdges.forEach(function (e) { incoming.set(e.down, (incoming.get(e.down) || 0) + e.count); outgoing.set(e.up, (outgoing.get(e.up) || 0) + e.count); });
+nodes = itemList.map(function (p) { return { key: p.key, title: p.name, eyebrow: kindName(p.type) + " · " + p.workspace, lines: [
+fmt(p.objects) + (p.objects === 1 ? " object" : " objects"),
+fmt(incoming.get(p.key) || 0) + " in · " + fmt(outgoing.get(p.key) || 0) + " out"], tone: loadTone(p), note: loadNote(p) }; });
+edges = topo.itemEdges; loops = topo.itemLoops;
+}
+var drawing = el("div", { "class": "wd-estate" });
+body.appendChild(drawing);
+drawTopology(drawing, nodes, edges, s, function (key) { s.selected = s.selected === key ? null : key; saveState(); redraw(); });
+if (loops.length) {
+body.appendChild(section("Loops", [
+el("p", { "class": "wd-note", text: s.level === "workspace" ?
+"These workspaces read from one another, directly or through others. A loop between workspaces does not mean any object reads itself." :
+"These items read from one another, directly or through others." }),
+el("ul", { "class": "wd-list" }, loops.map(function (members) {
+return el("li", { text: members.map(function (k) { return s.level === "workspace" ? k : topo.items.get(k).name + " · " + topo.items.get(k).workspace; }).join(" ⇄ ") });
+}))
+]));
+}
+if (s.selected) body.appendChild(estateDetail(m, topo, s));
+}
+function estateDetail(m, topo, s) {
+var rows, title;
+if (s.level === "workspace") {
+var w = topo.workspaces.get(s.selected);
+title = w.name;
+rows = w.items.map(function (p) {
+var inn = 0, out = 0, from = new Set(), to = new Set();
+topo.itemEdges.forEach(function (e) {
+var a = topo.items.get(e.up), b = topo.items.get(e.down);
+if (a.workspace === b.workspace) return;
+if (e.down === p.key) { inn += e.count; from.add(a.workspace); }
+if (e.up === p.key) { out += e.count; to.add(b.workspace); }
+});
+return { p: p, inn: inn, out: out, from: Array.from(from).sort(compare).join(", "), to: Array.from(to).sort(compare).join(", ") };
+});
+} else {
+var p0 = topo.items.get(s.selected);
+title = p0.name + " · " + p0.workspace;
+rows = [];
+topo.itemEdges.forEach(function (e) {
+if (e.down === s.selected) rows.push({ p: topo.items.get(e.up), inn: 0, out: e.count, from: "", to: p0.name });
+if (e.up === s.selected) rows.push({ p: topo.items.get(e.down), inn: e.count, out: 0, from: p0.name, to: "" });
+});
+}
+var w0 = s.level === "workspace" ? topo.workspaces.get(s.selected) : null;
+return section(title, [
+w0 && w0.unmatched ? el("p", { "class": "wd-note", text: fmt(w0.unmatched) + " shortcuts here read items no catalogue read installs; they are not counted." }) : null,
+dataTable([
+{ key: "item", title: s.level === "workspace" ? "Item" : "Connected item", value: function (r) { return r.p.name; } },
+{ key: "kind", title: "Kind", value: function (r) { return r.p.type; } },
+{ key: "workspace", title: "Workspace", value: function (r) { return r.p.workspace; } },
+{ key: "objects", title: "Objects", numeric: true, value: function (r) { return r.p.objects; } },
+{ key: "in", title: s.level === "workspace" ? "Dependencies in" : "It reads", numeric: true, value: function (r) { return r.inn; } },
+{ key: "out", title: s.level === "workspace" ? "Dependencies out" : "Reads it", numeric: true, value: function (r) { return r.out; } },
+s.level === "workspace" ? { key: "from", title: "Receives from", value: function (r) { return r.from; } } : null,
+s.level === "workspace" ? { key: "to", title: "Supplies", value: function (r) { return r.to; } } : null,
+{ key: "state", title: "Load state", render: function (r) { return el("span", { "class": "wd-chip wd-" + loadTone(r.p), text: loadNote(r.p) }); }, value: function (r) { return loadNote(r.p); } }
+].filter(Boolean), rows, { sort: "item", desc: false, emptyText: "Nothing here." })
+]);
+}
+var ESTATE_CARD = { W: 300, H: 118, GAP_X: 120, GAP_Y: 28, PAD: 24 };
+function drawTopology(host, nodes, edges, s, onPick) {
+if (!nodes.length) { host.appendChild(empty("The catalogues record no installed items yet.")); return; }
+var G = ESTATE_CARD, keys = nodes.map(function (n) { return n.key; }), byKey = new Map(nodes.map(function (n) { return [n.key, n]; }));
+var columns = topologyColumns(keys, edges), pos = new Map();
+columns.forEach(function (col, x) {
+col.forEach(function (k, y) { pos.set(k, { x: G.PAD + x * (G.W + G.GAP_X), y: G.PAD + y * (G.H + G.GAP_Y) }); });
+});
+var width = G.PAD * 2 + columns.length * (G.W + G.GAP_X) - G.GAP_X;
+var height = G.PAD * 2 + Math.max.apply(null, columns.map(function (c) { return c.length; })) * (G.H + G.GAP_Y) - G.GAP_Y;
+var near = new Set();
+if (s.selected) { near.add(s.selected); edges.forEach(function (e) { if (e.up === s.selected) near.add(e.down); if (e.down === s.selected) near.add(e.up); }); }
+var svg = sv("svg", { "class": "wd-estate-svg", viewBox: "0 0 " + width + " " + height, width: width, height: height, role: "img", "aria-label": "Estate" });
+svg.appendChild(sv("defs", {}, [sv("marker", { id: "wd-estate-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
+[sv("path", { d: "M 0 0 L 10 5 L 0 10 z", "class": "wd-estate-arrowhead" })])]));
+edges.forEach(function (e) {
+var a = pos.get(e.up), b = pos.get(e.down);
+if (!a || !b) return;
+var x1 = a.x + G.W, y1 = a.y + G.H / 2, x2 = b.x, y2 = b.y + G.H / 2, back = x2 <= x1;
+var d = back ? "M " + (a.x + G.W / 2) + " " + a.y + " C " + (a.x + G.W / 2) + " " + (Math.min(a.y, b.y) - 60) + ", " + (b.x + G.W / 2) + " " + (Math.min(a.y, b.y) - 60) + ", " + (b.x + G.W / 2) + " " + b.y
+: "M " + x1 + " " + y1 + " C " + (x1 + G.GAP_X / 2) + " " + y1 + ", " + (x2 - G.GAP_X / 2) + " " + y2 + ", " + x2 + " " + y2;
+var lit = s.selected && (e.up === s.selected || e.down === s.selected);
+svg.appendChild(sv("path", { d: d, "class": "wd-estate-edge" + (lit ? " wd-lit" : "") + (s.selected && !lit ? " wd-dim" : ""), "marker-end": "url(#wd-estate-arrow)" }));
+var lx = back ? (a.x + b.x + G.W) / 2 : (x1 + x2) / 2, ly = back ? Math.min(a.y, b.y) - 40 : (y1 + y2) / 2 - 6;
+svg.appendChild(sv("text", { x: lx, y: ly, "class": "wd-estate-count" + (s.selected && !lit ? " wd-dim" : ""), "text-anchor": "middle" }, [fmt(e.count)]));
+});
+nodes.forEach(function (n) {
+var p = pos.get(n.key), dim = s.selected && !near.has(n.key);
+var g = sv("g", { "class": "wd-estate-card wd-" + n.tone + (n.key === s.selected ? " wd-current" : "") + (dim ? " wd-dim" : ""), transform: "translate(" + p.x + "," + p.y + ")", tabindex: 0, role: "button" }, [
+sv("title", {}, [n.title + " · " + n.note]),
+sv("rect", { width: G.W, height: G.H, rx: 10 }),
+sv("rect", { "class": "wd-estate-tone", width: 5, height: G.H, rx: 2 }),
+sv("text", { x: 16, y: 22, "class": "wd-estate-eyebrow" }, [clipText(n.eyebrow, 40)]),
+sv("text", { x: 16, y: 44, "class": "wd-estate-title" }, [clipText(n.title, 30)])
+].concat(n.lines.map(function (line, i) { return sv("text", { x: 16, y: 66 + i * 17, "class": "wd-estate-line" }, [clipText(line, 44)]); })));
+g.addEventListener("click", function () { onPick(n.key); });
+g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onPick(n.key); } });
+svg.appendChild(g);
+});
+host.appendChild(el("div", { "class": "wd-estate-scroll" }, [svg]));
+}
 var PAGES = {
-overview: overviewPage, health: healthPage, orchestration: orchestrationPage, gantt: ganttPage,
+workspaces: workspacesPage, overview: overviewPage, health: healthPage, orchestration: orchestrationPage, gantt: ganttPage,
 performance: performancePage, entities: entitiesPage, semantic: semanticPage
 };
 var STORE = "weaver-dashboard-state";
-function saveState() {
-try { root.sessionStorage.setItem(STORE, JSON.stringify(state())); } catch (e) { /* unavailable */ }
+/* View state is kept per set of catalogues, so one Dashboard's focus never
+lands on another's objects. */
+var STATE_VERSION = 2;
+function storeKey(m) {
+return STORE + ":" + STATE_VERSION + ":" + (m && m.catalogues ? m.catalogues.map(function (c) { return c.reference; }).sort().join("|") : "");
 }
-function restoreState() {
-if (root.__WD_STATE) return;
+var STATE_KEY = STORE;
+function saveState() {
+try { root.sessionStorage.setItem(STATE_KEY, JSON.stringify(state())); } catch (e) { /* unavailable */ }
+}
+function restoreState(m) {
+STATE_KEY = storeKey(m);
+if (root.__WD_STATE && root.__WD_STATE_KEY === STATE_KEY) return;
+root.__WD_STATE = null;
+root.__WD_STATE_KEY = STATE_KEY;
 try {
-var raw = root.sessionStorage.getItem(STORE);
+var raw = root.sessionStorage.getItem(STATE_KEY);
 if (raw) root.__WD_STATE = JSON.parse(raw);
 } catch (e) { /* unavailable */ }
 }
@@ -3879,8 +4683,8 @@ function start() {
 if (typeof document === "undefined") return;
 var mount = document.getElementById("wd-app"), source = document.getElementById("wd-data");
 if (!mount) return;
-restoreState();
 var parsed = parsePayload(source ? source.textContent : ""), m = buildModel(parsed.tables, parsed.problems);
+restoreState(m);
 if (!source) m.problems.push("The page carries no catalogue data.");
 function render() {
 var scroller = scrollBox(mount), scroll = scroller ? scroller.scrollTop : root.scrollY || 0;
@@ -3888,7 +4692,8 @@ mount.textContent = "";
 mount.className = "wd wd-page-" + m.page;
 var body = shell(mount, m);
 try {
-(PAGES[m.page] || overviewPage)(body, m);
+if (m.tooLarge) tooLargePage(body, m);
+else (PAGES[m.page] || overviewPage)(body, m);
 } catch (error) {
 body.appendChild(el("pre", { "class": "wd-error", text: "This page could not be drawn: " + (error && error.message) }));
 }
@@ -3905,7 +4710,9 @@ parsePayload: parsePayload, buildModel: buildModel, assessHealth: assessHealth, 
 layoutEstate: layoutEstate, WINDOW_GEOMETRY: WINDOW_GEOMETRY, subModel: subModel, focusWindow: focusWindow, searchNodes: searchNodes, nodeMatches: nodeMatches, dictionaryEntries: dictionaryEntries,
 searchEntries: searchEntries, metadata: metadata, modelTables: modelTables, busMatrix: busMatrix, erGraph: erGraph,
 erWindow: erWindow, erLayout: erLayout, ER: ER, ganttSummary: ganttSummary, clockTicks: clockTicks, clockLabel: clockLabel, canvasRatio: canvasRatio, duration: duration, stamp: stamp, wallOf: wallOf, instantOf: instantOf, zoneLabel: zoneLabel, logRows: logRows, perfRows: perfRows, performanceCard: performanceCard, largestRows: largestRows, runStatRows: runStatRows, sortRows: sortRows, taskRank: taskRank, runsOf: runsOf, runObjectRows: runObjectRows, runView: runView, dayStartHour: dayStartHour, testRows: testRows, recordKind: recordKind, tone: tone, BUDGET: BUDGET,
-FIELD: FIELD, ROW: ROW, TABLE: TABLE, LESS: LESS
+estateTopology: estateTopology, loopsOf: loopsOf, topologyColumns: topologyColumns,
+joinCatalogues: joinCatalogues, components: components, keysOf: keysOf, scopeSelection: scopeSelection, eligibleItems: eligibleItems, chosenItems: chosenItems, stableItem: stableItem, shownItem: shownItem, storeKey: storeKey,
+FIELD: FIELD, ROW: ROW, TABLE: TABLE, LESS: LESS, OWNER: OWNER
 };
 if (typeof module === "object" && module && module.exports) module.exports = api;
 else { root.WeaverDashboard = api; start(); }

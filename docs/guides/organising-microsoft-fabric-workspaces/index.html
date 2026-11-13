@@ -18,13 +18,13 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
+<meta property="og:image:alt" content="Weaver: Making Fabric easier to use.">
 <meta property="og:locale" content="en_AU">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Organising Fabric workspaces for independent teams">
 <meta name="twitter:description" content="How to organise Microsoft Fabric workspaces so teams own their projects and schedules while coordinating shared data dependencies and recovery.">
 <meta name="twitter:image" content="https://weaverstack.dev/og.png">
-<meta name="twitter:image:alt" content="Organising 50 Microsoft Fabric workspaces for self-service data.">
+<meta name="twitter:image:alt" content="Weaver: Making Fabric easier to use.">
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
@@ -98,6 +98,12 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 .implementation-steps li { display: grid; grid-template-columns: 230px 1fr; gap: 22px; padding: 18px 0; border-bottom: 1px solid var(--line); counter-increment: implementation; }
 .implementation-steps strong::before { content: counter(implementation, decimal-leading-zero) "  "; color: var(--blue); font: 12px var(--mono); }
 .implementation-steps span { color: var(--ink-soft); }
+.result-list { margin: 26px 0; border-top: 1px solid var(--line); }
+.result-list > div { display: grid; grid-template-columns: 1fr 2fr .7fr; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.result-list dt { font-weight: 700; }
+.result-list dd { margin: 0; min-width: 0; }
+.result-list dd:last-child { color: var(--muted); }
+@media (max-width: 640px) { .result-list > div { grid-template-columns: 1fr; gap: 7px; } }
 @media (max-width: 900px) { .article-layout { grid-template-columns: 1fr; } .article-nav { position: static; order: -1; } }
 @media (max-width: 640px) { .facts-figure { grid-template-columns: repeat(2, 1fr); } .facts-figure div { padding: 12px; border-left: 0; border-top: 1px solid var(--line); } .facts-figure div:nth-child(-n+2) { border-top: 0; } .name-parts { grid-template-columns: 1fr; } .strategy-figure { grid-template-columns: 1fr; } .implementation-steps li { grid-template-columns: 1fr; gap: 7px; } .dashboard-guide-demo iframe { height: 980px; } }
 </style>
@@ -113,7 +119,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <section class="page-head"><div class="wrap">
 <p class="eyebrow"><a href="/guides/">Fabric Engineering Guides</a></p>
 <h1>Organising Fabric workspaces for independent teams</h1>
-<p class="lead">Give your teams their own Fabric projects and schedules, and you still need a way to follow the data between them. When a shared source fails, each team should be able to recover its own work—and join a coordinated recovery when that helps. This 50-workspace experiment shows how.</p>
+<p class="lead">Give your teams their own Fabric projects and schedules, and you still need a way to follow the data between them. This experiment traced a shared-source failure across 500 real Fabric workspaces, tested a team's local recovery and recorded where the wider campaign failed.</p>
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
@@ -122,8 +128,8 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>Suppose you run Finance's Warehouse. Your team owns its tables and its schedule, but your sales analysis reads a customer table maintained centrally. That customer load fails. Which of your tables are affected? Once the central team repairs it, what should you reload?</p>
 <p>You need answers at both levels: the central team needs to see the reach of the failure, and you need to recover Finance's work on your own schedule. Keeping separate projects should make ownership clearer, not leave you reconstructing the connections during an incident.</p>
 <figure class="facts-figure" aria-label="Experiment at a glance">
-<div><strong>50</strong><span>Fabric workspaces</span></div><div><strong>50</strong><span>separate catalogues</span></div><div><strong>53</strong><span>cross-workspace connections</span></div><div><strong>FTL64</strong><span>trial capacity</span></div>
-<figcaption>One central Bronze, Silver/Gold and semantic-model architecture and 47 business workspaces, with no shared repository or configuration.</figcaption>
+<div><strong>500</strong><span>Fabric workspaces</span></div><div><strong>500</strong><span>separate catalogues</span></div><div><strong>497</strong><span>business workspaces</span></div><div><strong>FTL64</strong><span>trial capacity</span></div>
+<figcaption>Three central workspaces supply 497 simulated business teams. Each team owns its project and catalogue; the catalogues connect their recorded dependencies.</figcaption>
 </figure>
 
 <h2 id="the-enterprise-problem">1. Self-service data and the coordination problem</h2>
@@ -132,7 +138,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <li>A central team owns the Bronze Lakehouse in one workspace.</li>
 <li>Another team owns the Silver Lakehouse and Gold Warehouse in a second.</li>
 <li>Shared semantic models live in a third.</li>
-<li>Forty or fifty business areas own workspaces of their own. They read central data and occasionally one another's.</li>
+<li>Hundreds of business areas own workspaces of their own. They read central data and occasionally one another's.</li>
 </ul>
 <p>A central scheduler can coordinate those loads; separate schedules let teams choose when to run. Either way, Finance still needs to know whether its last successful load used the latest central data. Looking only at Finance's job history will not answer that question.</p>
 <p>Keep the teams' ownership, then connect the dependency and load records they already need. That gives you a way to investigate one team's work or coordinate a wider recovery, without making every change go through a shared project.</p>
@@ -165,18 +171,18 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>Those same connections let you run independent teams' work together. Each reader waits for the source it needs, including a SQL endpoint refresh or OneLake publication between engines; unrelated branches can continue. The <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">performance guide</a> explains how that scheduling works within a project.</p>
 
 <h2 id="experimental-setup">4. Experimental setup</h2>
-<p>Here is a concrete test of that arrangement: 50 real Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with its own catalogue, project and configuration, initialised, built and loaded separately. These are simulated teams, with results from the 7 November 2026 run.</p>
+<p>The experiment used 500 real Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented an independently owned project with its own catalogue and configuration. The teams and small tables were synthetic; the experiment tested dependency tracking and execution across workspaces, not data-volume throughput.</p>
 <div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Team</th><th scope="col">Workspaces</th><th scope="col">Each holds</th></tr></thead><tbody>
 <tr><td>Bronze</td><td>1</td><td>Bronze Lakehouse with Python tables run in Spark</td></tr>
 <tr><td>Central</td><td>1</td><td>Silver Lakehouse with shortcuts into Bronze; Gold Warehouse</td></tr>
 <tr><td>Semantic</td><td>1</td><td>Bridge Lakehouse over Gold; Direct Lake semantic model</td></tr>
-<tr><td>Marts</td><td>29</td><td>Bridge Lakehouse over Gold; Warehouse with two SQL tables</td></tr>
-<tr><td>Models</td><td>10</td><td>Bridge Lakehouse over Gold; Direct Lake semantic model</td></tr>
-<tr><td>Lakehouses</td><td>4</td><td>Lakehouse with a shortcut to Gold and a Python table</td></tr>
-<tr><td>Thin reports</td><td>4</td><td>A report bound to the central semantic model in another workspace</td></tr>
+<tr><td>Marts</td><td>299</td><td>Bridge Lakehouse over Gold; Warehouse with SQL tables</td></tr>
+<tr><td>Models</td><td>100</td><td>Bridge Lakehouse over Gold; Direct Lake semantic model</td></tr>
+<tr><td>Lakehouses</td><td>49</td><td>Lakehouse with a shortcut to Gold and a Python table</td></tr>
+<tr><td>Thin reports</td><td>49</td><td>A report bound to the central semantic model in another workspace</td></tr>
 </tbody></table></div>
 <p>Two simulated business teams read each other's summaries, deliberately forming a dependency cycle across workspaces.</p>
-<p>The experiment then introduced a failure into the central Bronze table <code>BRZ.Customer</code>, and tested what each team could see and do.</p>
+<p>After a successful coordinated baseline, the experiment introduced a failure into the central Bronze table <code>BRZ.Customer</code>, then tested central repair, Team 05's recovery and the remaining selected stale work. A later full coordinated Load failed one semantic-model refresh, so the complete campaign did not qualify end to end.</p>
 
 <h2 id="the-implementation-weaver">5. The implementation: Weaver</h2>
 <p>With <a href="/">Weaver</a>, each team keeps those records in its own Fabric Warehouse catalogue. Build records the objects and dependencies; Load and Test record what ran. To investigate connected work, you bring the relevant catalogues together. The teams keep their projects where they are.</p>
@@ -190,34 +196,44 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <p>The central catalogues provide context; only Team 05's work is selected to run. Select several teams when you want a coordinated run instead. Weaver orders that selection and records each result in its owner's catalogue. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/">across-catalogue guide</a> covers the setup, selectors and required permissions.</p>
 <h3 id="the-catalogue-dashboard">5.2 The Catalogue Dashboard</h3>
 <p>If you would rather explore the connections in Power BI, open the <a href="/features/#visibility">Catalogue Dashboard</a>. Select Team 05 in Workspaces, follow the teams that supply it, then use Health and Orchestration to investigate the failed load. You can narrow the same pages to your workspace, item or object.</p>
-<p>The snapshot below lets you explore ten of the experiment's catalogues. For the full set, deploy the Dashboard in Import mode and refresh it to read new records; Direct Lake supports up to ten catalogues.</p>
+<p>The earlier snapshot below illustrates the interface over ten catalogues; it is not the 500-workspace result. For the full set, deploy the Dashboard in Import mode and refresh it to read new records; Direct Lake supports up to ten catalogues.</p>
 <figure class="dashboard-guide-demo">
 <iframe src="/assets/spread-dashboard/workspaces.html" title="The Spread Dashboard Workspaces page" loading="lazy"></iframe>
-<figcaption>The Spread Dashboard over ten of the 50 catalogues, read over Direct Lake and exported as static HTML. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
+<figcaption>An earlier ten-catalogue Spread Dashboard snapshot, read over Direct Lake and exported as static HTML. It illustrates navigation, not the current 500-workspace state. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
 </figure>
 
-<h2 id="results">6. Results</h2>
-<p>Now return to the failed customer load. What could you see as the central team, what could you do as Team 05, and what happened when the remaining work ran together?</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Experiment results"><table class="benchmark" style="min-width:640px"><colgroup><col style="width:16%"><col style="width:28%"><col style="width:40%"><col style="width:16%"></colgroup><thead><tr><th scope="col">Who asks</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Time</th></tr></thead><tbody>
-<tr><td>The organisation</td><td>Which managed work depends on the failed table?</td><td>77 managed tables and semantic models in 45 downstream workspaces, each traced to <code>BRZ.Customer</code>.</td><td>82 seconds</td></tr>
-<tr><td>Team 05</td><td>Which of our tables need attention, and why?</td><td>Both Mart tables, with the failed <code>BRZ.Customer</code> load named as the cause.</td><td>11 seconds</td></tr>
-<tr><td>The central team</td><td>Can we repair our selected work first?</td><td>Six central objects reloaded across Bronze, Silver/Gold and the shared model.</td><td>2 minutes 18 seconds</td></tr>
-<tr><td>Team 05</td><td>The upstream is repaired. What should we reload?</td><td>Its two stale Mart tables.</td><td>5 seconds to check, 15 seconds to reload</td></tr>
-<tr><td>The organisation</td><td>Recover the remaining selected work.</td><td>71 object loads plus 41 readiness steps. The combined run spanned 43 workspaces.</td><td>4 minutes 16 seconds</td></tr>
-<tr><td>The organisation</td><td>Coordinate a run using all 50 participating catalogues.</td><td>125 steps: 80 loads, 41 endpoint refreshes and four publication waits. All succeeded under one workflow ID.</td><td>5 minutes 15 seconds end to end</td></tr>
-</tbody></table></div>
-<p class="small">The coordinated run's end-to-end time includes catalogue reads, planning, Spark startup, execution and recording. The test used small tables on the FTL64 trial capacity to measure coordination across workspaces. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>
+<h2 id="results">6. Results across 500 workspaces</h2>
+<p>The recorded recovery stages returned successful reports. The campaign as a whole did not: a subsequent full coordinated Load failed one semantic-model refresh and had no post-Load Health check. The results below keep those outcomes separate.</p>
+<dl class="result-list" aria-label="500-workspace managed experiment results">
+<div><dt>Establish the baseline</dt><dd>All 500 catalogues supplied; 755 object loads and 405 readiness steps succeeded under one workflow ID. Execution had owners in 451 workspaces.</dd><dd>About 40 minutes</dd></div>
+<div><dt>Trace the failed source</dt><dd>Health read all 500 catalogues and traced 752 downstream tables and models in 450 workspaces to <code>BRZ.Customer</code>.</dd><dd>About 33 minutes</dd></div>
+<div><dt>Inspect Team 05</dt><dd>Its own Health report named the failed central source as the cause affecting both Mart tables.</dd><dd>About 15 seconds</dd></div>
+<div><dt>Load the repaired central estate</dt><dd>After the repair Build, six selected object loads and four readiness steps succeeded across Bronze, Silver/Gold and the shared model.</dd><dd>About 100 seconds for Load</dd></div>
+<div><dt>Recover Team 05</dt><dd>Check its recorded stale state, then reload only its two object loads, with one upstream publication wait and one endpoint refresh. A separate catalogue-only Health check returned green.</dd><dd>About 5 seconds to check; 20 seconds to reload</dd></div>
+<div><dt>Recover remaining stale work</dt><dd>746 object loads and 401 readiness steps succeeded, with execution across 448 workspaces.</dd><dd>About 45 minutes</dd></div>
+<div><dt>Check after stale recovery</dt><dd>All 500 catalogues were readable: 499 green and one amber finding on the deliberate dependency cycle.</dd><dd>About 28 minutes</dd></div>
+<div><dt>Run another full coordinated Load</dt><dd>1,159 steps succeeded; one semantic-model refresh failed. The run was partially successful, not a passing full-campaign result.</dd><dd>About 41 minutes</dd></div>
+</dl>
+<p class="small">Successful operation times include Session open and close, not CLI startup. The failed full-Load duration also includes error reporting. The repair Build took about 80 seconds separately from the central Load. Team 05's five-second state check and post-reload Health disabled physical inventories; the full-estate checks kept them enabled. Readiness steps are endpoint refreshes and publication waits, not additional table loads. See the <a href="/guides/fabric-performance-optimisation/">performance guide</a> for data-volume results.</p>
 <h3 id="impact-across-the-organisation">6.1 Knowing the impact of a failure</h3>
-<p>As the central team, you could trace the failed Bronze load to 61 Warehouse tables, five Lakehouse tables and 11 semantic models across 45 downstream workspaces. As a business team, you could narrow that view to your own work and see the same failed source named as the cause. You did not need to ask every team to inspect its job history separately.</p>
-<p>The four thin-report workspaces read the central semantic model, so their data recovery follows that model's upstream recovery.</p>
+<p>The impact assessment traced the failed Bronze load to 601 Warehouse tables, 50 Lakehouse tables and 101 semantic models in 450 downstream workspaces. That count excludes the failed source itself and counts each managed object once, even when it had several findings. An affected object was not necessarily failed: it could still hold an earlier successful result.</p>
+<p>The 49 thin-report workspaces read the central semantic model. Their data recovery follows that model; they are not counted as additional managed table or model loads.</p>
 <h3 id="independent-recovery">6.2 Each team recovers on its own terms</h3>
-<p>The central team reloaded six objects across Bronze, Silver/Gold and the shared semantic model. Weaver ordered the work and waited for the publications and endpoint refreshes its readers needed. Business teams retained control of when to reload their own tables.</p>
-<p>For Team 05, the next decision was small: check its two Mart tables and reload them. The check took five seconds and the reload took 15. Its project and schedule stayed its own; recovering those tables did not require waiting for every other business team's run.</p>
+<p>After building the repair, the central team selected its own work. Six object loads and four readiness steps completed across the three central catalogues. Team 05 then checked its two Mart tables, saw that their upstream data had been repaired, and loaded its own stale work. Its two object loads succeeded, and its subsequent catalogue-only Health report was green.</p>
+<p>The upstream catalogues supplied context and readiness requirements. They did not expand Team 05's object-load selection to every other team. The remaining stale recovery was a separate operation with its own result.</p>
 <h3 id="cycles">6.3 Teams that read one another's data</h3>
-<p>Teams 01 and 02 read each other's summaries. Weaver reported that cycle and ran its members once in a consistent order. Where a dependency closed the loop, the consumer could use the result available from an earlier run. Health continued to report failures, pending work and overdue loads. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">cycle guide</a> explains the execution and assessment rules.</p>
-<h3 id="coordination-when-required">6.4 Coordination when the organisation needs it</h3>
-<p>When you need a wider recovery, select the workspaces or items together and supply their catalogues. Use <code>--stale</code> to narrow that selection to work whose recorded state needs another load.</p>
-<p>In this run, that meant coordinating work across the participating projects using their existing dependencies. You can choose this for an organisation-wide recovery while leaving everyday scheduling with each team.</p>
+<p>Teams 01 and 02 read each other's summaries. The cycle appeared in both the baseline and post-recovery Health reports. The post-recovery check left one amber stale-ancestor finding on that cycle rather than claiming every catalogue was green. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">cycle guide</a> explains the execution and assessment rules.</p>
+<h3 id="coordination-when-required">6.4 Coordination and its recorded failure</h3>
+<p>The initial all-catalogue baseline and the later selected stale recovery succeeded. A further full coordinated Load did not: Team 496's semantic-model refresh failed after 1,159 other steps succeeded. The campaign therefore lacks a successful final coordinated Load and its post-Load Health check.</p>
+<p>A subsequent managed candidate run also stopped during its impact assessment, with 388 unreadable catalogues, before reaching recovery. Neither attempt is a qualified end-to-end 500-workspace campaign. Successful individual stages and the read-only checks below do not remove those failures.</p>
+
+<h3 id="health-at-500-workspaces">6.5 Faster Health, measured separately</h3>
+<p>A later unreleased desktop candidate checked the same 500-workspace estate with every default target inventory enabled. Two fresh-client checks took about seven minutes and five minutes, including Session close and isolated native-driver cleanup. The first missed the six-minute target; the second passed it. These are observed timings, not a guarantee that every check will finish within six minutes.</p>
+<figure class="facts-figure" aria-label="Separate read-only Health checks across 500 workspaces">
+<div><strong>500</strong><span>catalogues in each check</span></div><div><strong>5–7 min</strong><span>observed complete checks</span></div><div><strong>0</strong><span>unreadable catalogues</span></div><div><strong>50 / 450</strong><span>green / amber catalogues</span></div>
+<figcaption>Both checks retained all default inventories and returned the same report content apart from observation timestamps. Fabric's server-cache warmth was not controlled.</figcaption>
+</figure>
+<p>These checks included discovery, catalogue reads, physical target inventories and joined assessment. Complete means every selected catalogue was readable and assessed, not that every catalogue was green. Their later operational state differs from the earlier fault-and-recovery exercise. These are Health measurements, not new Load or recovery results.</p>
 
 <h2 id="conclusion">7. Team ownership, coordinated operation</h2>
 <p>You can give teams control of their Fabric work without losing the ability to operate across it. Keep each team's project, catalogue and schedule; use the recorded connections when a shared failure or coordinated run needs a wider view.</p>

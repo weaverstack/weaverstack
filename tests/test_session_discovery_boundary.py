@@ -32,6 +32,7 @@ def test_repeated_discovery_reuses_workers_and_drains_before_session_close(monke
 
         def request(self, *args, **kwargs):
             assert not self.closed
+            barrier.wait(timeout=5)
             return threading.get_ident()
 
         def close(self):
@@ -44,7 +45,6 @@ def test_repeated_discovery_reuses_workers_and_drains_before_session_close(monke
             barrier = threading.Barrier(4)
 
             def read(entry):
-                barrier.wait(timeout=5)
                 return session._http.request("GET", "https://example.invalid/")
 
             outcomes = concurrently(list(range(4)), read, workers=4, session=session)

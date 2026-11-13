@@ -1,4 +1,4 @@
-"""A Console Session owns reusable, thread-confined HTTP connections."""
+"""A Console Session owns reusable HTTP connections, one request at a time each."""
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -78,21 +78,26 @@ def test_reused_connections_do_not_carry_response_cookies_into_another_request(
 
 
 @weaver_test()
-def test_http_pool_is_thread_confined_and_session_owned(monkeypatch):
+def test_http_sessions_serve_one_request_at_a_time_and_are_session_owned(
+    monkeypatch,
+):
     from weaver.fabric.http import HttpTransport
 
-    wires = []
     barrier = threading.Barrier(4)
 
     class Wire:
         def __init__(self):
-            self.owner = threading.get_ident()
             self.cookies = {}
             self.closed = False
-            wires.append(self)
+            self.busy = False
 
         def request(self, *args, **kwargs):
-            assert self.owner == threading.get_ident()
+            assert not self.busy
+            self.busy = True
+            try:
+                barrier.wait(timeout=5)
+            finally:
+                self.busy = False
             return self
 
         def close(self):
@@ -101,23 +106,54 @@ def test_http_pool_is_thread_confined_and_session_owned(monkeypatch):
     monkeypatch.setattr("requests.Session", Wire)
     first, second = HttpTransport(), HttpTransport()
 
-    def worker(_):
-        barrier.wait(timeout=5)
-        a = first.request("GET", "https://example.test/a")
-        assert first.request("GET", "https://example.test/b") is a
-        assert second.request("GET", "https://example.test/a") is not a
-        return a
-
     with ThreadPoolExecutor(max_workers=4) as pool:
-        owned = list(pool.map(worker, range(4)))
-    assert len(wires) == 8
+        owned = set(
+            pool.map(lambda _: first.request("GET", "https://example.test"), range(4))
+        )
+    assert len(owned) == 4
+    barrier = threading.Barrier(1)
+    other = second.request("GET", "https://example.test")
+    assert other not in owned
     first.close()
     assert all(wire.closed for wire in owned)
-    assert all(not wire.closed for wire in wires if wire not in owned)
+    assert not other.closed
     second.close()
-    assert all(wire.closed for wire in wires)
+    assert other.closed
     with pytest.raises(RuntimeError, match="closed"):
         first.request("GET", "https://example.test/c")
+
+
+@weaver_test()
+def test_short_lived_worker_pools_reuse_idle_http_sessions(monkeypatch):
+    from weaver.fabric.http import HttpTransport
+
+    wires = []
+
+    class Wire:
+        def __init__(self):
+            self.cookies = {}
+            wires.append(self)
+
+        def request(self, *args, **kwargs):
+            return self
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("requests.Session", Wire)
+    transport = HttpTransport()
+    try:
+        for _ in range(20):
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(
+                    pool.map(
+                        lambda _: transport.request("GET", "https://example.test"),
+                        range(4),
+                    )
+                )
+    finally:
+        transport.close()
+    assert len(wires) <= 4
 
 
 @weaver_test()

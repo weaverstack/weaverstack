@@ -52,6 +52,36 @@ def test_desktop_authentication_uses_the_injected_credential_and_sql_scope(monke
 
 
 @weaver_test()
+def test_sql_scopes_reuse_the_session_sql_token(monkeypatch):
+    from weaver.sessions.console import ConsoleSession
+
+    calls = []
+    connections = []
+
+    def acquire(scope):
+        calls.append(scope)
+        return SimpleNamespace(token="test-token", expires_on=1e12)
+
+    def connect(endpoint, authentication):
+        authentication.connection_arguments()
+        connections.append(endpoint)
+        return SimpleNamespace(close=lambda: None)
+
+    monkeypatch.setattr("weaver.sql.connection.connect", connect)
+    credential = SimpleNamespace(get_token=acquire)
+    with ConsoleSession(credential=credential) as session:
+        for name in ("one", "two"):
+            executor = session.sql_executor(
+                SqlEndpoint("server.example", name), workspace=Workspace(workspace=name)
+            )
+            with executor.pool.lease():
+                pass
+
+    assert len(connections) == 2
+    assert calls == [SQL_SCOPE]
+
+
+@weaver_test()
 def test_fabric_authentication_uses_notebookutils_not_the_desktop_chain(monkeypatch):
     from weaver.fabric.session import FabricSessionResolver
 

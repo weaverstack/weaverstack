@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Mapping, Sequence
 
@@ -96,6 +97,19 @@ class CatalogueSet:
     crossings: tuple[Crossing, ...] = ()
     graph: Graph = field(default_factory=lambda: Graph(()))
 
+    @cached_property
+    def _crossing_reach(self) -> Mapping[str, frozenset[str]]:
+        """Each crossing's downstream nodes, shared by the member reports."""
+
+        consumers = dict.fromkeys(crossing.consumer for crossing in self.crossings)
+        return MappingProxyType(
+            {
+                consumer: frozenset({consumer, *self.graph.descendants(consumer)})
+                for consumer in consumers
+                if consumer in self.graph
+            }
+        )
+
     @property
     def by_label(self) -> Mapping[str, Member]:
         return MappingProxyType({member.label: member for member in self.members})
@@ -146,7 +160,7 @@ class Across:
         for crossing in joined.crossings:
             if crossing.consumer not in joined.graph:
                 continue
-            reached = {crossing.consumer, *joined.graph.descendants(crossing.consumer)}
+            reached = joined._crossing_reach[crossing.consumer]
             if crossing.producer is not None:
                 crossed.update(reached)
             if (crossing.workspace or "").casefold() in unread and (

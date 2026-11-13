@@ -182,11 +182,15 @@ def fork_statements(
 COPIED_ROWS = 1000
 
 
-def read_copied_rows(connection, source: ForkSource, *, graphed: bool = True) -> dict:
+def read_copied_rows(
+    connection, source: ForkSource, *, graphed: bool = True, map_reads=None
+) -> dict:
     """Read the rows :func:`copy_statements` would copy, from the source catalogue.
 
     For a source in another workspace, which a Warehouse cannot name. Each row
     maps the destination's public column names to the source's values.
+    ``map_reads(statements, read)`` reads whole tables on separate connections;
+    without it they are read in one batch, which a Warehouse runs serially.
     """
 
     tables = [
@@ -196,11 +200,12 @@ def read_copied_rows(connection, source: ForkSource, *, graphed: bool = True) ->
     ]
     statements = [_copied_query(table, source.columns[table.name]) for table in tables]
     row_sets = getattr(connection, "row_sets", None)
-    sets = (
-        row_sets(statements)
-        if row_sets is not None
-        else [connection.rows(statement) for statement in statements]
-    )
+    if map_reads is not None:
+        sets = map_reads(statements, connection.rows)
+    elif row_sets is not None:
+        sets = row_sets(statements)
+    else:
+        sets = [connection.rows(statement) for statement in statements]
     return {
         table.name: tuple(dict(row) for row in rows)
         for table, rows in zip(tables, sets)

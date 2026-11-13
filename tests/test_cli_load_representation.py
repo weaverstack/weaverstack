@@ -1203,14 +1203,13 @@ def livy(monkeypatch):
         "query_tsql",
         lambda self, statement, **kwargs: _FakeTds.answer(statement),
     )
-    for method in ("query_tsql_sets", "query_tsql_batch"):
-        monkeypatch.setattr(
-            ConsoleSession,
-            method,
-            lambda self, statements, **kwargs: tuple(
-                _FakeTds.answer(statement) for statement in statements
-            ),
-        )
+    monkeypatch.setattr(
+        ConsoleSession,
+        "query_tsql_batch",
+        lambda self, statements, **kwargs: tuple(
+            _FakeTds.answer(statement) for statement in statements
+        ),
+    )
     monkeypatch.setattr(
         ConsoleSession, "execute_tsql", lambda self, statement, **kwargs: None
     )

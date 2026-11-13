@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from support.weaver_test import weaver_test
 
+from weaver.errors import CommandError
 from weaver.sessions import ConsoleSession
 from weaver.workspaces import Workspace
 
@@ -119,7 +120,7 @@ def test_http_sessions_serve_one_request_at_a_time_and_are_session_owned(
     assert not other.closed
     second.close()
     assert other.closed
-    with pytest.raises(RuntimeError, match="closed"):
+    with pytest.raises(CommandError, match="closed"):
         first.request("GET", "https://example.test/c")
 
 
@@ -187,7 +188,7 @@ def test_http_close_drains_admitted_requests_before_closing_connections(monkeypa
             closing.result(timeout=5)
         request.result(timeout=5)
     assert closed.is_set()
-    with pytest.raises(RuntimeError, match="closed"):
+    with pytest.raises(CommandError, match="closed"):
         transport.request("GET", "https://example.test")
 
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from support.weaver_test import weaver_test
 
+from weaver.errors import CommandError
 from weaver.operations.joined import concurrently
 from weaver.sessions import ConsoleSession, NotebookSession
 from weaver.workspaces import Workspace
@@ -54,7 +55,7 @@ def test_repeated_discovery_reuses_workers_and_drains_before_session_close(monke
     finally:
         session.close()
     assert all(wire.closed for wire in wires)
-    with pytest.raises(RuntimeError, match="closed"):
+    with pytest.raises(CommandError, match="closed"):
         concurrently([1], lambda x: x, session=session)
 
 
@@ -62,13 +63,14 @@ def test_repeated_discovery_reuses_workers_and_drains_before_session_close(monke
 @weaver_test()
 def test_worker_cannot_close_its_own_session(session_type):
     program = f"""
+from weaver.errors import CommandError
 from weaver.sessions import {session_type}
 from weaver.workspaces import Workspace
 session = {session_type}(workspace=Workspace(workspace='Example'))
 def work(entry):
     try:
         session.close()
-    except RuntimeError as error:
+    except CommandError as error:
         assert 'discovery worker' in str(error)
         return 'rejected'
     raise AssertionError('worker-originated close was allowed')
@@ -96,6 +98,7 @@ def _assert_program_finishes(program):
 def test_worker_close_is_rejected_before_external_console_close_lock():
     _assert_program_finishes("""
 import threading
+from weaver.errors import CommandError
 from weaver.sessions import ConsoleSession
 session = ConsoleSession(progress=False)
 entered = threading.Event()
@@ -114,7 +117,7 @@ def work(entry):
     assert external_locked.wait(2)
     try:
         session.close()
-    except RuntimeError as error:
+    except CommandError as error:
         assert 'discovery worker' in str(error)
         return 'rejected'
     raise AssertionError('worker close was allowed')
@@ -226,7 +229,7 @@ def test_close_retry_cannot_reopen_admission_under_another_closer(monkeypatch):
             with pytest.raises(OSError, match="first flush failed"):
                 first.result(timeout=2)
             assert second_flush.wait(2)
-            with pytest.raises(RuntimeError, match="closed"):
+            with pytest.raises(CommandError, match="closed"):
                 session.map_discovery([0], lambda value: value, workers=1)
         finally:
             allow_resume.set()
@@ -239,7 +242,7 @@ def test_close_retry_cannot_reopen_admission_under_another_closer(monkeypatch):
 @weaver_test()
 def test_discovery_rejects_invalid_worker_budgets(workers):
     with ConsoleSession(progress=False) as session:
-        with pytest.raises(ValueError, match="discovery workers"):
+        with pytest.raises(CommandError, match="discovery workers"):
             session.map_discovery([0], lambda value: value, workers=workers)
 
 
@@ -290,3 +293,16 @@ def test_discovery_exception_drains_active_work_before_returning():
         with pytest.raises(ValueError, match="expected work failure"):
             future.result(timeout=2)
         assert session.map_discovery([3], lambda value: value, workers=1) == [3]
+
+
+@weaver_test()
+def test_discovery_nested_in_a_saturated_pool_runs_inline():
+    _assert_program_finishes("""
+from weaver.sessions import ConsoleSession
+from weaver.sessions.discovery import MAX_WORKERS
+session = ConsoleSession(progress=False)
+def outer(entry):
+    return sum(session.map_discovery(range(3), lambda value: value, workers=3))
+assert session.map_discovery(range(MAX_WORKERS), outer, workers=MAX_WORKERS) == [3] * MAX_WORKERS
+session.close()
+""")

@@ -51,7 +51,10 @@ class _Inventory:
                 {"id": DEFAULT_ID, "displayName": "Other"},
             ]
         for scope, item in ITEM_IDS.items():
-            if path == f"workspaces/{scope}/items?type=Warehouse":
+            if path in (
+                f"workspaces/{scope}/items?type=Warehouse",
+                f"workspaces/{scope}/warehouses",
+            ):
                 return (
                     []
                     if self.missing and scope == REQUESTED_ID

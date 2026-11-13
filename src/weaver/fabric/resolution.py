@@ -7,6 +7,8 @@ name without asking the workspace again.
 
 from __future__ import annotations
 
+from threading import Lock
+
 from ..build_bundle.targets import WAREHOUSE_TARGET
 from ..errors import CommandError
 from ..locations import LakehouseSparkLocation, Location
@@ -39,6 +41,7 @@ class FabricResolver:
     #: A class default, because a subclass that supplies its own workspace and
     #: items does not run ``__init__``.
     _listed = False
+    _warehouses = None
 
     def __init__(
         self,
@@ -46,11 +49,13 @@ class FabricResolver:
         *,
         client: FabricClient | None = None,
         base_url: str = ONELAKE_DFS,
+        directory=None,
     ) -> None:
         self.configuration = workspace
         self.client = client or FabricClient()
         self.base_url = base_url.rstrip("/")
         self._workspace: Workspace | None = None
+        self._directory = directory
         self._items: dict[str, Item] = {}
         # Cache hits are recorded because they avoid an otherwise invisible REST call.
         self.cache_hits = 0
@@ -63,7 +68,13 @@ class FabricResolver:
             self._workspace
             if workspaces is None and self._workspace is not None
             else find_workspace(
-                self.configuration.workspace, client=rest, workspaces=workspaces
+                self.configuration.workspace,
+                client=rest,
+                workspaces=(
+                    workspaces
+                    if workspaces is not None
+                    else self._directory_entries(rest)
+                ),
             )
         )
         items = list_items(physical, client=rest)
@@ -87,9 +98,15 @@ class FabricResolver:
     def workspace(self) -> Workspace:
         if self._workspace is None:
             self._workspace = find_workspace(
-                self.configuration.workspace, client=self.client
+                self.configuration.workspace,
+                client=self.client,
+                workspaces=self._directory_entries(self.client),
             )
         return self._workspace
+
+    def _directory_entries(self, client):
+        directory = getattr(self, "_directory", None)
+        return None if directory is None else directory.read(client=client)
 
     @property
     def root(self) -> Location:
@@ -271,11 +288,37 @@ class FabricResolver:
     def sql_endpoint(self, target: WarehouseTarget):
         from ..sql import SqlEndpoint
 
+        with self.__dict__.setdefault("_warehouse_lock", Lock()):
+            if self._warehouses is None:
+                self._warehouses = tuple(
+                    (
+                        Item(
+                            row["id"], row["displayName"], WAREHOUSE, self.workspace.id
+                        ),
+                        (row.get("properties") or {}).get("connectionString"),
+                    )
+                    for row in self.client.paged(
+                        f"workspaces/{self.workspace.id}/warehouses"
+                    )
+                )
+            matches = [
+                item
+                for item, _ in self._warehouses
+                if item.name == target.warehouse.name
+            ]
+            if len(matches) == 1:
+                self._items.setdefault(
+                    f"{target.warehouse.name}:{WAREHOUSE}", matches[0]
+                )
         warehouse = self.warehouse(target)
-        payload = self.client.get_json(
-            f"workspaces/{self.workspace.id}/warehouses/{warehouse.id}/connectionString"
+        value = next(
+            (value for item, value in self._warehouses if item.id == warehouse.id), None
         )
-        value = payload.get("connectionString")
+        if not isinstance(value, str) or not value.strip():
+            payload = self.client.get_json(
+                f"workspaces/{self.workspace.id}/warehouses/{warehouse.id}/connectionString"
+            )
+            value = payload.get("connectionString")
         if not isinstance(value, str) or not value.strip():
             raise CommandError(
                 f"Fabric returned no SQL connection string for Warehouse "

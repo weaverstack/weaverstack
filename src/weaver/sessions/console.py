@@ -106,11 +106,16 @@ class ConsoleSession(Session):
         self.direct_delta_workers = direct_delta_workers
         self._delta_resolution_lock = threading.Lock()
         from ..fabric.auth import checked_credential
+        from ..fabric.http import HttpTransport
+        from ..fabric.resources import WorkspaceDirectory
 
         # Validate the supplied credential now; acquire its token lazily.
         self._given_credential = checked_credential(credential)
         self._token_providers: dict[tuple[int, str], Any] = {}
         self._token_lock = threading.Lock()
+        self._workspace_directory = WorkspaceDirectory()
+        self._http = HttpTransport()
+        self._http_close_lock = threading.RLock()
         self._given_livy = livy
         self._given_store = store
         self._given_resolver = resolver
@@ -122,6 +127,13 @@ class ConsoleSession(Session):
         self._progress_lock = threading.Lock()
         self._ticker = None
         self._ticking = False
+
+    def close(self) -> None:
+        self._discovery.assert_can_close()
+        with self._http_close_lock:
+            super().close()
+            if self._closed:
+                self._http.close()
 
     # --- progress -----------------------------------------------------------
 
@@ -401,6 +413,8 @@ class ConsoleSession(Session):
             resolver=self._given_resolver,
             credential=self._given_credential,
             token_provider_factory=self._token_provider,
+            workspace_directory=self._workspace_directory,
+            http_request=self._http.request,
         )
 
     def _token_provider(self, scope, credential):
@@ -813,6 +827,8 @@ class ConsoleScope(WorkspaceScope):
         livy: Any = None,
         credential: Any = None,
         token_provider_factory=None,
+        workspace_directory=None,
+        http_request=None,
         **kwargs,
     ) -> None:
         super().__init__(workspace, **kwargs)
@@ -822,6 +838,8 @@ class ConsoleScope(WorkspaceScope):
         self._credential = credential
         self._given_credential = credential
         self._token_provider_factory = token_provider_factory
+        self._workspace_directory = workspace_directory
+        self._http_request = http_request
         self._transport_store = None
         self._version_checked = False
         #: The Lakehouse this scope's Livy session was acquired against.
@@ -919,7 +937,9 @@ class ConsoleScope(WorkspaceScope):
                 from ..fabric.resolution import FabricResolver
 
                 self._resolver = FabricResolver(
-                    self.workspace, client=self._fabric_client()
+                    self.workspace,
+                    client=self._fabric_client(),
+                    directory=self._workspace_directory,
                 )
             return self._resolver
 
@@ -943,15 +963,24 @@ class ConsoleScope(WorkspaceScope):
         with self._lock:
             if self._transport_store is None:
                 from ..fabric import OneLakeDfsClient
+                from ..fabric.auth import STORAGE_SCOPE
 
-                self._transport_store = OneLakeDfsClient(telemetry=self.telemetry)
+                self._transport_store = OneLakeDfsClient(
+                    token=self.token_provider(STORAGE_SCOPE),
+                    telemetry=self.telemetry,
+                    requester=self._http_request,
+                )
             return self._transport_store
 
     def _fabric_client(self):
         from ..fabric.client import FabricClient
 
         # Share one renewing token source across this Session's REST calls.
-        return FabricClient(token=self.token_provider(), telemetry=self.telemetry)
+        return FabricClient(
+            token=self.token_provider(),
+            telemetry=self.telemetry,
+            requester=self._http_request,
+        )
 
     def token_provider(self, scope=None):
         from ..fabric.auth import FABRIC_SCOPE, TokenProvider

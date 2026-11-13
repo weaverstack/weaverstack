@@ -47,6 +47,39 @@ def test_an_isolated_node_is_fine():
 # --- ordering ----------------------------------------------------------------
 
 
+@pytest.mark.parametrize("cycle", [False, True])
+@weaver_test()
+def test_ordering_equivalent_custom_keys_keep_stable_arrival_order(cycle):
+    class Rank:
+        def __lt__(self, other):
+            return False
+
+    graph = Graph("ABCDE", [("A", "B"), ("B", "A")] if cycle else [])
+    assert graph.order(key=lambda _: Rank()) == graph.order(key=lambda _: 0)
+
+
+@pytest.mark.parametrize("cycle", [False, True])
+@weaver_test()
+def test_ready_frontiers_rank_each_node_only_a_bounded_number_of_times(cycle):
+    nodes = [f"N{i:04d}" for i in range(1000)]
+    edges = [(nodes[0], nodes[1]), (nodes[1], nodes[0])] if cycle else []
+    graph = Graph(nodes, edges)
+    calls = []
+
+    def rank(node):
+        calls.append(node)
+        return node
+
+    assert graph.order(key=rank) == graph.order()
+    assert len(calls) <= 3 * len(nodes)
+
+
+@weaver_test()
+def test_ready_frontiers_preserve_arrival_order_when_caller_ranks_tie():
+    graph = Graph(("A", "B", "AA"), (("A", "AA"),))
+    assert graph.order(key=lambda node: 0) == ("A", "B", "AA")
+
+
 @weaver_test()
 def test_upstream_comes_before_downstream():
     assert chain().order() == ("A", "B", "C")

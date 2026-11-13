@@ -65,6 +65,7 @@ def guard_preview(session, monkeypatch):
     for name, many in (
         ("query_tsql", False),
         ("query_tsql_sets", True),
+        ("query_tsql_batch", True),
         ("execute_spark_sql", False),
         ("execute_spark_sql_batch", True),
     ):

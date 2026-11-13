@@ -388,3 +388,26 @@ def test_a_source_in_another_workspace_crosses_as_rows_read_by_name():
     ] * 2
     assert "CAST('2026-11-07T01:02:03.456789' AS datetime2(6))" in statements[0]
     assert "N'Model1000'" in statements[1]
+
+
+@weaver_test()
+def test_a_remote_source_reads_each_whole_table_through_the_supplied_map():
+    from weaver.catalogue.fork import read_copied_rows
+
+    class _Source:
+        def rows(self, statement):
+            return [{"statement": statement}]
+
+        def row_sets(self, statements):
+            raise AssertionError("a whole-table copy must not share one batch")
+
+    mapped = []
+
+    def map_reads(statements, read):
+        mapped.append(list(statements))
+        return [read(statement) for statement in reversed(statements)][::-1]
+
+    rows = read_copied_rows(_Source(), _fork(current()), map_reads=map_reads)
+    (statements,) = mapped
+    assert len(statements) == len(rows) > 1
+    assert [table_rows[0]["statement"] for table_rows in rows.values()] == statements

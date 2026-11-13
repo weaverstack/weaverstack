@@ -67,3 +67,26 @@ def test_incorrect_result_set_count_is_not_an_incomplete_catalogue(sets):
     connection = CatalogueConnection(lambda statement: (), query_sets=lambda _: sets)
     with pytest.raises(CommandError, match="result sets"):
         connection.row_sets(["select 1", "select 2"])
+
+
+@pytest.mark.parametrize("session_type", [ConsoleSession, NotebookSession])
+@weaver_test()
+def test_session_sets_run_each_query_on_its_own_connection_in_order(
+    monkeypatch, session_type
+):
+    import threading
+
+    statements = ["select 1", "select 2", "select 3"]
+    barrier = threading.Barrier(len(statements))
+
+    class Executor:
+        def query(self, statement):
+            # Every query is in flight at once, or the barrier times out.
+            barrier.wait(timeout=5)
+            return [{"value": statement}]
+
+    with session_type(workspace=Workspace(workspace="Example")) as session:
+        monkeypatch.setattr(session, "sql_executor", lambda *args, **kwargs: Executor())
+        result = session.query_tsql_sets(statements, target="unused")
+        assert session.query_tsql_sets([], target="unused") == ()
+    assert result == tuple(({"value": statement},) for statement in statements)

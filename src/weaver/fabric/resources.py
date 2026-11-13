@@ -55,9 +55,14 @@ class WorkspaceDirectory:
         self._lock = threading.Lock()
         self._entries = None
 
-    def read(self, *, client: FabricClient):
+    def read(self, *, client: FabricClient, name: str | None = None):
+        """The snapshot, listed again once when it does not show ``name``."""
+
         with self._lock:
-            if self._entries is None:
+            if self._entries is None or (
+                name is not None
+                and not any(entry.get("displayName") == name for entry in self._entries)
+            ):
                 self._entries = tuple(client.paged("workspaces"))
             return self._entries
 

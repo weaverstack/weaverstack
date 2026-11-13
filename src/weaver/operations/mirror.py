@@ -250,8 +250,16 @@ def check_mirror(plan: MirrorPlan, *, session=None) -> ResolvedMirror:
         if not plan.remote:
             return replace(resolved, fork=fork)
         from ..catalogue.fork import read_copied_rows
+        from ..sql.pool import DEFAULT_MAX_CONNECTIONS
 
-        rows = read_copied_rows(connection, fork, graphed=graphed)
+        rows = read_copied_rows(
+            connection,
+            fork,
+            graphed=graphed,
+            map_reads=lambda statements, read: opened.map_discovery(
+                statements, read, workers=DEFAULT_MAX_CONNECTIONS
+            ),
+        )
         return replace(resolved, fork=fork, copied_rows=rows)
 
 

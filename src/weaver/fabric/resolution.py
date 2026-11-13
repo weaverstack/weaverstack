@@ -106,7 +106,9 @@ class FabricResolver:
 
     def _directory_entries(self, client):
         directory = getattr(self, "_directory", None)
-        return None if directory is None else directory.read(client=client)
+        if directory is None:
+            return None
+        return directory.read(client=client, name=self.configuration.workspace)
 
     @property
     def root(self) -> Location:

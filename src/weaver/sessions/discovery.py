@@ -4,6 +4,8 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextvars import copy_context
 from threading import Condition, local
 
+from ..errors import CommandError
+
 MAX_WORKERS = 64
 
 
@@ -18,7 +20,7 @@ class DiscoveryExecutor:
 
     def assert_can_close(self) -> None:
         if getattr(self._worker, "active", False):
-            raise RuntimeError("Cannot close a Session from its discovery worker")
+            raise CommandError("Cannot close a Session from its discovery worker")
 
     def _run(self, work, value):
         previous = getattr(self._worker, "active", False)
@@ -30,19 +32,32 @@ class DiscoveryExecutor:
 
     def map(self, entries, work, *, workers):
         if type(workers) is not int or not 1 <= workers <= MAX_WORKERS:
-            raise ValueError(f"discovery workers must be from 1 to {MAX_WORKERS}")
+            raise CommandError(f"discovery workers must be from 1 to {MAX_WORKERS}")
         values = tuple(entries)
         with self._condition:
             if self._closed:
-                raise RuntimeError("Discovery executor is closed")
+                raise CommandError("Discovery executor is closed")
             if not values:
                 return []
-            if self._pool is None:
-                self._pool = ThreadPoolExecutor(
-                    max_workers=MAX_WORKERS, thread_name_prefix="weaver-discovery"
-                )
-            pool = self._pool
+            if getattr(self._worker, "active", False):
+                # Work already on a worker runs inline: queued behind the pool
+                # it occupies, it could wait on itself.
+                nested = True
+            else:
+                nested = False
+                if self._pool is None:
+                    self._pool = ThreadPoolExecutor(
+                        max_workers=MAX_WORKERS, thread_name_prefix="weaver-discovery"
+                    )
+                pool = self._pool
             self._active += 1
+        if nested:
+            try:
+                return [work(value) for value in values]
+            finally:
+                with self._condition:
+                    self._active -= 1
+                    self._condition.notify_all()
         pending = {}
         remaining = iter(enumerate(values))
         results = [None] * len(values)
@@ -87,7 +102,7 @@ class DiscoveryExecutor:
 
         with self._condition:
             if self._shutdown:
-                raise RuntimeError("Discovery executor has shut down")
+                raise CommandError("Discovery executor has shut down")
             self._closed = False
 
     def close(self) -> None:

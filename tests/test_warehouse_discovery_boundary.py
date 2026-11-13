@@ -84,3 +84,34 @@ def test_absent_endpoint_properties_keep_the_existing_connection_string_lookup()
         client.calls[-1]
         == "workspaces/workspace-one/warehouses/catalogue/connectionString"
     )
+
+
+@weaver_test()
+def test_a_shared_directory_lists_again_for_a_workspace_created_after_it():
+    from weaver.fabric.resources import WorkspaceDirectory
+
+    class Directory(FabricClient):
+        def __init__(self):
+            self.workspaces = [{"id": "sales", "displayName": "Sales"}]
+            self.listings = 0
+
+        def paged(self, path):
+            assert path == "workspaces"
+            self.listings += 1
+            return list(self.workspaces)
+
+    client, directory = Directory(), WorkspaceDirectory()
+    first = FabricResolver(
+        Workspace(workspace="Sales"), client=client, directory=directory
+    )
+    assert first.workspace.id == "sales"
+    client.workspaces.append({"id": "inventory", "displayName": "Inventory"})
+    second = FabricResolver(
+        Workspace(workspace="Inventory"), client=client, directory=directory
+    )
+    third = FabricResolver(
+        Workspace(workspace="Sales"), client=client, directory=directory
+    )
+    assert second.workspace.id == "inventory"
+    assert third.workspace.id == "sales"
+    assert client.listings == 2

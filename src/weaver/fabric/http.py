@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import threading
 
+from ..errors import CommandError
+
 
 class HttpTransport:
     """Pooled ``requests`` sessions, lent to one request at a time.
@@ -24,7 +26,7 @@ class HttpTransport:
     def request(self, method, url, **options):
         with self._lock:
             if self._closed:
-                raise RuntimeError("HTTP transport is closed")
+                raise CommandError("HTTP transport is closed")
             if self._idle:
                 session = self._idle.pop()
             else:

@@ -266,7 +266,7 @@ def test_fault_tolerance_lets_an_independent_branch_finish():
 
 
 @weaver_test()
-def test_fault_tolerance_runs_a_descendant_after_its_upstream_settles_failed():
+def test_fault_tolerance_blocks_a_descendant_after_its_upstream_fails():
     dispatch = controlled({"a": Outcome(status=FAILED)})
 
     result = runner(
@@ -275,8 +275,8 @@ def test_fault_tolerance_runs_a_descendant_after_its_upstream_settles_failed():
         fault_tolerant=True,
     ).run(dispatch=dispatch)
 
-    assert dispatch.seen == ["a", "b", "c"]
-    assert result.by_node["b"].status == SUCCEEDED
+    assert dispatch.seen == ["a", "c"]
+    assert result.by_node["b"].status == BLOCKED
     assert result.by_node["c"].status == SUCCEEDED
 
 

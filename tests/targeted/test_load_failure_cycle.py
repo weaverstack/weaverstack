@@ -379,22 +379,22 @@ def test_a_tolerant_run_continues_independent_branches(session, dispatched):
 
 
 @weaver_test()
-def test_a_tolerant_run_attempts_refresh_and_warehouse_after_a_failed_load(
+def test_a_tolerant_run_blocks_refresh_and_warehouse_after_a_failed_load(
     session, dispatched
 ):
     dispatched.answers[ORDER] = RuntimeError("boom")
-    dispatched.answers[SUMMARY] = LoadResult.failure("the Warehouse load failed")
 
     report = _run(session, fault_tolerant=True)
 
-    assert dispatched.calls.index(ORDER) < dispatched.calls.index(REFRESH)
-    assert dispatched.calls.index(REFRESH) < dispatched.calls.index(SUMMARY)
+    assert ORDER in dispatched.calls
+    assert REFRESH not in dispatched.calls
+    assert SUMMARY not in dispatched.calls
     assert report.by_node[ORDER].status == FAILED
-    assert report.by_node[REFRESH].status == SUCCEEDED
-    assert report.by_node[SUMMARY].status == FAILED
+    assert report.by_node[REFRESH].status == BLOCKED
+    assert report.by_node[SUMMARY].status == BLOCKED
     assert _result_for(session, ORDER) == "Error"
-    assert _result_for(session, REFRESH) == "Succeeded"
-    assert _result_for(session, SUMMARY) == "Failed"
+    assert _result_for(session, REFRESH) == "Blocked"
+    assert _result_for(session, SUMMARY) == "Blocked"
 
 
 # --- the distinction rejects create -------------------------------------------

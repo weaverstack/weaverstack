@@ -331,13 +331,11 @@ def test_expanded_runner_retains_failure_blocking_and_fault_tolerance(
     }
     assert statuses == {
         "Source": FAILED,
-        "Child": SUCCEEDED if fault_tolerant else BLOCKED,
-        "Final": SUCCEEDED if fault_tolerant else BLOCKED,
+        "Child": BLOCKED,
+        "Final": BLOCKED,
         "Other": SUCCEEDED if fault_tolerant else PENDING,
     }
-    assert calls == (
-        ["Source", "Child", "Other", "Final"] if fault_tolerant else ["Source"]
-    )
+    assert calls == (["Source", "Other"] if fault_tolerant else ["Source"])
     assert not report.succeeded
     session.flush()
     recorded = "\n".join(

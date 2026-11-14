@@ -101,7 +101,7 @@ def test_semantic_nodes_keep_known_graph_order_and_runner_failure_policy(
         expected = (
             ["succeeded"] * 3
             if not failure
-            else ["failed", "succeeded", "succeeded"]
+            else ["failed", "blocked", "succeeded"]
             if fault_tolerant
             else ["failed", "blocked", "pending"]
         )

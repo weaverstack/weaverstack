@@ -190,17 +190,18 @@ def test_a_failure_starts_nothing_more_and_lets_running_work_settle():
 
 
 @weaver_test()
-def test_a_tolerant_run_continues_every_branch_after_a_failure():
+def test_a_tolerant_run_blocks_failed_dependants_and_continues_independent_work():
     gate = Gate(outcomes={"a": RuntimeError("a broke")})
     made = runner(
         nodes=[procedure("a"), procedure("b"), procedure("c")],
-        edges=[("c", "b")],
+        edges=[("a", "b")],
         fault_tolerant=True,
     )
 
     result = run(made, gate)
 
-    assert statuses(result) == {"a": FAILED, "b": SUCCEEDED, "c": SUCCEEDED}
+    assert statuses(result) == {"a": FAILED, "b": BLOCKED, "c": SUCCEEDED}
+    assert gate.started == ["a", "c"]
 
 
 @weaver_test()

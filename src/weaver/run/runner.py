@@ -102,7 +102,7 @@ class RunRequest:
     #: Original Load seeds, by logical identity, before expansion.
     #: ``None`` selects every loadable the requested items own. ``load`` only.
     selected: tuple | None = None
-    #: Continue through settled dependency failures, and report each outcome.
+    #: Continue independent branches after a failure, and report each outcome.
     fault_tolerant: bool = False
     #: Plan, resolve and report without dispatching anything.
     dry_run: bool = False
@@ -727,16 +727,11 @@ class Runner:
     _SATISFIED = (SUCCEEDED, SUCCEEDED_WITH_REJECTS, SKIPPED, VALIDATED)
 
     def _blocking(self, node, statuses) -> tuple[str, ...]:
-        satisfied = (
-            (*self._SATISFIED, FAILED)
-            if self.request.fault_tolerant
-            else self._SATISFIED
-        )
         return tuple(
             sorted(
                 upstream
                 for upstream in self.graph.upstream(node.node_id)
-                if statuses.get(upstream) not in satisfied
+                if statuses.get(upstream) not in self._SATISFIED
             )
         )
 

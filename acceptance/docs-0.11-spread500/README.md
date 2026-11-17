@@ -12,5 +12,5 @@ run records, which stay unpublished, and records a SHA-256 for each one.
 - `intermediate_rerun`: the later rerun on an intermediate Health build, which
   stopped in its impact assessment when the desktop ran out of file
   descriptors. Only Bronze was reloaded afterwards.
-- `health_checks`: the two read-only Health checks on the 0.11.1 pre-release
-  build (C and D), each over all 500 catalogues with inventories enabled.
+- `health_checks`: the two read-only Health checks (C and D) that give the
+  guide's Health time, each over all 500 catalogues with inventories enabled.

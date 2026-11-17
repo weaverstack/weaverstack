@@ -23,6 +23,11 @@ discovering. Over 500 catalogues, Health completed in five to seven minutes.
 
 ### Fixed
 
+- `weaver fabric environment publish` republishes into an Environment that
+  already lists external libraries. Fabric exports the list two spaces under
+  `- pip:`, and Weaver added its entries at a different depth, which Fabric
+  refused as invalid YAML. Entries are now added at the list's own depth, and
+  the versions already listed are kept.
 - Mirror from a catalogue in another workspace reads its tables in parallel,
   up to the SQL pool size.
 - A workspace created after a Session first listed the workspaces now resolves.

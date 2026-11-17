@@ -378,16 +378,17 @@ def _edit_pip(
     assert header is not None
     index, indent = header
 
+    # Fabric exports the entries two spaces under ``- pip:``; a hand-written
+    # file often uses four. The first entry sets the depth for those added.
+    item_indent = _entry_indent(lines, index, indent)
     end = index + 1
     kept: list[str] = []
-    item_indent = f"{indent}    "
     settled: set[str] = set()
     while end < len(lines):
         line = lines[end]
-        if line.strip() and not line.startswith(item_indent):
+        if line.strip() and len(_indent(line)) <= len(indent):
             break
-        if line.strip():
-            item_indent = line[: len(line) - len(line.lstrip())]
+        if line.strip() and not line.lstrip().startswith("#"):
             # The item's YAML value, so a quoted or commented entry is read as
             # the requirement it names. The line itself is kept as authored.
             scalar = pip_scalar(line.strip().lstrip("-").strip())
@@ -408,9 +409,31 @@ def _edit_pip(
         kept.append(line)
         end += 1
 
+    # Trailing blank lines stay after the list rather than inside it.
+    trailing: list[str] = []
+    while kept and not kept[-1].strip():
+        trailing.insert(0, kept.pop())
     added = [f"{item_indent}- {wanted[name]}" for name in sorted(wanted)]
-    rewritten = lines[: index + 1] + kept + added + lines[end:]
+    rewritten = lines[: index + 1] + kept + added + trailing + lines[end:]
     return "\n".join(rewritten).rstrip("\n") + "\n"
+
+
+def _indent(line: str) -> str:
+    return line[: len(line) - len(line.lstrip())]
+
+
+def _entry_indent(lines: list[str], index: int, indent: str) -> str:
+    """The indentation of the entries under the ``- pip:`` at ``index``."""
+
+    for line in lines[index + 1 :]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        own = _indent(line)
+        if len(own) > len(indent) and stripped.startswith("-"):
+            return own
+        break
+    return f"{indent}  "
 
 
 def _pip_header(lines: list[str]) -> tuple[int, str] | None:
@@ -422,9 +445,20 @@ def _pip_header(lines: list[str]) -> tuple[int, str] | None:
 
 
 def _with_pip_section(lines: list[str]) -> list[str]:
+    """Add a ``- pip:`` entry beside the dependencies already listed."""
+
     for index, line in enumerate(lines):
-        if line.strip() in ("dependencies:", "dependencies: "):
-            return lines[: index + 1] + ["  - pip:"] + lines[index + 1 :]
+        if line.strip() == "dependencies:":
+            indent = _indent(line)
+            sibling = f"{indent}  "
+            for following in lines[index + 1 :]:
+                stripped = following.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if stripped.startswith("-") and len(_indent(following)) >= len(indent):
+                    sibling = _indent(following)
+                break
+            return lines[: index + 1] + [f"{sibling}- pip:"] + lines[index + 1 :]
     return [*lines, "dependencies:", "  - pip:"]
 
 

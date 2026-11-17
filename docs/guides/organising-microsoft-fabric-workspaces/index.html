@@ -214,7 +214,6 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <div><dt>Team 05's Health report</dt><dd>Team 05's own Health report named the failed central table as the cause behind both of its Mart tables.</dd><dd>About 13 seconds</dd></div>
 <div><dt>Central repair</dt><dd>After the repair Build, the central team reloaded its six affected objects across Bronze, Silver/Gold and the shared model.</dd><dd>About 100 seconds</dd></div>
 <div><dt>Team 05 recovery</dt><dd>Team 05 confirmed its upstream was repaired and reloaded just its two tables, then reported green.</dd><dd>About 5 seconds to check; 20 seconds to reload</dd></div>
-<div><dt>Remaining stale work</dt><dd>746 object loads and 401 readiness steps brought the remaining stale work up to date across 447 workspaces.</dd><dd>About 45 minutes</dd></div>
 <div><dt>Final Health check</dt><dd>Health read all 500 catalogues: 499 green, and one amber on the deliberate dependency cycle.</dd><dd>5–7 minutes for all 500 catalogues</dd></div>
 </dl>
 <p class="small">Readiness steps are SQL endpoint refreshes and OneLake publication waits that let readers see new data. Health times are for a full check of the 500-workspace estate with every target inventory enabled. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>

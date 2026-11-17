@@ -1096,3 +1096,32 @@ def test_a_publish_that_never_moves_from_the_previous_state_times_out(monkeypatc
 
     with pytest.raises(FabricError, match="did not finish"):
         env_mod.publish_and_wait(_env(), client=client, timeout=0.01)
+
+
+@weaver_test()
+def test_development_republishes_over_fabrics_own_export(monkeypatch, tmp_path):
+    """What Fabric exports is what the republish edits and sends back."""
+
+    import yaml
+
+    client = _LibraryClient(
+        external=(
+            "dependencies:\n"
+            "- pip:\n"
+            "  - deltalake==1.6.6\n"
+            "  - pyyaml==6.0.3\n"
+            "  - weaverstack==0.4.0\n"
+        ),
+    )
+    wheel = _built_wheel(tmp_path)
+
+    _library_publication(monkeypatch, client, dev=True, wheel=wheel)
+
+    (imported,) = client.imported
+    assert yaml.safe_load(imported)["dependencies"][0]["pip"] == [
+        "deltalake==1.6.6",
+        "pyyaml==6.0.3",
+        "mssql-python",
+    ]
+    assert "\n  - mssql-python\n" in imported
+    assert client.uploaded == [WHEEL]

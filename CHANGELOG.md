@@ -3,6 +3,46 @@
 What changed in each weaverstack release on PyPI. Each GitHub Release also
 lists the pull requests it contains.
 
+## 0.11.1
+
+Changes since 0.11.0.
+
+### Faster Health across many catalogues
+
+Health given many `--catalogue` values spends far less time authenticating and
+discovering. Over 500 catalogues, Health completed in five to seven minutes.
+
+- A Session reuses one token per credential and audience, renewing it as it
+  expires, instead of asking the credential again for every SQL connection and
+  REST client. Concurrent readers share one acquisition.
+- Each catalogue's reads are sent as one T-SQL batch.
+- Ancestry across the joined catalogues is computed once, not once per
+  catalogue reported.
+- Discovery reuses one bounded pool of workers and HTTP connections for the
+  Session's lifetime.
+
+### Fixed
+
+- `weaver fabric environment publish` republishes into an Environment that
+  already lists external libraries. Fabric exports the list two spaces under
+  `- pip:`, and Weaver added its entries at a different depth, which Fabric
+  refused as invalid YAML. Entries are now added at the list's own depth, and
+  the versions already listed are kept.
+- Mirror from a catalogue in another workspace reads its tables in parallel,
+  up to the SQL pool size.
+- A workspace created after a Session first listed the workspaces now resolves.
+- A closed Session or discovery pool raises a Weaver error rather than a
+  Python `RuntimeError`.
+
+### Upgrading
+
+The catalogue schema is unchanged. Republish each Environment that runs Weaver
+so Fabric runs 0.11.1:
+
+```bash
+weaver fabric environment publish <environment> --workspace <workspace>
+```
+
 ## 0.11.0
 
 Changes since 0.10.0.

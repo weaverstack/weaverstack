@@ -74,7 +74,12 @@ class CatalogueConnection:
 
         if self._query_sets is None:
             return tuple(self._query(statement) for statement in statements)
-        return tuple(self._query_sets(statements))
+        sets = tuple(self._query_sets(statements))
+        if len(sets) != len(statements):
+            raise CommandError(
+                f"Catalogue returned {len(sets)} result sets for {len(statements)} queries"
+            )
+        return sets
 
     def execute(self, statement: str) -> None:
         if self._execute is None:
@@ -99,7 +104,7 @@ def catalogue_connection(session, workspace=None) -> CatalogueConnection:
         lambda statement: session.execute_tsql(
             statement, target=target, workspace=resolved
         ),
-        lambda statements: session.query_tsql_sets(
+        lambda statements: session.query_tsql_batch(
             statements, target=target, workspace=resolved
         ),
     )

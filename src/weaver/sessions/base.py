@@ -144,8 +144,12 @@ class Session(ABC):
             max_workers=4, thread_name_prefix="weaver-session"
         )
         self._owns_executor = executor is None
+        from .discovery import DiscoveryExecutor
+
+        self._discovery = DiscoveryExecutor()
         self._scopes: dict[tuple, "WorkspaceScope"] = {}
         self._scope_lock = threading.Lock()
+        self._close_lock = threading.RLock()
         self._frames: list[ReportingFrame] = []
         #: Closed reporting frames, in closing order. These record logical work;
         #: telemetry separately records physical operations.
@@ -615,6 +619,11 @@ class Session(ABC):
     ) -> Any:
         """Run a T-SQL query against a Warehouse and return its rows."""
 
+    def map_discovery(self, entries, work, *, workers):
+        """Read independent entries with reusable, bounded Session-owned workers."""
+
+        return self._discovery.map(entries, work, workers=workers)
+
     def query_tsql_sets(
         self,
         statements: Sequence[str],
@@ -644,6 +653,26 @@ class Session(ABC):
         workers = min(len(statements), DEFAULT_MAX_CONNECTIONS)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             return tuple(pool.map(query, statements))
+
+    def query_tsql_batch(
+        self,
+        statements: Sequence[str],
+        *,
+        target: Any,
+        workspace: Workspace | None = None,
+    ) -> tuple[tuple[Any, ...], ...]:
+        """Run independent SELECTs in one batch, retaining each result set."""
+
+        if not statements:
+            return ()
+        sets = self.sql_executor(target, workspace=workspace).query_result_sets(
+            ";\n".join(statements) + ";"
+        )
+        if len(sets) != len(statements):
+            raise CommandError(
+                f"SQL batch returned {len(sets)} result sets for {len(statements)} queries"
+            )
+        return sets
 
     def query_tsql_limited(
         self,
@@ -948,7 +977,17 @@ class Session(ABC):
         releases its resources.
         """
 
-        self.stop_presenting()
+        self._discovery.assert_can_close()
+        with self._close_lock:
+            self._close_owned()
+
+    def _close_owned(self) -> None:
+        self._discovery.drain()
+        try:
+            self.stop_presenting()
+        except Exception:
+            self._discovery.resume_admission()
+            raise
         with self._scope_lock:
             if self._closed or self._draining:
                 return
@@ -966,8 +1005,10 @@ class Session(ABC):
         if failures:
             with self._scope_lock:
                 self._draining = False
+            self._discovery.resume_admission()
             raise failures[0]
 
+        self._discovery.close()
         with self._scope_lock:
             self._flushers.clear()
             self._closed = True

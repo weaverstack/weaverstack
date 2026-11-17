@@ -39,6 +39,27 @@ def test_public_dry_run_returns_the_real_plan_without_execution(tmp_path, monkey
 
 
 @weaver_test()
+def test_an_empty_dry_run_plan_counts_zero_actions():
+    from types import SimpleNamespace
+
+    from weaver.operations.build import BuildResult
+
+    empty = SimpleNamespace(to_mapping=lambda: {"actions": [], "no_op": True})
+    result = BuildResult(
+        source=".",
+        items=("Lakehouse/Sales",),
+        bundle_id="b",
+        installation=False,
+        bundle_path=None,
+        status="succeeded",
+        dry_run=True,
+        preview=empty,
+    )
+    mapping = result.to_mapping()
+    assert mapping["actions"] == {"total": 0} and mapping["preview"]["no_op"]
+
+
+@weaver_test()
 def test_cli_accepts_dry_run_and_json():
     args = build_parser().parse_args(["build", ".", "--dry-run", "--json"])
     assert args.dry_run and args.json and not args.bundle_only
@@ -135,6 +156,8 @@ def test_cli_drives_the_public_api_and_prints_preview(
             mapping["dry_run"]
             and mapping["preview"]["plan"]["bundle_id"] == mapping["bundle_id"]
         )
+        assert mapping["actions"] == {"total": len(mapping["preview"]["actions"])}
+        assert mapping["actions"]["total"] > 0 and not mapping["preview"]["no_op"]
     else:
         assert "Build plan (dry run)" in output and "Reporting_Dev" in output
     assert not session.semantic_model("Reporting_Dev").calls

@@ -9,6 +9,7 @@ previous shape never modelled.
 
 from __future__ import annotations
 
+import pytest
 from support.weaver_test import weaver_test
 
 from weaver.fabric.auth import TokenProvider, token_source
@@ -110,6 +111,60 @@ def test_the_credential_is_built_once_and_kept(monkeypatch):
 
     assert credential.calls == 1
     assert provider._credential() is credential
+
+
+@pytest.mark.parametrize("renew", [False, True])
+@weaver_test()
+def test_concurrent_callers_acquire_one_token(monkeypatch, renew):
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    now, advance = _clock()
+    monkeypatch.setattr("time.time", now)
+    calls = []
+    ready = Barrier(8)
+
+    class Credential:
+        def get_token(self, scope):
+            calls.append(scope)
+            time.sleep(0.05)  # Hold acquisition open while the other callers arrive.
+            return _Acquired("shared", now() + 3600)
+
+    provider = TokenProvider("scope", Credential())
+    if renew:
+        provider()
+        advance(3600)
+        calls.clear()
+
+    def acquire(_):
+        ready.wait(timeout=5)
+        return provider()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        assert list(pool.map(acquire, range(8))) == ["shared"] * 8
+    assert calls == ["scope"]
+
+
+@weaver_test()
+def test_a_failed_acquisition_does_not_poison_the_shared_provider(monkeypatch):
+    now, _ = _clock()
+    monkeypatch.setattr("time.time", now)
+    calls = []
+
+    class Credential:
+        def get_token(self, scope):
+            calls.append(scope)
+            if len(calls) == 1:
+                raise RuntimeError("credential unavailable")
+            return _Acquired("recovered", now() + 3600)
+
+    provider = TokenProvider("scope", Credential())
+    with pytest.raises(RuntimeError, match="credential unavailable"):
+        provider()
+    assert provider() == "recovered"
+    assert provider() == "recovered"
+    assert calls == ["scope", "scope"]
 
 
 # --- what a caller may supply -------------------------------------------------

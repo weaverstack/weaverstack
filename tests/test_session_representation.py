@@ -38,6 +38,107 @@ def _fabric(name="A_Workspace") -> Workspace:
     return Workspace(workspace=name, catalogue="Warehouse/Weaver", environment="weaver")
 
 
+@weaver_test()
+def test_workspace_scopes_discover_the_directory_only_once(monkeypatch):
+    from weaver.fabric.client import FabricClient
+
+    calls = []
+
+    def directory(client, path, **kwargs):
+        assert path == "workspaces"
+        calls.append(path)
+        return [
+            {"id": "workspace-one", "displayName": "one"},
+            {"id": "workspace-two", "displayName": "two"},
+        ]
+
+    monkeypatch.setattr(FabricClient, "paged", directory)
+    credential = SimpleNamespace(get_token=lambda scope: None)
+    with ConsoleSession(credential=credential) as session:
+        assert session.resolver(_other("one")).workspace.id == "workspace-one"
+        assert session.resolver(_other("two")).workspace.id == "workspace-two"
+
+    assert calls == ["workspaces"]
+
+
+@weaver_test()
+def test_storage_scopes_share_the_sessions_credential_and_provider(monkeypatch):
+    from weaver.fabric.auth import STORAGE_SCOPE
+
+    calls = []
+    credential = SimpleNamespace(
+        get_token=lambda scope: (
+            calls.append(scope) or SimpleNamespace(token="explicit", expires_on=1e12)
+        )
+    )
+    default = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="default", expires_on=1e12)
+    )
+    monkeypatch.setattr("weaver.fabric.auth.credential", lambda: default)
+    with ConsoleSession(credential=credential) as session:
+        first = session.scope(_other("one")).transport_store
+        second = session.scope(_other("two")).transport_store
+        assert first.token == second.token == "explicit"
+    assert calls == [STORAGE_SCOPE]
+
+
+@weaver_test()
+def test_workspace_scopes_share_one_token_provider_per_credential_audience():
+    from weaver.fabric.auth import SQL_SCOPE
+
+    calls = []
+
+    def acquire(scope):
+        calls.append(scope)
+        return SimpleNamespace(token="test-token", expires_on=1e12)
+
+    credential = SimpleNamespace(get_token=acquire)
+    with ConsoleSession(credential=credential) as session:
+        first = session.scope(_other("one")).token_provider(SQL_SCOPE)
+        second = session.scope(_other("two")).token_provider(SQL_SCOPE)
+        assert first() == second() == "test-token"
+
+    assert calls == [SQL_SCOPE]
+
+
+@weaver_test()
+def test_session_token_cache_keeps_audiences_separate():
+    from weaver.fabric.auth import FABRIC_SCOPE, SQL_SCOPE
+
+    calls = []
+
+    def acquire(scope):
+        calls.append(scope)
+        return SimpleNamespace(token=scope, expires_on=1e12)
+
+    with ConsoleSession(credential=SimpleNamespace(get_token=acquire)) as session:
+        first = session.scope(_other("one"))
+        second = session.scope(_other("two"))
+        assert first.token_provider(SQL_SCOPE)() == SQL_SCOPE
+        assert second.token_provider(FABRIC_SCOPE)() == FABRIC_SCOPE
+        assert second.token_provider(SQL_SCOPE)() == SQL_SCOPE
+        assert first.token_provider(FABRIC_SCOPE)() == FABRIC_SCOPE
+    assert calls == [SQL_SCOPE, FABRIC_SCOPE]
+
+
+@weaver_test()
+def test_a_new_session_does_not_reuse_another_sessions_token():
+    from weaver.fabric.auth import SQL_SCOPE
+
+    calls = []
+
+    def acquire(scope):
+        calls.append(scope)
+        return SimpleNamespace(token=f"identity-{len(calls)}", expires_on=1e12)
+
+    credential = SimpleNamespace(get_token=acquire)
+    with ConsoleSession(credential=credential) as first:
+        assert first.scope(_other()).token_provider(SQL_SCOPE)() == "identity-1"
+    with ConsoleSession(credential=credential) as second:
+        assert second.scope(_other()).token_provider(SQL_SCOPE)() == "identity-2"
+    assert calls == [SQL_SCOPE, SQL_SCOPE]
+
+
 # --- identity ---------------------------------------------------------------
 
 

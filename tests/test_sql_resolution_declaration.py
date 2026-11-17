@@ -18,7 +18,7 @@ class Client:
     def paged(self, path):
         if path == "workspaces":
             return [{"id": "workspace-id", "displayName": "Analytics"}]
-        assert path == "workspaces/workspace-id/items?type=Warehouse"
+        assert path == "workspaces/workspace-id/warehouses"
         return [
             {
                 "id": "warehouse-id",

@@ -287,7 +287,7 @@ def _require_sources(opened, base, places, mode):
 
         return retried(attempt, session=opened, workspace=workspace)
 
-    outcomes = concurrently(places, read)
+    outcomes = concurrently(places, read, session=opened)
     failed = [
         str(each) if isinstance(each, CommandError) else f"{place[0]}: {each}"
         for place, each in zip(places, outcomes)

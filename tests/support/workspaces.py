@@ -66,8 +66,12 @@ class InventoryClient:
                 }
             ]
         route, _, query = path.partition("?")
-        if route.endswith("/items"):
-            wanted = query.partition("type=")[2] or None
+        if route.endswith(("/items", "/warehouses")):
+            wanted = (
+                WAREHOUSE_TYPE
+                if route.endswith("/warehouses")
+                else query.partition("type=")[2] or None
+            )
             return [
                 {
                     "id": _identifier(kind, name),

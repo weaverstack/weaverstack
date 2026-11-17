@@ -195,7 +195,21 @@ class LoadRunReport(ReportAlias):
             "order": list(self.order),
             "edges": [list(edge) for edge in self.edges],
             "nodes": [node.to_mapping() for node in self.nodes],
+            "totals": self.totals(),
             "messages": [message.to_mapping() for message in self.messages],
+        }
+
+    def totals(self) -> dict[str, int]:
+        """Node counts by status, over this run's whole status vocabulary."""
+
+        statuses = VALIDATION_STATUSES if self.dry_run else EXECUTION_STATUSES
+        return {
+            "planned": len(self.nodes),
+            "executed": sum(node.executed for node in self.nodes),
+            **{
+                status: sum(node.status == status for node in self.nodes)
+                for status in statuses
+            },
         }
 
     @classmethod

@@ -6,12 +6,14 @@ import base64
 from pathlib import Path
 
 import pytest
+import yaml
 from support.weaver_test import weaver_test
 
 from weaver.errors import CommandError
 from weaver.fabric.environment_definition import (
     CUSTOM_LIBRARIES,
     DESKTOP_ONLY,
+    DISTRIBUTION,
     EXTERNAL_LIBRARIES,
     PLATFORM,
     SPARK_COMPUTE,
@@ -538,3 +540,125 @@ def test_what_cannot_be_proved_is_left_alone(written):
     )
 
     assert entries == (written,)
+
+
+# --- the indentation Fabric writes --------------------------------------------
+
+#: ``exportExternalLibraries`` as Fabric returns it: entries two spaces under a
+#: ``- pip:`` at the left margin.
+FABRIC_EXPORT = (
+    "dependencies:\n"
+    "- pip:\n"
+    "  - deltalake==1.6.6\n"
+    "  - mssql-python==1.14.0\n"
+    "  - pyyaml==6.0.3\n"
+    "  - openpyxl==3.1.5\n"
+)
+
+#: The same list with the entries four spaces under the header.
+DEEP_EXPORT = (
+    "dependencies:\n"
+    "- pip:\n"
+    "    - deltalake==1.6.6\n"
+    "    - mssql-python==1.14.0\n"
+    "    - pyyaml==6.0.3\n"
+    "    - openpyxl==3.1.5\n"
+)
+
+
+def _indents(text: str) -> set[str]:
+    """The indentation of every pip entry in ``text``."""
+
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip() == "- pip:")
+    header = len(lines[start]) - len(lines[start].lstrip())
+    found = set()
+    for line in lines[start + 1 :]:
+        indent = len(line) - len(line.lstrip())
+        if line.strip() and indent <= header:
+            break
+        if line.strip():
+            found.add(line[:indent])
+    return found
+
+
+@weaver_test()
+@pytest.mark.parametrize(
+    ("text", "indent"), [(FABRIC_EXPORT, "  "), (DEEP_EXPORT, "    ")]
+)
+def test_a_republish_keeps_the_existing_pip_entries_and_their_indentation(text, indent):
+    """Fabric's own export is edited in place, whatever its entries' depth."""
+
+    result = development_external_libraries(
+        text,
+        requirements=("deltalake>=1.0", "pyyaml>=6", "sqlparse>=0.5"),
+        source="x",
+    )
+
+    entries = yaml.safe_load(result)["dependencies"][0]["pip"]
+    assert entries == [
+        "deltalake==1.6.6",
+        "mssql-python==1.14.0",
+        "pyyaml==6.0.3",
+        "openpyxl==3.1.5",
+        "sqlparse>=0.5",
+    ]
+    assert _indents(result) == {indent}
+    assert weaver_requirement(entries) is None
+
+
+@weaver_test()
+@pytest.mark.parametrize("text", [FABRIC_EXPORT, DEEP_EXPORT])
+def test_a_released_republish_adds_weaver_at_the_existing_indentation(text):
+    result = released_external_libraries(text, source="x", version="0.9.0")
+
+    entries = yaml.safe_load(result)["dependencies"][0]["pip"]
+    assert entries[:4] == yaml.safe_load(text)["dependencies"][0]["pip"]
+    assert entries[4:] == [f"{DISTRIBUTION}==0.9.0"]
+    assert len(_indents(result)) == 1
+
+
+@weaver_test()
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "dependencies:\n- pip:\n",
+        "dependencies:\n  - pip:\n",
+        "dependencies:\n- python=3.11\n",
+        "dependencies:\n  - python=3.11\n",
+        "channels:\n- conda-forge\n",
+    ],
+)
+def test_a_new_or_empty_pip_list_is_written_consistently(text):
+    result = development_external_libraries(
+        text, requirements=("pyyaml>=6", "sqlparse>=0.5"), source="x"
+    )
+
+    dependencies = yaml.safe_load(result)["dependencies"]
+    pip = next(entry["pip"] for entry in dependencies if isinstance(entry, dict))
+    assert pip == ["pyyaml>=6", "sqlparse>=0.5"]
+    assert len(_indents(result)) == 1
+
+
+@weaver_test()
+def test_a_comment_inside_fabrics_list_survives():
+    text = (
+        "dependencies:\n"
+        "- pip:\n"
+        "  # pinned for the parser\n"
+        "  - pyyaml==6.0.3\n"
+        "  - --index-url https://packages.invalid/simple\n"
+    )
+
+    result = development_external_libraries(
+        text, requirements=("pyyaml>=6", "sqlparse>=0.5"), source="x"
+    )
+
+    assert "  # pinned for the parser\n" in result
+    assert "  - --index-url https://packages.invalid/simple\n" in result
+    assert yaml.safe_load(result)["dependencies"][0]["pip"] == [
+        "pyyaml==6.0.3",
+        "--index-url https://packages.invalid/simple",
+        "sqlparse>=0.5",
+    ]

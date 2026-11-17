@@ -46,6 +46,27 @@ class Item:
         return f"{self.type} {self.name} ({self.id})"
 
 
+class WorkspaceDirectory:
+    """One lazy directory snapshot shared by a Session's workspace resolvers."""
+
+    def __init__(self) -> None:
+        import threading
+
+        self._lock = threading.Lock()
+        self._entries = None
+
+    def read(self, *, client: FabricClient, name: str | None = None):
+        """The snapshot, listed again once when it does not show ``name``."""
+
+        with self._lock:
+            if self._entries is None or (
+                name is not None
+                and not any(entry.get("displayName") == name for entry in self._entries)
+            ):
+                self._entries = tuple(client.paged("workspaces"))
+            return self._entries
+
+
 def find_workspace(
     name: str, *, client: FabricClient | None = None, workspaces=None
 ) -> WorkspaceItem:
@@ -338,6 +359,10 @@ def _request(handle: dict, batch, client: FabricClient) -> dict:
         "status": "Running",
     }
     if started["done"]:
+        started["failed_tables"] = {
+            **handle.get("failed_tables", {}),
+            **_failed_tables(response),
+        }
         return _next({**started, "status": _refresh_status(response)}, client)
     operation = accepted_operation(response)
     return {
@@ -386,6 +411,23 @@ def refresh_details(refresh: dict) -> dict:
         key: refresh[key]
         for key in ("lakehouse", "sql_endpoint_id", "operation_id", "status")
     }
+
+
+def _failed_tables(response) -> dict[str, str]:
+    """``Schema.Table`` to Fabric's reason, for each table a refresh could not sync."""
+
+    body = response.json() if response.content else {}
+    rows = body.get("value") if isinstance(body, dict) else None
+    failed = {}
+    for row in rows if isinstance(rows, list) else ():
+        if not isinstance(row, dict) or row.get("status") != "Failure":
+            continue
+        error = row.get("error") if isinstance(row.get("error"), dict) else {}
+        reason = ": ".join(
+            str(part) for part in (error.get("errorCode"), error.get("message")) if part
+        )
+        failed[str(row.get("tableName"))] = reason or "Failure"
+    return failed
 
 
 def _refresh_status(response) -> str:

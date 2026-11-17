@@ -147,6 +147,39 @@ LOAD_OUTPUTS = (
 
 
 @weaver_test()
+def test_query_result_sets_retains_empty_ordinals_and_distinct_columns():
+    cursor = MultiSetCursor(
+        [
+            ([], ["empty_first"]),
+            ([(False, "Table")], ["enabled", "word"]),
+            ([], ["last"]),
+        ]
+    )
+    connection = Connection(cursor)
+    executor, _ = _executor([connection])
+    sets = executor.query_result_sets("select first; select middle; select last")
+    assert sets == ((), ({"enabled": False, "word": "Table"},), ())
+    assert cursor.closed
+    assert connection.commits == 1
+
+
+@weaver_test()
+def test_result_set_transition_error_discards_partial_rows_and_closes_resources():
+    class BrokenNextSet(MultiSetCursor):
+        def nextset(self):
+            raise ValueError("second SELECT failed")
+
+    cursor = BrokenNextSet([([(1,)], ["first"])])
+    connection = Connection(cursor)
+    executor, _ = _executor([connection])
+    with pytest.raises(SqlExecutionError, match="second SELECT failed"):
+        executor.query_result_sets("select first; broken second")
+    assert cursor.closed
+    assert connection.closed
+    assert connection.rollbacks == 1
+
+
+@weaver_test()
 def test_call_procedure_declares_locals_and_passes_them_as_outputs():
     cursor = MultiSetCursor(
         [([(True, 4, None)], ["succeeded", "rows_read", "error_message"])]

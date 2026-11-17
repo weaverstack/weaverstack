@@ -115,7 +115,9 @@ def _backoff(delay: float, deadline: float | None) -> None:
     time.sleep(delay if deadline is None else min(delay, _remaining(deadline)))
 
 
-def send(method: str, url: str, *, deadline: float | None = None, **kwargs):
+def send(
+    method: str, url: str, *, deadline: float | None = None, requester=None, **kwargs
+):
     """One HTTP request, retried while the failure is safe to repeat.
 
     A read can always be repeated. Anything else only when the connection was
@@ -136,7 +138,7 @@ def send(method: str, url: str, *, deadline: float | None = None, **kwargs):
                 "timeout": remaining if timeout is None else min(timeout, remaining),
             }
         try:
-            return requests.request(method, url, **options)
+            return (requester or requests.request)(method, url, **options)
         except requests.exceptions.RequestException as exc:
             repeatable = method in READ_METHODS or never_sent(exc)
             if not repeatable or attempt == CONNECTION_ATTEMPTS:
@@ -179,10 +181,12 @@ class FabricClient:
         token: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         telemetry=None,
+        requester=None,
     ) -> None:
         self.api_base_url = api_base_url.rstrip("/")
         self.timeout = timeout
         self.telemetry = telemetry
+        self._requester = requester
         self._token_source = token_source(token, scope=FABRIC_SCOPE)
 
     def authenticate(self) -> dict:
@@ -238,6 +242,11 @@ class FabricClient:
                     },
                     data=json.dumps(payload) if payload is not None else None,
                     timeout=self.timeout if timeout is None else timeout,
+                    **(
+                        {"requester": self._requester}
+                        if self._requester is not None
+                        else {}
+                    ),
                 )
             except requests.exceptions.RequestException as exc:
                 error = FabricError if never_sent(exc) else FabricOutcomeUnknown

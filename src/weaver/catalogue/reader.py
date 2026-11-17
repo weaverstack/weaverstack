@@ -55,11 +55,10 @@ def read_tables(catalogue: Any, tables: Sequence[CatalogueTable]) -> dict:
     present = [table for table in tables if statements[table.name] is not None]
     wanted = [statements[table.name] for table in present]
     row_sets = getattr(catalogue, "row_sets", None)
-    sets = (
-        row_sets(wanted)
-        if row_sets is not None
-        else [catalogue.rows(statement) for statement in wanted]
-    )
+    if row_sets is not None:
+        sets = row_sets(wanted)
+    else:
+        sets = [catalogue.rows(statement) for statement in wanted]
     read = {table.name: () for table in tables}
     for table, rows in zip(present, sets):
         read[table.name] = tuple(_internal(table, row) for row in rows)

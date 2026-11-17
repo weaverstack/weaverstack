@@ -18,6 +18,7 @@ FIELD, ROW, TABLE, LESS = "", "", "", ""
 
 #: The data each page measure concatenates, in order.
 PAGES = {
+    "workspaces": ("catalogue", "estate"),
     "overview": ("catalogue", "graph", "status", "workflow", "build"),
     "health": ("catalogue", "graph", "status", "workflow", "build"),
     "orchestration": ("catalogue", "graph", "status", "workflow"),
@@ -1006,7 +1007,110 @@ def semantic(rows, at) -> str:
     )
 
 
+def _owner(node_id: str) -> str:
+    """The item a node ID names: its first two path parts."""
+
+    return "/".join(node_id.split("/")[:2])
+
+
+def estate(rows, at) -> str:
+    """Per item counts and cross-item dependencies, as the Estate data measure
+    returns them for the Workspaces page."""
+
+    nodes = [r for r in _rows(rows, "LineageNode") if not r["is_internal"]]
+    visible = {r["node_key"] for r in nodes}
+    objects: dict[str, int] = {}
+    for r in nodes:
+        objects[r["item_label"]] = objects.get(r["item_label"], 0) + 1
+    between: set[tuple[str, str, str, str]] = set()
+    for r in _rows(rows, "LineageEdge"):
+        if r["edge_kind"] not in ("Dependency", "Shortcut"):
+            continue
+        through = r.get("through_node_key")
+        up = through or r["upstream_node_key"]
+        up_id = r["through_node_id"] if through else r["upstream_node_id"]
+        down = r["downstream_node_key"]
+        if up not in visible or down not in visible:
+            continue
+        up_item, down_item = _owner(up_id), _owner(r["downstream_node_id"])
+        if up_item != down_item:
+            between.add((down, up, down_item, up_item))
+    itemedges: dict[tuple[str, str], int] = {}
+    for _down, _up, down_item, up_item in between:
+        key = (up_item, down_item)
+        itemedges[key] = itemedges.get(key, 0) + 1
+    failing = ("Failed", "Error", "Blocked")
+    loads: dict[str, list[int]] = {}
+    for r in _rows(rows, "LoadStatus"):
+        c = loads.setdefault(item(r), [0, 0, 0])
+        c[0] += 1
+        c[1] += r.get("result") in failing
+        c[2] += r.get("result") == "Pending"
+    tests: dict[str, list[int]] = {}
+    for r in _rows(rows, "TestStatus"):
+        c = tests.setdefault(item(r), [0, 0])
+        c[0] += 1
+        c[1] += r.get("result") in failing
+    shortcuts = [
+        r
+        for r in _rows(rows, "Shortcut")
+        if r.get("target_type") == "Physical"
+        and r.get("schema_name") not in ("_", "Tables/_")
+    ]
+    return (
+        table(
+            "itemobjects",
+            ("item", "objects"),
+            [(k, str(v)) for k, v in sorted(objects.items())],
+        )
+        + table(
+            "itemedges",
+            ("up", "down", "count"),
+            [(up, down, str(n)) for (up, down), n in sorted(itemedges.items())],
+        )
+        + table(
+            "itemloads",
+            ("item", "loads", "failed", "pending"),
+            [(k, *map(str, v)) for k, v in sorted(loads.items())],
+        )
+        + table(
+            "itemtests",
+            ("item", "tests", "failed"),
+            [(k, *map(str, v)) for k, v in sorted(tests.items())],
+        )
+        + table(
+            "shortcuts",
+            (
+                "item",
+                "schema",
+                "object",
+                "type",
+                "workspace",
+                "targettype",
+                "target",
+                "targetschema",
+                "targetobject",
+            ),
+            [
+                (
+                    item(r),
+                    text(r.get("schema_name")),
+                    text(r.get("object_name")),
+                    text(r.get("shortcut_type")),
+                    text(r.get("target_workspace_name")),
+                    text(r.get("target_item_type")),
+                    text(r.get("target_item_name")),
+                    text(r.get("target_schema_name")),
+                    text(r.get("target_object_name")),
+                )
+                for r in shortcuts
+            ],
+        )
+    )
+
+
 BLOCKS = {
+    "estate": estate,
     "catalogue": catalogue,
     "graph": graph,
     "status": status,

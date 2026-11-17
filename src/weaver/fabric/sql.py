@@ -27,6 +27,7 @@ def desktop_sql_pool(
     resolver=None,
     max_connections: int = DEFAULT_MAX_CONNECTIONS,
     connection_factory=None,
+    token_provider=None,
 ) -> SqlConnectionPool:
     from ..resolution import resolver_for
     from ..sql.connection import connect
@@ -35,7 +36,11 @@ def desktop_sql_pool(
     endpoint = (
         target if isinstance(target, SqlEndpoint) else resolver.sql_endpoint(target)
     )
-    authentication = AccessTokenAuthentication(lambda: get_token(SQL_SCOPE, credential))
+    authentication = AccessTokenAuthentication(
+        token_provider
+        if token_provider is not None
+        else lambda: get_token(SQL_SCOPE, credential)
+    )
     return SqlConnectionPool(
         endpoint,
         authentication,

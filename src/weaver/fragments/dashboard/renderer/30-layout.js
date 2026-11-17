@@ -227,7 +227,7 @@ function focusWindow(m, selection, upDepth, downDepth, expanded, within, whole) 
   else within.forEach(function (k) { if (m.nodes.has(k)) lineage.set(k, 0); });
   var shown = new Set(lineage.keys()), added = new Set();
   (expanded || []).forEach(function (k) {
-    if (m.nodes.has(k) && !shown.has(k) && added.size < BUDGET.EXPANDED) { shown.add(k); added.add(k); }
+    if (m.nodes.has(k) && (!within || within.has(k)) && !shown.has(k) && added.size < BUDGET.EXPANDED) { shown.add(k); added.add(k); }
   });
   var edges = [], plain = [];
   shown.forEach(function (d) {
@@ -243,7 +243,8 @@ function focusWindow(m, selection, upDepth, downDepth, expanded, within, whole) 
   var more = new Map(), hidden = new Set();
   shown.forEach(function (k) {
     var n = m.nodes.get(k);
-    var up = n.vup.filter(function (j) { return !shown.has(j); }), down = n.vdown.filter(function (j) { return !shown.has(j); });
+    var outside = function (j) { return !shown.has(j) && (!within || within.has(j)); };
+    var up = n.vup.filter(outside), down = n.vdown.filter(outside);
     up.concat(down).forEach(function (j) { hidden.add(j); });
     if (up.length || down.length) more.set(k, { up: up, down: down });
   });

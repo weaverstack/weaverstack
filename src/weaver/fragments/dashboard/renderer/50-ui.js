@@ -454,9 +454,11 @@ function objectKey(m, plain) {
 function pageKey(m) { return el("div", { "class": "wd-legend wd-page-key" }, objectKey(m)); }
 
 /* plain leaves the item out, for a table that shows it in a column of its own. */
-function nodeLink(m, key, onOpen, plain) {
-  var n = m.nodes.get(key);
-  return el("button", { "class": "wd-link" + changeClass(n), type: "button", title: shownItem(n.item) + " · " + qualified(n), onclick: function () { onOpen(key); } },
+function nodeLink(m, key, onOpen, plain, within) {
+  var n = m.nodes.get(key), active = !within || within.has(key);
+  var attrs = { "class": (active ? "wd-link" : "wd-reference") + changeClass(n), title: shownItem(n.item) + " · " + qualified(n) + (active ? "" : " · Outside selected items") };
+  if (active) { attrs.type = "button"; attrs.onclick = function () { onOpen(key); }; }
+  return el(active ? "button" : "span", attrs,
     [kindMark(n.kind), n.label, changeMark(n), plain ? null : el("span", { "class": "wd-link-meta", text: shownName(n.item) })]);
 }
 
@@ -466,6 +468,7 @@ function details(panel, m, key, options) {
   var n = m.nodes.get(key);
   if (!n) { panel.appendChild(empty(options.emptyText || "Select an object to see its details.")); return; }
   var open = options.onOpen || function () {};
+  function link(k) { return nodeLink(m, k, open, false, options.within); }
   panel.appendChild(el("div", { "class": "wd-eyebrow" }, [kindMark(n.kind), " " + n.kind]));
   panel.appendChild(el("h2", { "class": "wd-detail-title", text: n.label }));
   panel.appendChild(el("div", { "class": "wd-mono wd-muted", text: shownItem(n.item) + " · " + qualified(n) }));
@@ -489,10 +492,10 @@ function details(panel, m, key, options) {
   }
   // The other side of a mirror: the source this copy came from, or the copies of this source.
   var FROM = { borrowed: "Borrowed from", changed: "Changed from" }, IN = { borrowed: "Borrowed by", changed: "Changed in" };
-  if (n.original) fact(FROM[n.change] || "Same code as", nodeLink(m, n.original.key, open));
+  if (n.original) fact(FROM[n.change] || "Same code as", link(n.original.key));
   else if (n.change === CHANGE.BORROWED) fact("Borrowed from", el("span", { "class": "wd-muted", text: "Its source's catalogue is not read" }));
   else if (n.change === CHANGE.ADDED) fact("Added", el("span", { "class": "wd-muted", text: "Not in the catalogue mirrored" }));
-  (n.copies || []).forEach(function (c) { fact(IN[c.change] || "Rebuilt in", nodeLink(m, c.key, open)); });
+  (n.copies || []).forEach(function (c) { fact(IN[c.change] || "Rebuilt in", link(c.key)); });
   if (n.built) fact("Built", stamp(n.built));
   if (n.isStatic) fact("Static", "Loaded once");
   panel.appendChild(facts);
@@ -511,7 +514,7 @@ function details(panel, m, key, options) {
     panel.appendChild(el("h3", { "class": "wd-h3", text: "Tests and Assumptions" }));
     panel.appendChild(el("ul", { "class": "wd-list" }, validations.map(function (d) {
       var t = m.nodes.get(d);
-      return el("li", {}, [nodeLink(m, d, open), el("span", { "class": "wd-grow" }), carries ? chip(t.test ? t.test.result : null, t.test ? null : "Not run") : null]);
+      return el("li", {}, [link(d), el("span", { "class": "wd-grow" }), carries ? chip(t.test ? t.test.result : null, t.test ? null : "Not run") : null]);
     })));
   }
   [["Reads", n.vup.filter(function (u) { return !isValidation(m.nodes.get(u)); })],
@@ -519,7 +522,7 @@ function details(panel, m, key, options) {
     if (!pair[1].length) return;
     var sorted = pair[1].slice().sort(function (a, b) { return compare(m.nodes.get(a).label, m.nodes.get(b).label); });
     panel.appendChild(el("h3", { "class": "wd-h3", text: pair[0] + " · " + pair[1].length }));
-    panel.appendChild(el("ul", { "class": "wd-list" }, sorted.slice(0, 40).map(function (k) { return el("li", {}, [nodeLink(m, k, open)]); })
+    panel.appendChild(el("ul", { "class": "wd-list" }, sorted.slice(0, 40).map(function (k) { return el("li", {}, [link(k)]); })
       .concat(sorted.length > 40 ? [el("li", { "class": "wd-muted", text: (sorted.length - 40) + " more" })] : [])));
   });
   if (n.missing.length) {

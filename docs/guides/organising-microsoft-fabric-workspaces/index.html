@@ -235,12 +235,13 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 </figure>
 
 <h2 id="conclusion">7. Conclusion</h2>
-<p>With the dependency and load records connected, teams can keep sharing data through Fabric as their number grows: each team keeps its project, catalogue and schedule, and the organisation can still see and recover across all of them.</p>
+<p>Coordinating work across Fabric workspaces is a common challenge once teams start sharing data. Each team owns its own project and schedule, but a failure in one workspace can reach tables and reports in many others, and no single team's job history shows how far.</p>
+<p>Weaver helps by connecting the records each team already keeps: what each table reads, and what happened when it last loaded. Each team keeps its project, catalogue and schedule, and the organisation can see across all of them when it needs to.</p>
 <ol class="implementation-steps">
 <li><strong>If you own a shared source:</strong><span>See every team that depends on it, and coordinate the recovery.</span></li>
 <li><strong>If you consume one:</strong><span>See what held up your work, and catch it up when you are ready.</span></li>
 </ol>
-<p>The same records support a single team's recovery and an organisation-wide run, so coordination does not require a shared deployment.</p>
+<p>Across 500 workspaces, that meant tracing one failed central table to 752 downstream objects in minutes, and letting each team recover its own work without waiting for the rest.</p>
 <p>See <a href="/how-it-works/">how Weaver works</a>, then the <a href="https://docs.weaverstack.dev/">documentation</a>.</p>
 
 <h2 id="references">References</h2>

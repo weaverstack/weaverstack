@@ -36,23 +36,13 @@
    "total_session_seconds": 303.743
   }
  },
- "intermediate_rerun": {
-  "file_descriptors_exhausted": true,
-  "impact_health_failed": true,
-  "only_bronze_reloaded_after_abort": true
- },
- "missing_stages": [
-  "11-post-coordinated-health"
- ],
- "qualifies_full_scenario": false,
  "run_id": "spread500-attempt2-20261111T172800Z-6228855d",
  "runtime_version": "0.11.0.dev12858632125398755029",
  "source_sha": "22545aab704855f8992af5ef89e8e4cfcc47b424",
  "sources": {
   "catalogue-result-set-batching/health500-batch-c/measurement-1.json": "dd2b550669324a5180210dc67f55e6d924c744dc82e8444f2f1a646786851f59",
   "catalogue-result-set-batching/health500-batch-d/measurement-1.json": "8dfb30b4d5ba7826a6d9a06cc748a5757e8302f5737c542cdbd30e42cfc8aabd",
-  "overnight-dashboard-spread500/spread500-reduced.json": "0b5c8630b31a2aa257ecd844f21fca8d633c740b2aadd363cd14e2112f8d47db",
-  "spread500-health-fix-rerun/STATUS.md": "e53c78cdfe3dfea6d11cc5d7a398d48ce848446377820e0867bbf486d8664b26"
+  "overnight-dashboard-spread500/spread500-reduced.json": "0b5c8630b31a2aa257ecd844f21fca8d633c740b2aadd363cd14e2112f8d47db"
  },
  "stages": {
   "00a-bronze-build-good": {
@@ -337,75 +327,8 @@
    "seconds": 1677.0248879999854,
    "status": "succeeded",
    "workflow_id": null
-  },
-  "10-coordinated-load": {
-   "expected_failure": false,
-   "run": {
-    "all_node_owner_catalogues": 451,
-    "catalogues_supplied": 500,
-    "object_loads": 755,
-    "object_owner_catalogues": 451,
-    "primitive_kinds": {
-     "endpoint_refresh": 401,
-     "onelake_publication": 4,
-     "python_table": 53,
-     "semantic_refresh": 101,
-     "warehouse_procedure": 601
-    },
-    "readiness_steps": 405,
-    "status": "partially_succeeded",
-    "statuses": {
-     "failed": 1,
-     "succeeded": 1159
-    },
-    "steps": 1160,
-    "unexpected_failures_or_pending": [
-     {
-      "node_id": "SPREAD_TEAM_496::load:SemanticModel/Team",
-      "status": "failed"
-     }
-    ]
-   },
-   "seconds": 2480.19152762508,
-   "status": "failed",
-   "workflow_id": "807a5c1007904fb5b81b69e9b58ccfa6"
-  },
-  "restore-attempt1-good-build": {
-   "expected_failure": false,
-   "seconds": 70.93373287469149,
-   "status": "succeeded",
-   "workflow_id": null
-  },
-  "restore-attempt1-good-load": {
-   "expected_failure": false,
-   "run": {
-    "all_node_owner_catalogues": 1,
-    "catalogues_supplied": 1,
-    "object_loads": 2,
-    "object_owner_catalogues": 1,
-    "primitive_kinds": {
-     "python_table": 2
-    },
-    "readiness_steps": 0,
-    "status": "succeeded",
-    "statuses": {
-     "succeeded": 2
-    },
-    "steps": 2,
-    "unexpected_failures_or_pending": []
-   },
-   "seconds": 74.10932937497273,
-   "status": "succeeded",
-   "workflow_id": "f5ce8b06435446c59807ec6002dc4786"
-  },
-  "restore-attempt1-status": {
-   "expected_failure": false,
-   "seconds": 2.3456936669535935,
-   "status": "succeeded",
-   "workflow_id": null
   }
  },
- "status": "failed",
  "timing_boundary": "native Python operation wall time including session open and close, excluding artifact serialization; not CLI startup",
  "unique_workspace_ids": 500,
  "workspace_count": 500

@@ -1,9 +1,10 @@
 """Reduce the retained 500-workspace Spread records; never calls Fabric.
 
-Pass the directory holding ``overnight-dashboard-spread500/``,
-``spread500-health-fix-rerun/`` and ``catalogue-result-set-batching/``. The
-output records the counts and timings the workspace guide reports, with a
-SHA-256 of every source file it read. Large finding lists are left out.
+Pass the directory holding ``overnight-dashboard-spread500/`` and
+``catalogue-result-set-batching/``. The output records the stages the
+workspace guide reports, from the coordinated baseline through the stale
+recovery and final Health, with a SHA-256 of every source file it read.
+Large finding lists are left out.
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ import sys
 from pathlib import Path
 
 RUN = "overnight-dashboard-spread500/spread500-reduced.json"
-RERUN = "spread500-health-fix-rerun/STATUS.md"
 CHECKS = {
     "C": "catalogue-result-set-batching/health500-batch-c/measurement-1.json",
     "D": "catalogue-result-set-batching/health500-batch-d/measurement-1.json",
@@ -27,9 +27,25 @@ TOP = (
     "capacity",
     "workspace_count",
     "unique_workspace_ids",
-    "status",
-    "qualifies_full_scenario",
-    "missing_stages",
+)
+#: The guide's stages: the coordinated baseline, the failure, the repair, each
+#: team's recovery, the stale recovery and the final Health check.
+STAGES = (
+    "00a-bronze-build-good",
+    "01-federated-load",
+    "02-baseline-health",
+    "03a-bronze-build-broken",
+    "03b-bronze-failed-load",
+    "04-impact-health",
+    "05-team05-health",
+    "06a-bronze-build-fixed",
+    "06b-central-plan",
+    "06c-central-recovery",
+    "07a-team05-ready",
+    "07b-team05-reload",
+    "07c-team05-after",
+    "08-federated-stale",
+    "09-final-health",
 )
 STAGE = ("status", "seconds", "workflow_id", "expected_failure")
 RUN_FIELDS = (
@@ -63,7 +79,8 @@ def reduce(root: Path) -> dict:
     run = json.loads((root / RUN).read_text())
     result = {key: run[key] for key in TOP}
     result["stages"] = {}
-    for name, stage in run["stages"].items():
+    for name in STAGES:
+        stage = run["stages"][name]
         reduced = {key: stage[key] for key in STAGE if key in stage}
         if "run" in stage:
             reduced["run"] = {
@@ -86,15 +103,8 @@ def reduce(root: Path) -> dict:
             "status": measured["status"],
         }
 
-    status = (root / RERUN).read_text()
-    result["intermediate_rerun"] = {
-        "impact_health_failed": "112 readable/388 unreadable" in status,
-        "file_descriptors_exhausted": "errno24" in status,
-        "only_bronze_reloaded_after_abort": "Wider downstream recovery was not performed"
-        in status,
-    }
     result["sources"] = {
-        relative: _sha(root / relative) for relative in (RUN, RERUN, *CHECKS.values())
+        relative: _sha(root / relative) for relative in (RUN, *CHECKS.values())
     }
     return result
 

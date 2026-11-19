@@ -111,7 +111,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 </figure>
 
 <h2 id="self-service">1. How self-service grows in Fabric</h2>
-<p>Consider how data sharing usually develops once an organisation adopts Fabric. A central team loads Bronze, Silver and Gold, and publishes trusted Gold tables for the rest of the organisation. Its responsibility ends there. It may not know who reads Gold, and it often has no permission to look: Finance, HR and Risk restrict their workspaces, as they should.</p>
+<p>Consider how data sharing usually develops once an organisation adopts Fabric. A central team loads Bronze, Silver and Gold, and publishes trusted Gold tables for the rest of the organisation. Its responsibility ends there. It may not know who reads Gold, and it often has no access to their data: Finance, HR and Risk restrict their workspaces, as they should.</p>
 <p>Business teams build on Gold through <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">OneLake shortcuts</a> instead of maintaining copies. Finance builds a Warehouse, Marketing a semantic model, and Risk a Lakehouse that also reads Finance's summary. Each team loads on its own schedule, usually set a little after the central team normally finishes. On most days, that is good enough.</p>
 <p>Nobody designs the overall shape. It grows one shortcut at a time, and in time some teams read one another's data in both directions. This is what self-service is meant to produce. Teams own their data and their schedules, and the central team doesn't become a bottleneck.</p>
 
@@ -122,7 +122,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <li>Which teams' tables and reports are built on the failed data?</li>
 <li>Who should be told once it is repaired?</li>
 </ul>
-<p>Its view ends at Gold, though, and it shouldn't need access to other teams' workspaces to find out.</p>
+<p>Its view ends at Gold, though, and it shouldn't need access to other teams' data to find out.</p>
 <p>Finance needs to know about its own work:</p>
 <ul>
 <li>Are any of Finance's tables built on the failed data?</li>
@@ -160,10 +160,10 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 </dl>
 <p class="small">Times are wall-clock times for each command, including catalogue reads, planning, Spark startup where needed, execution and recording. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>
 <h3 id="central-assessment">5.1 The central team's assessment</h3>
-<p>From one failed Bronze load, the central team traced 61 Warehouse tables, five Lakehouse tables and 11 semantic models in 45 downstream workspaces, without checking job histories one team at a time. An affected object hadn't necessarily failed: it could still hold its last good result.</p>
+<p>From one failed Bronze load, the central team traced 61 Warehouse tables, five Lakehouse tables and 11 semantic models in 45 downstream workspaces, without checking job histories one team at a time. It read the business teams' catalogues to do so, but none of their data. An affected object hadn't necessarily failed: it could still hold its last good result.</p>
 <h3 id="independent-recovery">5.2 Team 05's recovery</h3>
 <p>Team 05 found the cause from its own Health report, without asking the central team. Once the central team had repaired its objects, Team 05 reloaded just its two tables with one scheduled <code>load --stale</code> command, which reads the two central catalogues for context. It didn't wait for the other business teams, and their work didn't run.</p>
-<p>Team 05 read the central catalogues; the central team didn't need to read Team 05's. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/">across-catalogue guide</a> covers the setup and permissions.</p>
+<p>Each side read the other's catalogue, and neither needed access to the other's data. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/">across-catalogue guide</a> covers the setup and permissions.</p>
 
 <h2 id="at-500-workspaces">6. Repeating the test at 500 workspaces</h2>
 <p>The same setup was then repeated at ten times the scale: three central workspaces and 497 business teams, on the same FTL64 trial capacity.</p>

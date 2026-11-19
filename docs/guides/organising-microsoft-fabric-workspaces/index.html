@@ -6,14 +6,14 @@
 <meta name="theme-color" content="#f7f7f6">
 <title>Organising Microsoft Fabric workspaces for enterprise data sharing</title>
 <meta name="keywords" content="organising Microsoft Fabric workspaces, Fabric workspace design, self-service data in Microsoft Fabric, data democratisation in Microsoft Fabric, enterprise Fabric, cross-workspace dependencies">
-<meta name="description" content="How to organise Microsoft Fabric workspaces so teams share data through OneLake, keep their own projects and schedules, and trace and recover from failures across workspaces. Tested across 50 workspaces and repeated at 500.">
+<meta name="description" content="How self-service data sharing works in Microsoft Fabric, why central schedulers don't answer what a failed load affects, and how teams can trace and recover from it independently. Tested across 50 workspaces and repeated at 500.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/">
 <meta property="og:site_name" content="Weaver">
 <meta property="og:title" content="Organising Microsoft Fabric workspaces for enterprise data sharing">
-<meta property="og:description" content="How to organise Microsoft Fabric workspaces so teams share data through OneLake, keep their own projects and schedules, and trace and recover from failures across workspaces. Tested across 50 workspaces and repeated at 500.">
+<meta property="og:description" content="How self-service data sharing works in Microsoft Fabric, why central schedulers don't answer what a failed load affects, and how teams can trace and recover from it independently. Tested across 50 workspaces and repeated at 500.">
 <meta property="og:image" content="https://weaverstack.dev/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 <meta property="og:locale" content="en_AU">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Organising Microsoft Fabric workspaces for enterprise data sharing">
-<meta name="twitter:description" content="How to organise Microsoft Fabric workspaces so teams share data through OneLake, keep their own projects and schedules, and trace and recover from failures across workspaces. Tested across 50 workspaces and repeated at 500.">
+<meta name="twitter:description" content="How self-service data sharing works in Microsoft Fabric, why central schedulers don't answer what a failed load affects, and how teams can trace and recover from it independently. Tested across 50 workspaces and repeated at 500.">
 <meta name="twitter:image" content="https://weaverstack.dev/og.png">
 <meta name="twitter:image:alt" content="Weaver: Making Fabric easier to use.">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -37,7 +37,7 @@
     {
       "@type": "TechArticle",
       "headline": "Organising Microsoft Fabric workspaces for enterprise data sharing",
-      "description": "How to organise Microsoft Fabric workspaces so teams share data through OneLake, keep their own projects and schedules, and trace and recover from failures across workspaces. Tested across 50 workspaces and repeated at 500.",
+      "description": "How self-service data sharing works in Microsoft Fabric, why central schedulers don't answer what a failed load affects, and how teams can trace and recover from it independently. Tested across 50 workspaces and repeated at 500.",
       "url": "https://weaverstack.dev/guides/organising-microsoft-fabric-workspaces/",
       "inLanguage": "en-AU",
       "author": {"@type": "Organization", "name": "Weaver contributors"},
@@ -80,24 +80,6 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 .facts-figure strong { display: block; color: var(--blue); font: 700 25px var(--mono); }
 .facts-figure span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
 .facts-figure figcaption { grid-column: 1 / -1; margin-top: 18px; color: var(--muted); font-size: 13px; }
-.name-figure { margin: 26px 0 34px; }
-.name-parts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
-.name-parts div { padding: 16px 14px; background: var(--paper); }
-.name-parts strong { display: block; color: var(--blue); font: 12px var(--mono); }
-.name-parts span { display: block; margin-top: 8px; font: 700 15px var(--mono); overflow-wrap: anywhere; }
-.name-figure figcaption { margin-top: 13px; color: var(--muted); font-size: 13px; }
-.strategy-figure { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 26px 0 42px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--line); }
-.strategy-figure div { padding: 18px; background: var(--paper); }
-.strategy-figure strong { display: block; color: var(--blue); font: 12px var(--mono); }
-.strategy-figure span { display: block; margin: 8px 0 5px; font-weight: 750; }
-.strategy-figure small { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.dashboard-guide-demo { margin: 30px 0 42px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); box-shadow: var(--shadow); }
-.dashboard-guide-demo iframe { display: block; width: 100%; height: clamp(700px, 72vw, 820px); border: 0; background: var(--white); }
-.dashboard-guide-demo figcaption { padding: 14px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
-.implementation-steps { margin: 24px 0 34px; padding: 0; list-style: none; counter-reset: implementation; border-top: 1px solid var(--line); }
-.implementation-steps li { display: grid; grid-template-columns: 230px 1fr; gap: 22px; padding: 18px 0; border-bottom: 1px solid var(--line); counter-increment: implementation; }
-.implementation-steps strong::before { content: counter(implementation, decimal-leading-zero) "  "; color: var(--blue); font: 12px var(--mono); }
-.implementation-steps span { color: var(--ink-soft); }
 .result-list { margin: 26px 0; border-top: 1px solid var(--line); }
 .result-list > div { display: grid; grid-template-columns: 1fr 2fr .7fr; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .result-list dt { font-weight: 700; }
@@ -105,7 +87,7 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 .result-list dd:last-child { color: var(--muted); }
 @media (max-width: 640px) { .result-list > div { grid-template-columns: 1fr; gap: 7px; } }
 @media (max-width: 900px) { .article-layout { grid-template-columns: 1fr; } .article-nav { position: static; order: -1; } }
-@media (max-width: 640px) { .facts-figure { grid-template-columns: repeat(2, 1fr); } .facts-figure div { padding: 12px; border-left: 0; border-top: 1px solid var(--line); } .facts-figure div:nth-child(-n+2) { border-top: 0; } .name-parts { grid-template-columns: 1fr; } .strategy-figure { grid-template-columns: 1fr; } .implementation-steps li { grid-template-columns: 1fr; gap: 7px; } .dashboard-guide-demo iframe { height: 980px; } }
+@media (max-width: 640px) { .facts-figure { grid-template-columns: repeat(2, 1fr); } .facts-figure div { padding: 12px; border-left: 0; border-top: 1px solid var(--line); } .facts-figure div:nth-child(-n+2) { border-top: 0; } }
 </style>
 </head>
 <body class="guide-article">
@@ -119,63 +101,43 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <section class="page-head"><div class="wrap">
 <p class="eyebrow"><a href="/guides/">Fabric Engineering Guides</a></p>
 <h1>Organising Microsoft Fabric workspaces for enterprise data sharing</h1>
-<p class="lead">Microsoft Fabric makes it easy for teams across your organisation to share data. As more teams build on one another's work, you also need to see how that work connects: what a failure affects, and what needs to run once it is fixed. This guide shows one way to organise Fabric workspaces with a separate project for each team, and how to trace and recover from a failure across them. It was tested across 50 workspaces and repeated at 500.</p>
+<p class="lead">Self-service in Microsoft Fabric usually grows one team at a time. A central team publishes trusted data, and business teams build on it in their own workspaces and on their own schedules. This guide looks at what happens when a central load fails under that arrangement: what the central team needs to know, what each business team needs to know, and how both can find out without a central scheduler. It was tested across 50 workspaces and repeated at 500.</p>
 </div></section>
 <section class="section"><div class="wrap article-layout">
 <article class="article-body">
-<h2 id="introduction">Why organisations share data in Microsoft Fabric</h2>
-<p>When your organisation chooses Microsoft Fabric, one reason is often its enterprise sharing. OneLake gives the whole tenant one data lake, shortcuts let one team read another team's tables without copying them, and workspaces separate each team's items and permissions. A central data team can publish trusted data once, and business teams can build on it directly instead of maintaining copies.</p>
-<p>Sharing on that scale also creates a coordination problem. Once dozens or hundreds of teams read one another's data, a failure in one workspace can affect tables and reports in many others, and no single team's job history shows how far it reached.</p>
-<figure class="facts-figure" aria-label="The test at a glance">
-<div><strong>50</strong><span>Fabric workspaces</span></div><div><strong>47</strong><span>independent business teams</span></div><div><strong>77</strong><span>affected objects traced to one failure</span></div><div><strong>82 s</strong><span>to trace them</span></div>
-<figcaption>Three central workspaces supply 47 simulated business teams. Each team has a separate project and catalogue, and the catalogues record the dependencies between them.</figcaption>
+<figure class="facts-figure" aria-label="One business team at a glance">
+<div><strong>3</strong><span>catalogues read by one business team</span></div><div><strong>11 s</strong><span>to find the cause of its stale tables</span></div><div><strong>15 s</strong><span>to reload just those tables</span></div><div><strong>13 s</strong><span>to find the same cause among 500 workspaces</span></div>
+<figcaption>Team 05, one of 47 simulated business teams, traces a failed central load and recovers its own work. It reads its own catalogue and the two central catalogues it depends on.</figcaption>
 </figure>
 
-<h2 id="the-enterprise-problem">1. Shared data across separate workspaces</h2>
-<p>Consider the following setup, which is common when an organisation adopts Fabric for self-service data:</p>
+<h2 id="self-service">1. How self-service grows in Fabric</h2>
+<p>Consider how data sharing usually develops once an organisation adopts Fabric. A central team loads Bronze, Silver and Gold, and publishes trusted Gold tables for the rest of the organisation. Its responsibility ends there. It may not know who reads Gold, and it often has no permission to look: Finance, HR and Risk restrict their workspaces, as they should.</p>
+<p>Business teams build on Gold through <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">OneLake shortcuts</a> instead of maintaining copies. Finance builds a Warehouse, Marketing a semantic model, and Risk a Lakehouse that also reads Finance's summary. Each team loads on its own schedule, usually set a little after the central team normally finishes. On most days, that is good enough.</p>
+<p>Nobody designs the overall shape. It grows one shortcut at a time, and in time some teams read one another's data in both directions. This is what self-service is meant to produce. Teams own their data and their schedules, and the central team doesn't become a bottleneck.</p>
+
+<h2 id="when-a-central-load-fails">2. When a central load fails</h2>
+<p>Now suppose the central customer load fails overnight. Finance's 6:15 job runs anyway and reports success, because Finance's own step worked. The two sides of the organisation now have different questions.</p>
+<p>The central team needs to judge the impact:</p>
 <ul>
-<li>A central team owns the Bronze Lakehouse in one workspace.</li>
-<li>Another team owns the Silver Lakehouse and Gold Warehouse in a second.</li>
-<li>Shared semantic models live in a third.</li>
-<li>Dozens or hundreds of business areas each have a workspace. They read central data, and sometimes one another's.</li>
+<li>Which teams' tables and reports are built on the failed data?</li>
+<li>Who should be told once it is repaired?</li>
 </ul>
-<p>Now suppose the central customer load fails overnight, and you run Finance's Warehouse. Three questions follow:</p>
+<p>Its view ends at Gold, though, and it shouldn't need access to other teams' workspaces to find out.</p>
+<p>Finance needs to know about its own work:</p>
 <ul>
-<li>Which tables and reports across the organisation are affected?</li>
 <li>Are any of Finance's tables built on the failed data?</li>
 <li>Once the central team repairs it, what should Finance reload, and when?</li>
 </ul>
-<p>A central scheduler can coordinate the loads, or teams can run on separate schedules. Either way, Finance cannot answer these questions from Finance's job history, because the cause sits in another team's workspace.</p>
-<p>This guide answers them by connecting two records across teams: what each table reads, and what happened when it last loaded.</p>
+<p>Finance can't answer either question from its own job history, because the cause sits in another team's workspace. Without a shared record, the usual options are to raise a ticket and wait, or to reload everything to be safe.</p>
 
-<h2 id="what-fabric-provides">2. What Fabric provides</h2>
-<p>Fabric already provides two of the foundations: every item and object can be named precisely, and OneLake connects data across workspaces.</p>
-<h3 id="every-object-has-a-five-part-name">2.1 Fully qualified object names</h3>
-<p>When someone says <code>CustomerSales</code> failed, you need to know which team's table they mean. For a Warehouse table, the workspace, item type, item name, schema and object name identify it exactly. A Folder uses a path instead of a schema; a semantic model or Report is an item in its own right.</p>
-<figure class="name-figure">
-<div class="name-parts"><div><strong>Workspace</strong><span>SPREAD_CENTRAL</span></div><div><strong>Item type</strong><span>Warehouse</span></div><div><strong>Item name</strong><span>Gold</span></div><div><strong>Schema</strong><span>GOLD</span></div><div><strong>Object</strong><span>CustomerSales</span></div></div>
-<figcaption>The full name of the central team's Warehouse table.</figcaption>
-</figure>
-<h3 id="onelake-shares-data-across-workspaces">2.2 OneLake shares data across workspaces</h3>
-<p>Every Fabric tenant has a single OneLake <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">(Microsoft 2026a)</a>. Its shortcuts let an item in one workspace read data held by an item in another, including a Lakehouse reading a Warehouse, without copying it <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">(Microsoft 2026b)</a>.</p>
-<p>Spark can address tables in other workspaces directly by four-part name. Warehouse T-SQL reaches only items in its own workspace, so each business team in this test brought the central Gold tables into its workspace through shortcuts in a small bridge Lakehouse, and read them through that Lakehouse's SQL analytics endpoint.</p>
-<p>Fabric also offers <a href="https://learn.microsoft.com/en-us/fabric/governance/lineage">item lineage</a> and <a href="https://learn.microsoft.com/en-us/fabric/governance/impact-analysis">impact analysis</a> across workspaces. Recovering from a failure needs one level more: how the tables and loads themselves depend on one another, which loads need attention, and what should run next.</p>
-
-<h2 id="the-two-missing-pieces">3. Dependency and load records</h2>
-<p>To answer Finance's questions, you need two records connected across every team:</p>
-<figure class="strategy-figure" aria-label="What a cross-workspace dependency graph needs">
-<div><strong>01</strong><span>Dependencies</span><small>Which tables and models each object reads, including across workspaces</small></div><div><strong>02</strong><span>Load status</span><small>When each object last loaded, and whether it succeeded</small></div>
-</figure>
-<h3 id="dependencies-between-names">3.1 Dependencies between objects</h3>
-<p>Finance's shortcut already names the central item and path it reads. Bring both teams' catalogues together, and Weaver matches that source to the central team's table.</p>
-<h3 id="operational-status-of-names">3.2 Load status</h3>
-<p>A successful Finance load can still be behind if the central customer table has been repaired since it ran. Compare Finance's load record with its source, and you can tell a failed step from work that simply needs catching up. The same comparison traces a central failure through every table and model that depends on it.</p>
-<p>You choose which teams' catalogues to include, from a pair of teams to the whole organisation, and Weaver connects their dependencies for that investigation or run.</p>
-<h3 id="concurrency">3.3 Running several teams' work together</h3>
-<p>The same connections let independent teams' work run side by side. Each reader waits only for the sources it needs, including a SQL endpoint refresh or OneLake publication between engines, while unrelated work carries on. The <a href="/guides/fabric-performance-optimisation/#concurrency-and-asynchronous-execution">performance guide</a> explains how that scheduling works.</p>
+<h2 id="central-schedulers">3. Why a central scheduler doesn't answer these questions</h2>
+<p>One response is to move every team's loads into a single orchestration, so that the central team's failure stops everything downstream of it. In a large organisation, that is rarely practical. Someone would have to model and maintain the dependencies of dozens of teams whose work changes every week. They would also need access to every team's workspace, and every team's schedule change would become a change to the central orchestration.</p>
+<p>Leaving each team with its own scheduler doesn't answer the questions either. Fifty teams with 50 schedulers each know when their own jobs ran, but none of them can see what happened in the central team's schedule, or whether its sources were ready.</p>
+<p>The missing piece isn't control over when each team runs. It is a shared record of how the teams' work connects, and what happened when each part last ran.</p>
+<p><a href="/">Weaver</a> takes a different approach. It lets teams keep their own projects and schedules, but still see how their work connects across workspaces. The following experiment shows how.</p>
 
 <h2 id="experimental-setup">4. The 50-workspace test</h2>
-<p>The test used 50 Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with a separate catalogue, project and configuration, initialised, built and loaded separately. The teams and their tables were synthetic and small, so the test measures coordination across workspaces rather than data volume.</p>
+<p>The test used 50 Fabric workspaces on an FTL64 trial capacity in Australia East. Each represented a team with its own project, configuration and Weaver catalogue: a Fabric Warehouse in the team's workspace that records what each of its objects reads and what happened when it last loaded. Each team was initialised, built and loaded separately. The teams and their tables were synthetic and small, so the test measures coordination across workspaces rather than data volume.</p>
 <div class="table-scroll"><table class="benchmark"><thead><tr><th scope="col">Team</th><th scope="col">Workspaces</th><th scope="col">Each holds</th></tr></thead><tbody>
 <tr><td>Bronze</td><td>1</td><td>Bronze Lakehouse with Python tables run in Spark</td></tr>
 <tr><td>Central</td><td>1</td><td>Silver Lakehouse with shortcuts into Bronze; Gold Warehouse</td></tr>
@@ -185,72 +147,39 @@ table.benchmark td:nth-child(2) { white-space: normal; }
 <tr><td>Lakehouses</td><td>4</td><td>Lakehouse with a shortcut to Gold and a Python table</td></tr>
 <tr><td>Thin reports</td><td>4</td><td>A report bound to the central semantic model in another workspace</td></tr>
 </tbody></table></div>
-<p>Two business teams read each other's summaries, forming a dependency cycle across workspaces.</p>
-<p>After running every team together, the test broke the central Bronze table <code>BRZ.Customer</code>, then followed the organisation through finding the impact, repairing the source and recovering each team's work.</p>
+<p>Each business team read the central Gold tables through shortcuts in a small bridge Lakehouse in its own workspace. Two business teams read each other's summaries, forming a dependency cycle across workspaces.</p>
+<p>To start from a known state, the test first loaded every team once. In practice, each team would run on its own schedule. The test then broke the central Bronze table <code>BRZ.Customer</code> and followed the central team and Team 05 through the failure and recovery.</p>
 
-<h2 id="the-implementation-weaver">5. Connecting the catalogues with Weaver</h2>
-<p>With <a href="/">Weaver</a>, Weaver keeps these records in a catalogue: a Fabric Warehouse in each team's workspace. Build records the objects and their dependencies; Load and Test record what ran. When you need the wider view, you bring the relevant catalogues together.</p>
-<h3 id="the-weaver-cli">5.1 The Weaver CLI</h3>
-<p>After the central repair, Team 05 catches up with one command. Run from Team 05's project, the command selects Team 05's work and includes the central catalogues that explain its upstream state:</p>
-<div class="code"><div class="code-bar"><span>Reload Team 05's stale work</span></div><pre><code>
-<span class="c-key">$</span> weaver load SPREAD_TEAM_05 --workspace SPREAD_TEAM_05 --stale \
-  --catalogue SPREAD_TEAM_05/Warehouse/Catalogue \
-  --catalogue SPREAD_BRONZE/Warehouse/Catalogue \
-  --catalogue SPREAD_CENTRAL/Warehouse/Catalogue</code></pre></div>
-<p>The central catalogues provide context; only Team 05's work runs. Select several teams when you want a coordinated run instead. Weaver orders the work and records each result in its owner's catalogue. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/">across-catalogue guide</a> covers the setup, selectors and permissions.</p>
-<h3 id="the-catalogue-dashboard">5.2 The Catalogue Dashboard</h3>
-<p>If you would rather explore in Power BI, open the <a href="/features/#visibility">Catalogue Dashboard</a>. Select Team 05 on the Workspaces page, follow the teams that supply it, then use Health and Orchestration to investigate the failed load. Every page narrows to your workspace, item or object.</p>
-<p>The snapshot below lets you explore ten of the test's 50 catalogues. Direct Lake reads up to ten; for the full set, deploy the Dashboard in Import mode and refresh it to read new records.</p>
-<figure class="dashboard-guide-demo">
-<iframe src="/assets/spread-dashboard/workspaces.html" title="The Spread Dashboard Workspaces page" loading="lazy"></iframe>
-<figcaption>The Dashboard's Workspaces page over ten of the 50 catalogues, read over Direct Lake and exported as static HTML. <a href="/assets/spread-dashboard/workspaces.html" target="_blank" rel="noopener">Open this snapshot full size</a>.</figcaption>
-</figure>
-
-<h2 id="results">6. Results</h2>
-<p>The stages below run from a coordinated load of every team through the failure, the repair and each team's recovery.</p>
+<h2 id="results">5. Results</h2>
+<p>The stages below follow the central team and Team 05 from the failed load to Team 05's recovery.</p>
 <dl class="result-list" aria-label="Results across 50 Fabric workspaces">
-<div><dt>Coordinated load of every team</dt><dd>125 steps across all 50 catalogues: 80 loads, 41 endpoint refreshes and four publication waits, ordered by their dependencies. All succeeded under one workflow ID.</dd><dd>5 minutes 15 seconds</dd></div>
-<div><dt>Impact assessment</dt><dd>Health traced 77 downstream tables and models in 45 workspaces back to <code>BRZ.Customer</code>.</dd><dd>82 seconds</dd></div>
+<div><dt>Central impact assessment</dt><dd>Health traced 77 downstream tables and models in 45 workspaces back to <code>BRZ.Customer</code>.</dd><dd>82 seconds</dd></div>
 <div><dt>Team 05's Health report</dt><dd>Team 05's Health report named the failed central table as the cause behind both of its Mart tables.</dd><dd>11 seconds</dd></div>
 <div><dt>Central repair</dt><dd>The central team reloaded six objects across Bronze, Silver/Gold and the shared model. Weaver waited for the publications and endpoint refreshes their readers needed.</dd><dd>2 minutes 18 seconds</dd></div>
 <div><dt>Team 05 recovery</dt><dd>Team 05 confirmed its upstream was repaired and reloaded just its two Mart tables.</dd><dd>5 seconds to check; 15 seconds to reload</dd></div>
-<div><dt>Coordinated recovery</dt><dd>One run selected with <code>--stale</code> loaded the remaining stale work: 71 loads and 41 readiness steps across 43 workspaces.</dd><dd>4 minutes 16 seconds</dd></div>
-<div><dt>Final Health check</dt><dd>49 catalogues green, and one amber on the deliberate dependency cycle.</dd><dd>1 minute 46 seconds</dd></div>
 </dl>
-<p class="small">Times are wall-clock times for each command, including catalogue reads, planning, Spark startup where needed, execution and recording. Readiness steps are SQL endpoint refreshes and OneLake publication waits that let readers see new data. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>
-<h3 id="impact-across-the-organisation">6.1 Impact of the failed load</h3>
-<p>From one failed Bronze load, the central team could trace 61 Warehouse tables, five Lakehouse tables and 11 semantic models in 45 downstream workspaces. Each business team could narrow the same view to its workspace and see the failed source named as the cause, without checking job histories one team at a time. An affected object had not necessarily failed: it could still hold its last good result.</p>
-<p>The four thin-report workspaces read the central semantic model, so their reports recover when that model does.</p>
-<h3 id="independent-recovery">6.2 Recovery by each team</h3>
-<p>The central team repaired and reloaded the central objects first. Team 05 then saw that its upstream data was fixed and reloaded just its two tables, without waiting for the other business teams. The central catalogues told Team 05 what was ready; they did not pull other teams' work into its run.</p>
-<h3 id="cycles">6.3 Teams that read one another's data</h3>
-<p>Teams 01 and 02 read each other's summaries. Weaver ran the cycle once, in a consistent order, and reported it in Health; the one amber finding in the final check was on that cycle. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/#cycles">cycle guide</a> explains how cycles run and how Health assesses them.</p>
-<h3 id="coordination-when-required">6.4 Coordinated recovery</h3>
-<p>When a wider recovery is needed, select the teams together and add <code>--stale</code>: Weaver loads only the work whose recorded state needs it, in dependency order. In this test, one run brought the remaining stale work in 43 workspaces up to date in just over four minutes.</p>
+<p class="small">Times are wall-clock times for each command, including catalogue reads, planning, Spark startup where needed, execution and recording. For data-volume results, see the <a href="/guides/fabric-performance-optimisation/">performance guide</a>.</p>
+<h3 id="central-assessment">5.1 The central team's assessment</h3>
+<p>From one failed Bronze load, the central team traced 61 Warehouse tables, five Lakehouse tables and 11 semantic models in 45 downstream workspaces, without checking job histories one team at a time. An affected object hadn't necessarily failed: it could still hold its last good result.</p>
+<h3 id="independent-recovery">5.2 Team 05's recovery</h3>
+<p>Team 05 found the cause from its own Health report, without asking the central team. Once the central team had repaired its objects, Team 05 reloaded just its two tables with one scheduled <code>load --stale</code> command, which reads the two central catalogues for context. It didn't wait for the other business teams, and their work didn't run.</p>
+<p>Team 05 read the central catalogues; the central team didn't need to read Team 05's. The <a href="https://docs.weaverstack.dev/estate/across-catalogues/">across-catalogue guide</a> covers the setup and permissions.</p>
 
-<h2 id="at-500-workspaces">7. Repeating the test at 500 workspaces</h2>
-<p>The same setup was then repeated at ten times the scale: three central workspaces and 497 business teams, with 299 Marts, 100 Models, 49 Lakehouses and 49 thin reports, on the same FTL64 trial capacity.</p>
-<figure class="facts-figure" aria-label="The test at 500 workspaces">
-<div><strong>500</strong><span>Fabric workspaces</span></div><div><strong>1,160</strong><span>steps in one coordinated load, all succeeded</span></div><div><strong>752</strong><span>affected objects traced to one failure</span></div><div><strong>5–7 min</strong><span>for a full Health check</span></div>
-</figure>
+<h2 id="at-500-workspaces">6. Repeating the test at 500 workspaces</h2>
+<p>The same setup was then repeated at ten times the scale: three central workspaces and 497 business teams, on the same FTL64 trial capacity.</p>
 <ul>
-<li>A coordinated load of every team ran 755 loads and 405 readiness steps across all 500 catalogues. All 1,160 steps succeeded under one workflow ID, in about 39 minutes.</li>
-<li>After the same Bronze failure, Health traced 752 downstream tables and models in 450 workspaces: 601 Warehouse tables, 50 Lakehouse tables and 101 semantic models.</li>
-<li>Team 05's Health report named the cause in about 13 seconds. Team 05 then checked and reloaded its two tables in about 5 and 20 seconds, against 5 and 15 seconds at 50 workspaces.</li>
 <li>A full Health check of all 500 catalogues, reading every catalogue and inventorying its physical targets, takes five to seven minutes from a desktop.</li>
+<li>Team 05's Health report named the cause in about 13 seconds, against 11 seconds at 50 workspaces.</li>
 </ul>
+<p>Team 05 reads only the catalogues it depends on, so its own investigation changed little with ten times as many teams in the estate.</p>
 
-<h2 id="conclusion">8. Conclusion</h2>
-<p>Coordinating work across Fabric workspaces is a common challenge once teams start sharing data. Teams work in separate projects on separate schedules, but a failure in one workspace can reach tables and reports in many others, and no single team's job history shows how far.</p>
-<p>Weaver helps by connecting two records across those projects: what each table reads, and what happened when it last loaded. With both connected, you can trace a failure to everything it affects, and reload only the work that needs it.</p>
-<p>In the test, the failed central table was traced to 77 affected objects across 50 workspaces and 752 across 500. Team 05 used the same records to find its two stale tables and reload only those.</p>
+<h2 id="conclusion">7. Conclusion</h2>
+<p>Self-service in Fabric rarely follows a central design. Central teams publish trusted data and move on, business teams load on schedules that are good enough on most days, and the connections between them grow one shortcut at a time. A failure in that arrangement raises different questions for the central team and for each business team, and neither a single central scheduler nor 50 separate ones answers them.</p>
+<p>Weaver is a lightweight framework that works the way a Fabric organisation already runs. Each team gets a complete data engineering framework for its own project: builds, incremental loads, tests and an operational record in its own workspace. The same catalogue gives every team a common record that others can read, so visibility is decentralised in the same way as ownership. There is no separate platform or hosted runtime to install, and no central scheduler for every team to stay in step with. Weaver runs from a desktop, or from a Fabric notebook after <code>pip install weaverstack</code>.</p>
+<p>In the test, the central team traced a failed table to 77 affected objects across 50 workspaces. Team 05 found the same cause in 11 seconds, 13 at 500 workspaces, and reloaded only its two tables. That is how Weaver makes Fabric easier to use, and safer to scale.</p>
 <p>See <a href="/how-it-works/">how Weaver works</a>, then the <a href="https://docs.weaverstack.dev/">documentation</a>.</p>
-
-<h2 id="references">References</h2>
-<p>Microsoft (2026a). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview">OneLake, the unified data lake</a>. Microsoft Learn. Accessed 8 November 2026.</p>
-<p>Microsoft (2026b). <a href="https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts">Unify data sources with OneLake shortcuts</a>. Microsoft Learn. Accessed 8 November 2026.</p>
 </article>
-<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#introduction">Why share data in Fabric</a></li><li><a href="#the-enterprise-problem">Shared data across workspaces</a></li><li><a href="#what-fabric-provides">What Fabric provides</a></li><li><a href="#the-two-missing-pieces">Dependency and load records</a></li><li><a href="#experimental-setup">The 50-workspace test</a></li><li><a href="#the-implementation-weaver">Connecting catalogues with Weaver</a></li><li><a href="#results">Results</a></li><li><a href="#at-500-workspaces">At 500 workspaces</a></li><li><a href="#conclusion">Conclusion</a></li><li><a href="#references">References</a></li></ol></nav>
+<nav class="article-nav" aria-label="On this page"><strong>On this page</strong><ol><li><a href="#self-service">How self-service grows</a></li><li><a href="#when-a-central-load-fails">When a central load fails</a></li><li><a href="#central-schedulers">Why not a central scheduler</a></li><li><a href="#experimental-setup">The 50-workspace test</a></li><li><a href="#results">Results</a></li><li><a href="#at-500-workspaces">At 500 workspaces</a></li><li><a href="#conclusion">Conclusion</a></li></ol></nav>
 </div></section>
 </main>
 <footer class="site-footer"><div class="wrap footer-grid">

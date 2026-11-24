@@ -98,8 +98,8 @@ Follow the architecture and authoring contracts in the documentation.
 
 ### Architecture and configuration
 
-- [Design philosophy](https://docs.weaverstack.dev/core-concepts/design-philosophy/)
-- [Projects and estates](https://docs.weaverstack.dev/core-concepts/projects-and-estates/)
+- [Design principles](https://docs.weaverstack.dev/getting-started/how-weaver-works/design-principles/)
+- [Projects and estates](https://docs.weaverstack.dev/estate/projects-and-estates/)
 - [Weaver documents](https://docs.weaverstack.dev/reference/weaver-documents/overview/)
 - [Workspace configuration](https://docs.weaverstack.dev/reference/configuration-files/workspace-config/)
 
@@ -108,14 +108,14 @@ Follow the architecture and authoring contracts in the documentation.
 - [Tables](https://docs.weaverstack.dev/reference/weaver-documents/table/)
 - [Views](https://docs.weaverstack.dev/reference/weaver-documents/view/)
 - [Shortcuts](https://docs.weaverstack.dev/reference/weaver-documents/shortcut/)
-- [Incremental data processing and bookmarks](https://docs.weaverstack.dev/advanced/incremental-data-processing/)
-- [Protecting existing data](https://docs.weaverstack.dev/advanced/protecting-data/)
+- [Incremental loading and bookmarks](https://docs.weaverstack.dev/reference/incremental-loading/)
+- [Protecting existing data](https://docs.weaverstack.dev/lakehouse/protecting-data/)
 
 ### Validation
 
 - [Tests](https://docs.weaverstack.dev/reference/weaver-documents/test/)
 - [Assumptions](https://docs.weaverstack.dev/reference/weaver-documents/assumption/)
-- [Build, Load and Test](https://docs.weaverstack.dev/core-concepts/build-load-and-test/)
+- [How Weaver works](https://docs.weaverstack.dev/getting-started/how-weaver-works/)
 
 Use these specifications to implement the project. Prefer native Weaver capabilities rather than recreating dbt-specific runtime machinery.
 

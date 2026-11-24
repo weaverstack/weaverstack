@@ -74,7 +74,7 @@
     "title": "Work in Fabric or your own editor",
     "brief_copy": "Build and operate the same project through the desktop CLI/Python API or an attached Fabric notebook.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/portable-execution-between-desktop-and-fabric/"
+      "https://docs.weaverstack.dev/estate/automation-and-deployment/portable-execution/"
     ],
     "sources": [
       "docs/advanced/portable-execution-between-desktop-and-fabric.md"
@@ -310,7 +310,7 @@
     "title": "Data-quality safeguards",
     "brief_copy": "Track rejected rows and use stability thresholds to stop unusually large changes before they are applied.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/partial-failures-rejected-data-and-thresholds/"
+      "https://docs.weaverstack.dev/estate/recovery/partial-failures/"
     ],
     "sources": [
       "docs/advanced/partial-failures-rejected-data-and-thresholds.md"
@@ -471,7 +471,7 @@
     "title": "See all your work in one place",
     "brief_copy": "Queryable installed definitions, signatures, metadata, dependencies and operational state in a Fabric Warehouse.",
     "urls": [
-      "https://docs.weaverstack.dev/core-concepts/catalogue/"
+      "https://docs.weaverstack.dev/reference/catalogue-tour/"
     ],
     "sources": [
       "docs/core-concepts/catalogue.md"
@@ -517,7 +517,7 @@
     "title": "See run history and results",
     "brief_copy": "Inspect workflow history, Load counts, timings, row changes and recorded outcomes.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/row-auditing-and-operational-history/"
+      "https://docs.weaverstack.dev/estate/catalogue-and-health/row-auditing/"
     ],
     "sources": [
       "docs/advanced/row-auditing-and-operational-history.md"
@@ -633,7 +633,7 @@
     "title": "Update only what changed",
     "brief_copy": "Detect changed definitions and affected installed descendants; leave certified unchanged work in place.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/incremental-build-selection/"
+      "https://docs.weaverstack.dev/estate/selective-runs/build-selection/"
     ],
     "sources": [
       "docs/advanced/incremental-build-selection.md"
@@ -679,7 +679,7 @@
     "title": "Review deployments before applying them",
     "brief_copy": "Review and hand off frozen, destination-specific installation plans without replanning them during Install.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/build-bundles-and-controlled-installation/"
+      "https://docs.weaverstack.dev/estate/automation-and-deployment/build-bundles/"
     ],
     "sources": [
       "docs/advanced/build-bundles-and-controlled-installation.md"
@@ -725,7 +725,7 @@
     "title": "Protect important data",
     "brief_copy": "Separate source ownership from managed targets, preserve protected objects and bound destructive operations.",
     "urls": [
-      "https://docs.weaverstack.dev/advanced/protecting-data/"
+      "https://docs.weaverstack.dev/lakehouse/protecting-data/"
     ],
     "sources": [
       "docs/advanced/protecting-data.md"
@@ -748,7 +748,7 @@
     "title": "Share a Session across Python operations",
     "brief_copy": "A workflow shares Session and configuration; Load and Test records correlate under its workflow ID.",
     "urls": [
-      "https://docs.weaverstack.dev/core-concepts/sessions-and-workflows/"
+      "https://docs.weaverstack.dev/estate/automation-and-deployment/sessions-and-hosts/"
     ],
     "sources": [
       "src/weaver/workflow.py"

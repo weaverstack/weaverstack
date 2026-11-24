@@ -11,7 +11,7 @@ The source may be an older catalogue. Its columns are copied by name: a table
 it predates starts empty, a nullable column it predates is left null, and an
 Installation without Fabric identities takes the ones preflight verified.
 
-See https://docs.weaverstack.dev/core-concepts/catalogue/.
+See https://docs.weaverstack.dev/reference/catalogue-tour/.
 """
 
 from __future__ import annotations

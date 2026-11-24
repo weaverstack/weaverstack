@@ -41,7 +41,7 @@
       "title": "Work in Fabric or your own editor",
       "description": "Write code in VS Code or another editor on Windows, macOS or Linux, or work entirely in Fabric Notebooks. Deploy native Power BI models and Reports without Power BI Desktop.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/portable-execution-between-desktop-and-fabric/"
+        "https://docs.weaverstack.dev/estate/automation-and-deployment/portable-execution/"
       ]
     },
     {
@@ -86,7 +86,7 @@
       "title": "Data-quality safeguards",
       "description": "Keep rejected rows and stop unusually large proposed updates or deletes before they reach your tables.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/partial-failures-rejected-data-and-thresholds/"
+        "https://docs.weaverstack.dev/estate/recovery/partial-failures/"
       ]
     },
     {
@@ -176,7 +176,7 @@
       "title": "See all your work in one place",
       "description": "Weaver keeps its Catalogue of deployed items, dependencies and run results in an ordinary Fabric Warehouse. There's no separate monitoring service to run.",
       "urls": [
-        "https://docs.weaverstack.dev/core-concepts/catalogue/"
+        "https://docs.weaverstack.dev/reference/catalogue-tour/"
       ]
     },
     {
@@ -194,7 +194,7 @@
       "title": "See run history and results",
       "description": "See what ran, how long it took, row counts, data changes and recorded results.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/row-auditing-and-operational-history/"
+        "https://docs.weaverstack.dev/estate/catalogue-and-health/row-auditing/"
       ]
     },
     {
@@ -221,7 +221,7 @@
       "title": "Update only what changed",
       "description": "Update changed source definitions and the work that depends on them, while leaving unchanged parts in place.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/incremental-build-selection/"
+        "https://docs.weaverstack.dev/estate/selective-runs/build-selection/"
       ]
     },
     {
@@ -239,7 +239,7 @@
       "title": "Review deployments before applying them",
       "description": "Prepare a fixed deployment plan, review it and apply it later without changing the plan.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/build-bundles-and-controlled-installation/"
+        "https://docs.weaverstack.dev/estate/automation-and-deployment/build-bundles/"
       ]
     },
     {
@@ -248,7 +248,7 @@
       "title": "Protect important data",
       "description": "Keep irreplaceable sources outside managed targets and use Build replacement guards for protected owned objects.",
       "urls": [
-        "https://docs.weaverstack.dev/advanced/protecting-data/"
+        "https://docs.weaverstack.dev/lakehouse/protecting-data/"
       ]
     },
     {

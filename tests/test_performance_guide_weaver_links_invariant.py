@@ -18,10 +18,7 @@ LIVE_DASHBOARD = (
     "6562a0f5-774c-4b1a-9713-579cb84e52fb/orchestration"
     "?experience=fabric-developer"
 )
-BOOKMARKS = (
-    "https://docs.weaverstack.dev/advanced/incremental-data-processing/"
-    "#bookmarks-separate-processing-state-from-source-data"
-)
+BOOKMARKS = "https://docs.weaverstack.dev/reference/incremental-loading/#bookmark"
 
 
 class GuideLinks(HTMLParser):

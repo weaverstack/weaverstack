@@ -237,7 +237,7 @@ class RunRecord:
         # the same row the Warehouse ``_.Load`` procedure writes. A skip does
         # not advance the bookmark, because it consumed no source window; its
         # LoadStatus timestamp still takes part in health ancestry ordering.
-        # See https://docs.weaverstack.dev/core-concepts/state-and-health/.
+        # See https://docs.weaverstack.dev/estate/catalogue-and-health/state-and-health/.
         self.catalogue.update(
             LOAD_STATUS,
             load_status_row(node, identity, workflow_id=self.workflow_id),

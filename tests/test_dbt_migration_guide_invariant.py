@@ -139,8 +139,8 @@ def test_generated_guide_matches_markdown_source():
     assert "G. Validation and deployment" in parser.headings
     assert "dbt parse" in parser.code
     assert (
-        "Build, Load and Test",
-        "https://docs.weaverstack.dev/core-concepts/build-load-and-test/",
+        "How Weaver works",
+        "https://docs.weaverstack.dev/getting-started/how-weaver-works/",
     ) in parser.links
 
 

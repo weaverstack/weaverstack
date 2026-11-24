@@ -3,7 +3,7 @@
 A Fabric Warehouse reaches another Warehouse in its workspace by three-part
 name, as its ``_`` surface views do.
 
-See https://docs.weaverstack.dev/core-concepts/catalogue/.
+See https://docs.weaverstack.dev/reference/catalogue-tour/.
 """
 
 from __future__ import annotations

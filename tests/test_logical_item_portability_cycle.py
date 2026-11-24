@@ -4,7 +4,7 @@ Switching environments changes the workspace configuration and nothing else.
 Every claim here follows from the two owners of an item's physical target
 disagreeing: configuration answers for a build, and the catalogue for a load or a
 test. The public binding model is documented at
-https://docs.weaverstack.dev/core-concepts/logical-and-physical-items/.
+https://docs.weaverstack.dev/estate/environments/logical-and-physical-items/.
 """
 
 from __future__ import annotations

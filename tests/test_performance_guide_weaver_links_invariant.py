@@ -19,8 +19,8 @@ LIVE_DASHBOARD = (
     "?experience=fabric-developer"
 )
 BOOKMARKS = (
-    "https://docs.weaverstack.dev/advanced/incremental-data-processing/"
-    "#bookmarks-separate-processing-state-from-source-data"
+    "https://docs.weaverstack.dev/reference/incremental-loading/"
+    "#bookmark"
 )
 
 
